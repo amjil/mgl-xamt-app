@@ -41,56 +41,64 @@ defmodule XamtWeb.SettingsLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="xamt-settings">
+    <div class="xamt-page-inner">
       <Layouts.flash_group flash={@flash} />
-      <h1 class="xamt-section-title">{gettext("Settings")}</h1>
-      <.form
-        for={@form}
-        id="settings-form"
-        phx-change="validate"
-        phx-submit="save"
-        class="xamt-form"
-      >
-        <label class="xamt-label">
-          <span>{gettext("Display name")}</span>
-          <input
-            type="text"
-            name={@form[:display_name].name}
-            id={@form[:display_name].id}
-            value={@form[:display_name].value}
-            class="xamt-input mongol-input"
-            phx-hook="MongolianIME"
-            autocomplete="nickname"
-          />
-        </label>
-        <label class="xamt-label">
-          <span>{gettext("Bio")}</span>
-          <textarea
-            name={@form[:bio].name}
-            id={@form[:bio].id}
-            rows="4"
-            class="xamt-input mongol-input"
-            phx-hook="MongolianIME"
-          >{Phoenix.HTML.Form.normalize_value("textarea", @form[:bio].value)}</textarea>
-        </label>
-        <label class="xamt-label">
-          <span>{gettext("Avatar URL")}</span>
-          <input
-            type="text"
-            name={@form[:avatar].name}
-            id={@form[:avatar].id}
-            value={@form[:avatar].value}
-            class="xamt-input"
-          />
-        </label>
-        <button type="submit" class="xamt-btn xamt-btn--primary">{gettext("Save")}</button>
-      </.form>
+      <div class="xamt-settings">
+        <header class="xamt-page-head">
+          <h1 class="xamt-section-title mongol-text">{gettext("Settings")}</h1>
+        </header>
+        <.form
+          for={@form}
+          id="settings-form"
+          phx-change="validate"
+          phx-submit="save"
+          class="xamt-form"
+        >
+          <label class="xamt-label">
+            <span class="xamt-field__label">{gettext("Display name")}</span>
+            <input
+              type="text"
+              name={@form[:display_name].name}
+              id={@form[:display_name].id}
+              value={@form[:display_name].value}
+              class="xamt-input mongol-input"
+              phx-hook="MongolianIME"
+              autocomplete="nickname"
+            />
+          </label>
+          <label class="xamt-label">
+            <span class="xamt-field__label">{gettext("Bio")}</span>
+            <textarea
+              name={@form[:bio].name}
+              id={@form[:bio].id}
+              rows="4"
+              class="xamt-input mongol-input"
+              phx-hook="MongolianIME"
+            >{Phoenix.HTML.Form.normalize_value("textarea", @form[:bio].value)}</textarea>
+          </label>
+          <label class="xamt-label">
+            <span class="xamt-field__label">{gettext("Avatar URL")}</span>
+            <input
+              type="url"
+              name={@form[:avatar].name}
+              id={@form[:avatar].id}
+              value={@form[:avatar].value}
+              class="xamt-input xamt-input--latin"
+            />
+          </label>
+          <button type="submit" class="xamt-btn xamt-btn--primary mongol-text">
+            {gettext("Save")}
+          </button>
+        </.form>
 
-      <div class="xamt-settings__links">
-        <.link href={~p"/users/settings"} class="xamt-btn">{gettext("Account / password")}</.link>
-        <.link href={~p"/users/log-out"} method="delete" class="xamt-btn">
-          {gettext("Log out")}
-        </.link>
+        <div class="xamt-settings__links">
+          <.link href={~p"/users/settings"} class="xamt-btn mongol-text">
+            {gettext("Account / password")}
+          </.link>
+          <.link href={~p"/users/log-out"} method="delete" class="xamt-btn mongol-text">
+            {gettext("Log out")}
+          </.link>
+        </div>
       </div>
     </div>
     """

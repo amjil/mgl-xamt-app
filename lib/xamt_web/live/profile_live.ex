@@ -23,18 +23,20 @@ defmodule XamtWeb.ProfileLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div :if={@profile_user} class="xamt-profile">
+    <div :if={@profile_user} class="xamt-page-inner">
       <Layouts.flash_group flash={@flash} />
-      <header class="xamt-profile__header">
-        <div class="xamt-avatar xamt-avatar--lg">{user_initial(@profile_user)}</div>
-        <div>
-          <h1 class="mongol-text">{display_name(@profile_user)}</h1>
-          <p class="xamt-profile__username">@{@profile_user.username}</p>
-        </div>
-      </header>
-      <p :if={@profile_user.bio} class="xamt-profile__bio mongol-text">{@profile_user.bio}</p>
-      <p :if={!@profile_user.bio} class="xamt-empty">{gettext("No bio yet.")}</p>
-      <.link navigate={~p"/"} class="xamt-btn">{gettext("Back")}</.link>
+      <div class="xamt-profile">
+        <header class="xamt-profile__header">
+          <div class="xamt-avatar xamt-avatar--lg">{user_initial(@profile_user)}</div>
+          <div>
+            <h1 class="mongol-text">{display_name(@profile_user)}</h1>
+            <p class="xamt-profile__username">@{@profile_user.username}</p>
+          </div>
+        </header>
+        <p :if={@profile_user.bio} class="xamt-profile__bio mongol-text">{@profile_user.bio}</p>
+        <p :if={!@profile_user.bio} class="xamt-empty mongol-text">{gettext("No bio yet.")}</p>
+        <.link navigate={~p"/"} class="xamt-btn mongol-text">{gettext("Back")}</.link>
+      </div>
     </div>
     """
   end

@@ -1,14 +1,14 @@
 export const InfiniteScroll = {
   mounted() {
     this.loading = false
-    this.oldScrollHeight = null
+    this.oldScrollWidth = null
 
     this.observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting && !this.loading) {
             this.loading = true
-            this.oldScrollHeight = this.el.parentNode.scrollHeight
+            this.oldScrollWidth = this.el.parentNode.scrollWidth
 
             // Read event name dynamically; fall back to load_older for compatibility
             const eventName = this.el.dataset.event || "load_older"
@@ -16,7 +16,7 @@ export const InfiniteScroll = {
           }
         })
       },
-      // rootMargin 200px: trigger slightly before the top for smoother loading
+      // 触发无限加载的距离
       {root: this.el.parentNode, rootMargin: "200px"}
     )
 
@@ -28,11 +28,11 @@ export const InfiniteScroll = {
   },
 
   updated() {
-    // After LiveView stream_insert at: 0, compensate scroll so the viewport stays put
-    if (this.oldScrollHeight != null) {
-      const newScrollHeight = this.el.parentNode.scrollHeight
-      this.el.parentNode.scrollTop += newScrollHeight - this.oldScrollHeight
-      this.oldScrollHeight = null
+    // 渲染旧消息后，补偿水平滚动条，使用户视线停留
+    if (this.oldScrollWidth != null) {
+      const newScrollWidth = this.el.parentNode.scrollWidth
+      this.el.parentNode.scrollLeft += newScrollWidth - this.oldScrollWidth
+      this.oldScrollWidth = null
     }
 
     this.loading = false

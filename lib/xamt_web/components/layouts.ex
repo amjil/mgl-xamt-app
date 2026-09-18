@@ -35,9 +35,11 @@ defmodule XamtWeb.Layouts do
 
   def app(assigns) do
     ~H"""
-    <main class="xamt-auth-shell">
-      <div class="xamt-auth-shell__inner">
-        {render_slot(@inner_block)}
+    <main class="xamt-page-inner">
+      <div class="xamt-auth-shell">
+        <div class="xamt-auth-shell__inner">
+          {render_slot(@inner_block)}
+        </div>
       </div>
     </main>
 

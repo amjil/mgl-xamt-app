@@ -1,16 +1,14 @@
 <Layouts.app flash={@flash} current_scope={@current_scope}>
-  <div class="mx-auto max-w-sm">
-    <div class="text-center">
-      <.header>
-        {gettext("Register")}
-        <:subtitle>
-          {gettext("Already registered?")}
-          <.link href={~p"/login"} class="xamt-link">
-            {gettext("Log in")}
-          </.link>
-        </:subtitle>
-      </.header>
-    </div>
+  <section class="xamt-stack" id="register-panel">
+    <.header>
+      {gettext("Register")}
+      <:subtitle>
+        {gettext("Already registered?")}
+        <.link href={~p"/login"} class="xamt-link">
+          {gettext("Log in")}
+        </.link>
+      </:subtitle>
+    </.header>
 
     <.form
       :let={f}
@@ -35,8 +33,8 @@
         spellcheck="false"
         required
       />
-      <div class="xamt-label">
-        <label for="user_display_name">{gettext("Display name")}</label>
+      <label class="xamt-label">
+        <span class="xamt-field__label">{gettext("Display name")}</span>
         <input
           type="text"
           name="user[display_name]"
@@ -46,7 +44,7 @@
           autocomplete="nickname"
         />
         <mgl-ime target="#user_display_name" profile="auto" keyboard="auto"></mgl-ime>
-      </div>
+      </label>
       <.input
         field={f[:password]}
         type="password"
@@ -62,9 +60,9 @@
         required
       />
 
-      <.button variant="primary" class="xamt-btn xamt-btn--primary w-full">
+      <.button variant="primary" class="xamt-btn xamt-btn--primary">
         {gettext("Create an account")}
       </.button>
     </.form>
-  </div>
+  </section>
 </Layouts.app>

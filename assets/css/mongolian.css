@@ -1,15 +1,17 @@
-/* Traditional Mongolian UI adaptations */
+/* Traditional Mongolian typography & writing-mode helpers
+   Pattern aligned with nomio: shell stays horizontal; reading surface uses vertical-lr. */
 
 @font-face {
   font-family: "Oyun Qagan Tig";
   src: url("/fonts/OyunQaganTig.ttf") format("truetype");
-  font-weight: normal;
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 
 :root {
-  --xamt-font-mongol: "Oyun Qagan Tig", "Noto Sans Mongolian", "Mongolian Baiti", "Menksoft Qagan", serif;
+  --xamt-font-mongol: "Oyun Qagan Tig", "Noto Sans Mongolian", "Mongolian Baiti", "Menksoft Qagan",
+    serif;
   --xamt-font-ui: "IBM Plex Sans", "Source Sans 3", "Noto Sans", sans-serif;
   --xamt-bg: #1a1f24;
   --xamt-bg-2: #232a31;
@@ -26,10 +28,25 @@ html {
   color-scheme: dark;
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
 body {
   margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
   min-height: 100dvh;
-  font-family: var(--xamt-font-ui);
+  font-family: var(--xamt-font-mongol);
+  font-size: 17px;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
   background:
     radial-gradient(1200px 600px at 10% -10%, #2a4038 0%, transparent 55%),
     radial-gradient(900px 500px at 100% 0%, #3a3220 0%, transparent 50%),
@@ -37,6 +54,36 @@ body {
   color: var(--xamt-text);
 }
 
+/* Slim scrollbars — height matters for vertical-lr horizontal overflow */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--xamt-bg-3) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--xamt-bg-3);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--xamt-accent);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--xamt-accent) 28%, transparent);
+  color: var(--xamt-accent-2);
+}
+
+/* Script text (inherits writing-mode from vertical surface) */
 .mongol-text,
 .mongol-input,
 .xamt-message__content,
@@ -49,28 +96,57 @@ body {
 .mongol-text,
 .xamt-message__content {
   writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
   text-orientation: mixed;
-  line-height: 1.7;
+  line-height: 1.75;
 }
 
-.mongol-input {
-  writing-mode: vertical-lr;
-  text-orientation: mixed;
-  min-height: 8rem;
-  min-width: 3.5rem;
-  font-size: 1.15rem;
-}
-
-/* Horizontal forms still usable: keep inputs tall enough for vertical glyphs */
-input.mongol-input {
-  min-height: 3rem;
-  min-width: 12rem;
+/* Latin / UI chrome that must stay horizontal inside a vertical surface */
+.latin-text,
+.xamt-latin,
+.xamt-toast,
+.xamt-theme-toggle,
+.xamt-mobile-header,
+.xamt-mobile-toggle {
   writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  font-family: var(--xamt-font-ui);
 }
 
-textarea.mongol-input {
+/* Form controls in vertical-lr: block = physical width, inline = physical height */
+.mongol-input,
+.xamt-input,
+.xamt-select,
+.xamt-textarea {
+  font-family: var(--xamt-font-mongol);
   writing-mode: vertical-lr;
-  height: 10rem;
-  width: 100%;
-  max-width: 8rem;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  block-size: 2.75rem;
+  inline-size: 14rem;
+  max-inline-size: 100%;
+}
+
+textarea.mongol-input,
+.xamt-textarea,
+textarea.xamt-input {
+  block-size: 7rem;
+  inline-size: 18rem;
+  resize: block;
+}
+
+/* Explicit Latin fields (email, password, URL) stay readable LTR */
+.xamt-input--latin,
+input[type="email"],
+input[type="password"],
+input[type="url"],
+input[type="tel"] {
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  font-family: var(--xamt-font-ui);
+  width: 14rem;
+  max-width: 100%;
+  min-height: 2.75rem;
+  block-size: auto;
+  inline-size: auto;
 }

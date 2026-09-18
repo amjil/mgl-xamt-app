@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="mn" class="dark">
+<html lang="mn-Mong" class="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -9,6 +9,13 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Xamt" />
     <link rel="manifest" href={~p"/pwa/manifest.json"} />
+    <link
+      rel="preload"
+      href={~p"/fonts/OyunQaganTig.ttf"}
+      as="font"
+      type="font/ttf"
+      crossorigin
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -23,68 +30,73 @@
     </script>
   </head>
   <body class="xamt-body">
-    <%!-- Mobile top bar (small screens only) --%>
-    <div class="xamt-mobile-header">
-      <.link navigate={~p"/"} class="xamt-brand" style="font-size: 1.5rem; margin: 0;">
-        Xamt
-      </.link>
-      <button
-        type="button"
-        onclick="document.getElementById('leftnav').classList.toggle('is-open')"
-        class="xamt-mobile-toggle"
-        aria-label={gettext("Open menu")}
-      >
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M4 6h16M4 12h16M4 18h16"
-          >
-          </path>
-        </svg>
-      </button>
-    </div>
-
-    <%!-- Fixed left sidebar nav --%>
-    <aside id="leftnav" class="xamt-leftnav">
-      <nav class="xamt-leftnav__inner">
-        <.link navigate={~p"/"} class="xamt-brand-mark mb-8">X</.link>
-
-        <ul class="xamt-leftnav__links">
-          <%= if @current_scope && @current_scope.user do %>
-            <li>
-              <.link navigate={~p"/settings"} class="mongol-text">{gettext("Settings")}</.link>
-            </li>
-            <li>
-              <.link href={~p"/users/log-out"} method="delete" class="mongol-text">
-                {gettext("Log out")}
-              </.link>
-            </li>
-          <% else %>
-            <li>
-              <.link navigate={~p"/register"} class="mongol-text">{gettext("Register")}</.link>
-            </li>
-            <li>
-              <.link navigate={~p"/login"} class="mongol-text">{gettext("Log in")}</.link>
-            </li>
-          <% end %>
-        </ul>
-
-        <%!-- Mobile close button --%>
+    <div class="xamt-shell">
+      <%!-- Mobile top bar (small screens only; stays horizontal-tb) --%>
+      <div class="xamt-mobile-header">
+        <.link
+          navigate={~p"/"}
+          class="xamt-latin"
+          style="font-family: Fraunces, serif; font-size: 1.35rem; color: var(--xamt-accent-2); text-decoration: none;"
+        >
+          Xamt
+        </.link>
         <button
           type="button"
-          onclick="document.getElementById('leftnav').classList.remove('is-open')"
-          class="xamt-leftnav__close xamt-btn xamt-btn--soft mongol-text"
+          onclick="document.getElementById('leftnav').classList.toggle('is-open')"
+          class="xamt-mobile-toggle"
+          aria-label={gettext("Open menu")}
         >
-          {gettext("Close")}
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M4 6h16M4 12h16M4 18h16"
+            >
+            </path>
+          </svg>
         </button>
-      </nav>
-    </aside>
+      </div>
 
-    <%!-- Main content --%>
-    <div class="xamt-main-content">
-      {@inner_content}
+      <%!-- Left rail: shell stays horizontal; link glyphs are vertical-lr --%>
+      <aside id="leftnav" class="xamt-leftnav">
+        <nav class="xamt-leftnav__inner">
+          <.link navigate={~p"/"} class="xamt-brand-mark">X</.link>
+
+          <ul class="xamt-leftnav__links">
+            <%= if @current_scope && @current_scope.user do %>
+              <li>
+                <.link navigate={~p"/settings"} class="mongol-text">{gettext("Settings")}</.link>
+              </li>
+              <li>
+                <.link href={~p"/users/log-out"} method="delete" class="mongol-text">
+                  {gettext("Log out")}
+                </.link>
+              </li>
+            <% else %>
+              <li>
+                <.link navigate={~p"/register"} class="mongol-text">{gettext("Register")}</.link>
+              </li>
+              <li>
+                <.link navigate={~p"/login"} class="mongol-text">{gettext("Log in")}</.link>
+              </li>
+            <% end %>
+          </ul>
+
+          <button
+            type="button"
+            onclick="document.getElementById('leftnav').classList.remove('is-open')"
+            class="xamt-leftnav__close xamt-btn xamt-btn--soft mongol-text"
+          >
+            {gettext("Close")}
+          </button>
+        </nav>
+      </aside>
+
+      <%!-- Reading surface (vertical-lr for non-chat pages) --%>
+      <div class="xamt-main-content" id="page-scroll">
+        {@inner_content}
+      </div>
     </div>
   </body>
 </html>

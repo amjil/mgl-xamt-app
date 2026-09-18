@@ -46,82 +46,84 @@ defmodule XamtWeb.HomeLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="xamt-home">
+    <div class="xamt-page-inner">
       <Layouts.flash_group flash={@flash} />
-      <header class="xamt-home__hero">
-        <p class="xamt-brand">Xamt</p>
-        <h1 class="xamt-home__title mongol-text">{gettext("Mongolian community")}</h1>
-        <p class="xamt-home__lead mongol-text">
-          {gettext("Traditional Mongolian community & realtime chat")}
-        </p>
-      </header>
-
-      <%= if @current_scope && @current_scope.user do %>
-        <section class="xamt-home__panel">
-          <div class="xamt-home__toolbar">
-            <h2 class="xamt-section-title mongol-text">{gettext("Your servers")}</h2>
-            <button type="button" class="xamt-btn mongol-text" phx-click="toggle_create">
-              {if @show_create, do: gettext("Cancel"), else: gettext("Create server")}
-            </button>
-          </div>
-
-          <form
-            :if={@show_create}
-            id="create-server-form"
-            phx-submit="create_server"
-            class="xamt-form"
-          >
-            <label class="xamt-label">
-              <span>{gettext("Name")}</span>
-              <input
-                type="text"
-                name="server[name]"
-                id="server_name"
-                required
-                class="xamt-input mongol-input"
-                phx-hook="MongolianIME"
-                autocomplete="off"
-              />
-            </label>
-            <label class="xamt-label">
-              <span>{gettext("Description")}</span>
-              <textarea
-                name="server[description]"
-                id="server_description"
-                rows="2"
-                class="xamt-input mongol-input"
-                phx-hook="MongolianIME"
-              ></textarea>
-            </label>
-            <button type="submit" class="xamt-btn xamt-btn--primary mongol-text">
-              {gettext("Create")}
-            </button>
-          </form>
-
-          <ul class="xamt-server-list">
-            <li :for={server <- @servers} class="xamt-server-list__item">
-              <.link navigate={~p"/servers/#{server.slug}"} class="xamt-server-card">
-                <span class="xamt-server-card__icon">{server_initial(server.name)}</span>
-                <span class="xamt-server-card__meta">
-                  <span class="xamt-server-card__name mongol-text">{server.name}</span>
-                  <span class="xamt-server-card__slug">/{server.slug}</span>
-                </span>
-              </.link>
-            </li>
-          </ul>
-
-          <p :if={@servers == []} class="xamt-empty">
-            {gettext("No servers yet. Create one to start chatting.")}
+      <div class="xamt-home">
+        <header class="xamt-home__hero">
+          <p class="xamt-brand">Xamt</p>
+          <h1 class="xamt-home__title mongol-text">{gettext("Mongolian community")}</h1>
+          <p class="xamt-home__lead mongol-text">
+            {gettext("Traditional Mongolian community & realtime chat")}
           </p>
-        </section>
-      <% else %>
-        <section class="xamt-home__cta">
-          <.link navigate={~p"/login"} class="xamt-btn xamt-btn--primary mongol-text">
-            {gettext("Log in")}
-          </.link>
-          <.link navigate={~p"/register"} class="xamt-btn mongol-text">{gettext("Register")}</.link>
-        </section>
-      <% end %>
+        </header>
+
+        <%= if @current_scope && @current_scope.user do %>
+          <section class="xamt-home__panel">
+            <div class="xamt-home__toolbar">
+              <h2 class="xamt-section-title mongol-text">{gettext("Your servers")}</h2>
+              <button type="button" class="xamt-btn mongol-text" phx-click="toggle_create">
+                {if @show_create, do: gettext("Cancel"), else: gettext("Create server")}
+              </button>
+            </div>
+
+            <form
+              :if={@show_create}
+              id="create-server-form"
+              phx-submit="create_server"
+              class="xamt-form"
+            >
+              <label class="xamt-label">
+                <span class="xamt-field__label">{gettext("Name")}</span>
+                <input
+                  type="text"
+                  name="server[name]"
+                  id="server_name"
+                  required
+                  class="xamt-input mongol-input"
+                  phx-hook="MongolianIME"
+                  autocomplete="off"
+                />
+              </label>
+              <label class="xamt-label">
+                <span class="xamt-field__label">{gettext("Description")}</span>
+                <textarea
+                  name="server[description]"
+                  id="server_description"
+                  rows="2"
+                  class="xamt-input mongol-input"
+                  phx-hook="MongolianIME"
+                ></textarea>
+              </label>
+              <button type="submit" class="xamt-btn xamt-btn--primary mongol-text">
+                {gettext("Create")}
+              </button>
+            </form>
+
+            <ul class="xamt-server-list">
+              <li :for={server <- @servers} class="xamt-server-list__item">
+                <.link navigate={~p"/servers/#{server.slug}"} class="xamt-server-card">
+                  <span class="xamt-server-card__icon">{server_initial(server.name)}</span>
+                  <span class="xamt-server-card__meta">
+                    <span class="xamt-server-card__name mongol-text">{server.name}</span>
+                    <span class="xamt-server-card__slug">/{server.slug}</span>
+                  </span>
+                </.link>
+              </li>
+            </ul>
+
+            <p :if={@servers == []} class="xamt-empty mongol-text">
+              {gettext("No servers yet. Create one to start chatting.")}
+            </p>
+          </section>
+        <% else %>
+          <section class="xamt-home__cta">
+            <.link navigate={~p"/login"} class="xamt-btn xamt-btn--primary mongol-text">
+              {gettext("Log in")}
+            </.link>
+            <.link navigate={~p"/register"} class="xamt-btn mongol-text">{gettext("Register")}</.link>
+          </section>
+        <% end %>
+      </div>
     </div>
     """
   end

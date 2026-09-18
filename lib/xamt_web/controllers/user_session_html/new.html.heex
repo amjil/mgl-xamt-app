@@ -1,56 +1,66 @@
 <Layouts.app flash={@flash} current_scope={@current_scope}>
-  <div class="mx-auto max-w-sm space-y-4">
-    <div class="text-center">
-      <.header>
-        <p>Log in</p>
-        <:subtitle>
-          <%= if @current_scope do %>
-            You need to reauthenticate to perform sensitive actions on your account.
-          <% else %>
-            Don't have an account? <.link
-              href={~p"/register"}
-              class="xamt-link"
-              phx-no-format
-            >Sign up</.link> for an account now.
-          <% end %>
-        </:subtitle>
-      </.header>
-    </div>
+  <section class="xamt-stack" id="login-panel">
+    <.header>
+      {gettext("Log in")}
+      <:subtitle>
+        <%= if @current_scope do %>
+          {gettext("You need to reauthenticate to perform sensitive actions on your account.")}
+        <% else %>
+          {gettext("Don't have an account?")}
+          <.link href={~p"/register"} class="xamt-link">{gettext("Sign up")}</.link>
+        <% end %>
+      </:subtitle>
+    </.header>
 
     <div :if={local_mail_adapter?()} class="xamt-alert xamt-alert--info">
       <.icon name="hero-information-circle" class="size-6 shrink-0" />
-      <div>
-        <p>You are running the local mail adapter.</p>
+      <div class="xamt-latin">
+        <p>{gettext("You are running the local mail adapter.")}</p>
         <p>
-          To see sent emails, visit <.link href="/dev/mailbox" class="underline">the mailbox page</.link>.
+          {gettext("To see sent emails, visit")}
+          <.link href="/dev/mailbox" class="underline">{gettext("the mailbox page")}</.link>.
         </p>
       </div>
     </div>
 
-    <.form :let={f} for={@form} as={:user} id="login_form_magic" action={~p"/login"}>
+    <.form
+      :let={f}
+      for={@form}
+      as={:user}
+      id="login_form_magic"
+      action={~p"/login"}
+      class="xamt-form"
+    >
       <.input
         readonly={!!@current_scope}
         field={f[:email]}
         type="email"
-        label="Email"
+        label={gettext("Email")}
         autocomplete="username"
         spellcheck="false"
         required
         phx-mounted={JS.focus()}
       />
-      <.button variant="primary" class="xamt-btn xamt-btn--primary w-full">
-        Log in with email <span aria-hidden="true">→</span>
+      <.button variant="primary" class="xamt-btn xamt-btn--primary">
+        {gettext("Log in with email")}
       </.button>
     </.form>
 
-    <div class="xamt-divider">or</div>
+    <div class="xamt-divider">{gettext("or")}</div>
 
-    <.form :let={f} for={@form} as={:user} id="login_form_password" action={~p"/login"}>
+    <.form
+      :let={f}
+      for={@form}
+      as={:user}
+      id="login_form_password"
+      action={~p"/login"}
+      class="xamt-form"
+    >
       <.input
         readonly={!!@current_scope}
         field={f[:email]}
         type="email"
-        label="Email"
+        label={gettext("Email")}
         autocomplete="username"
         spellcheck="false"
         required
@@ -58,21 +68,21 @@
       <.input
         field={f[:password]}
         type="password"
-        label="Password"
+        label={gettext("Password")}
         autocomplete="current-password"
         spellcheck="false"
       />
       <.button
         variant="primary"
-        class="xamt-btn xamt-btn--primary w-full"
+        class="xamt-btn xamt-btn--primary"
         name={@form[:remember_me].name}
         value="true"
       >
-        Log in and stay logged in <span aria-hidden="true">→</span>
+        {gettext("Log in and stay logged in")}
       </.button>
-      <.button class="xamt-btn xamt-btn--soft w-full mt-2">
-        Log in only this time
+      <.button class="xamt-btn xamt-btn--soft">
+        {gettext("Log in only this time")}
       </.button>
     </.form>
-  </div>
+  </section>
 </Layouts.app>

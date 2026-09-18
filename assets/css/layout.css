@@ -1,17 +1,27 @@
 /* --------------------------------------
-   Left sidebar nav (Mongolian vertical-lr)
+   App shell (nomio-style): rail stays horizontal;
+   reading surface flips to vertical-lr.
    -------------------------------------- */
+.xamt-shell {
+  display: flex;
+  flex-direction: row;
+  height: 100dvh;
+  min-height: 0;
+}
+
 .xamt-leftnav {
-  position: fixed;
-  left: 0;
-  top: 0;
-  bottom: 0;
+  flex: 0 0 4.5rem;
   width: 4.5rem;
+  align-self: stretch;
+  min-height: 0;
   border-right: 1px solid var(--xamt-line);
   background: color-mix(in srgb, var(--xamt-bg-2) 90%, transparent);
   backdrop-filter: blur(8px);
   z-index: 40;
   padding: 1.5rem 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -20,71 +30,88 @@
   flex-direction: column;
   align-items: center;
   height: 100%;
+  gap: 0.75rem;
 }
 
 .xamt-leftnav__links {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 0.4rem;
   margin: 0;
   padding: 0;
   align-items: center;
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: min-content;
 }
 
 .xamt-leftnav__links a {
   color: var(--xamt-muted);
   text-decoration: none;
-  /* Keep link text vertical */
   writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
   text-orientation: mixed;
-  transition: color 160ms ease;
+  font-size: 13px;
+  padding: 0.7rem 0.4rem;
+  border-radius: 0.45rem;
+  transition: color 160ms ease, background-color 160ms ease;
 }
 
 .xamt-leftnav__links a:hover {
   color: var(--xamt-text);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .xamt-leftnav__close {
-  display: none; /* Hidden on desktop */
+  display: none;
   margin-top: auto;
 }
 
-/* --- Global scroll reset --- */
-html,
-body {
-  overflow-y: hidden; /* Disable native vertical page scroll */
-  height: 100dvh;
-}
-
-/* --- Main content horizontal scroll --- */
+/* Reading surface: inline top→bottom, blocks stack left→right */
 .xamt-main-content {
+  flex: 1 1 auto;
+  min-width: 0;
   height: 100dvh;
   overflow-x: auto;
   overflow-y: hidden;
-  /* Clear the fixed left nav */
-  padding-left: 4.5rem;
-  padding-right: 3rem;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
 }
 
-/* Vertical writing + rightward flow for non-chat pages (home, auth, settings) */
 .xamt-main-content:not(:has(.xamt-app)) {
   writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
   text-orientation: mixed;
+  line-height: 1.65;
 }
 
-/* Hide global left nav in fullscreen chat (preserve existing behavior) */
+.xamt-page-inner {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1.25rem;
+  padding-inline: 1.5rem 1.75rem;
+  padding-block: 1.25rem 4rem;
+}
+
+/* Hide global left nav in fullscreen chat */
 body:has(.xamt-app) .xamt-leftnav,
-body:has(.xamt-app) .xamt-mobile-header {
+body:has(.xamt-app) .xamt-mobile-header,
+body:has(.xamt-app) .xamt-shell > .xamt-leftnav {
   display: none;
 }
 
 body:has(.xamt-app) .xamt-main-content {
-  padding-left: 0;
-  padding-right: 0;
+  padding: 0;
   height: 100dvh;
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+}
+
+body:has(.xamt-app) .xamt-shell {
+  display: block;
 }
 
 body:has(.xamt-app) {
@@ -101,6 +128,8 @@ body:has(.xamt-app) {
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--xamt-line);
   background: var(--xamt-bg-2);
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
 }
 
 .xamt-mobile-toggle {
@@ -112,13 +141,16 @@ body:has(.xamt-app) {
 }
 
 @media (max-width: 960px) {
+  .xamt-shell {
+    flex-direction: column;
+  }
+
   .xamt-mobile-header {
     display: flex;
+    flex: 0 0 auto;
   }
 
   .xamt-main-content {
-    padding-left: 0; /* No left padding on mobile */
-    /* Subtract mobile-header height */
     height: calc(100dvh - 3.5rem);
   }
 
@@ -127,12 +159,16 @@ body:has(.xamt-app) {
   }
 
   .xamt-leftnav {
-    transform: translateX(-100%); /* Hidden off-screen by default */
-    width: 6rem; /* Slightly wider for touch */
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    transform: translateX(-100%);
+    width: 6rem;
+    flex: none;
     box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
   }
 
-  /* Open drawer when .is-open is present */
   .xamt-leftnav.is-open {
     transform: translateX(0);
   }
@@ -142,21 +178,52 @@ body:has(.xamt-app) {
   }
 }
 
-.xamt-auth-shell {
-  padding: 2.5rem 1rem 4rem;
+/* Auth / settings stack inside vertical-lr page */
+.xamt-auth-shell,
+.xamt-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1rem;
+  flex: 0 0 auto;
+  max-inline-size: 100%;
 }
 
-.xamt-auth-shell__inner {
-  max-height: 32rem; /* was max-width: 28rem */
-  height: 100%;
-  margin: auto 0;
+.xamt-auth-shell__inner,
+.xamt-stack__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.9rem;
+  max-inline-size: 36rem;
 }
 
+.xamt-page-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.xamt-page-head h1 {
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.xamt-page-head__lede {
+  color: var(--xamt-muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
 
 .xamt-brand {
   font-family: "Fraunces", "Iowan Old Style", "Palatino Linotype", serif;
-  font-size: clamp(2.5rem, 6vw, 4.5rem);
-  letter-spacing: 0.04em;
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  letter-spacing: 0.12em;
   margin: 0;
   color: var(--xamt-accent-2);
 }
@@ -169,41 +236,56 @@ body:has(.xamt-app) {
   border-radius: 0.75rem;
   background: linear-gradient(145deg, var(--xamt-accent), #2f6b54);
   color: white;
+  font-family: var(--xamt-font-ui);
+  writing-mode: horizontal-tb;
   font-weight: 700;
   text-decoration: none;
 }
 
 .xamt-home {
-  max-height: 52rem;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1.5rem;
   height: 100%;
-  margin: auto 0; /* Center vertically in vertical-lr */
-  padding: 2rem 1.25rem 2rem 4rem;
+  max-inline-size: 100%;
 }
 
 .xamt-home__hero {
-  margin-bottom: 0;
-  margin-right: 4rem; /* In vertical-lr, right gap replaces former bottom gap */
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-inline-end: 2rem;
+  border-inline-end: 1px solid var(--xamt-line);
 }
 
 .xamt-home__title {
-  font-size: 1.75rem;
-  height: 12rem;
-  margin: 1rem 0;
+  font-size: 1.5rem;
+  margin: 0;
+  max-inline-size: 18rem;
 }
 
 .xamt-home__lead {
   color: var(--xamt-muted);
-  max-width: 36rem;
+  max-inline-size: 22rem;
+  margin: 0;
+}
+
+.xamt-home__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-block-size: 0;
 }
 
 .xamt-home__toolbar,
 .xamt-home__cta,
 .xamt-settings__links {
   display: flex;
+  flex-direction: row;
   gap: 0.75rem;
   align-items: center;
   flex-wrap: wrap;
-  margin-bottom: 1rem;
 }
 
 .xamt-section-title {
@@ -217,13 +299,18 @@ body:has(.xamt-app) {
   background: var(--xamt-bg-2);
   color: var(--xamt-text);
   border-radius: 0.6rem;
-  padding: 0.55rem 0.95rem;
+  padding: 0.9rem 0.55rem;
   cursor: pointer;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
+  align-self: start;
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  font-family: inherit;
   transition: background-color 160ms ease, border-color 160ms ease, opacity 160ms ease;
 }
 
@@ -252,25 +339,30 @@ body:has(.xamt-app) {
 }
 
 .xamt-btn--sm {
-  padding: 0.35rem 0.7rem;
+  padding: 0.55rem 0.4rem;
   font-size: 0.875rem;
+}
+
+.xamt-btn--block {
+  align-self: stretch;
 }
 
 .xamt-input,
 .xamt-select,
 .xamt-textarea {
-  width: 100%;
   border: 1px solid var(--xamt-line);
   background: var(--xamt-bg);
   color: var(--xamt-text);
   border-radius: 0.55rem;
-  padding: 0.55rem 0.7rem;
+  padding: 0.7rem 0.6rem;
   font: inherit;
 }
 
-.xamt-textarea {
-  min-height: 6rem;
-  resize: vertical;
+.xamt-input:focus,
+.xamt-select:focus,
+.xamt-textarea:focus {
+  border-color: var(--xamt-accent);
+  outline: none;
 }
 
 .xamt-input--error,
@@ -287,18 +379,22 @@ body:has(.xamt-app) {
 }
 
 .xamt-field {
-  margin-bottom: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: start;
+  margin: 0;
 }
 
 .xamt-field__label {
   display: block;
-  margin-bottom: 0.35rem;
-  font-size: 0.875rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
   color: var(--xamt-muted);
 }
 
 .xamt-field-error {
-  margin-top: 0.4rem;
+  margin-top: 0.25rem;
   display: flex;
   gap: 0.4rem;
   align-items: center;
@@ -309,8 +405,9 @@ body:has(.xamt-app) {
 .xamt-label {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  margin-bottom: 0.85rem;
+  gap: 0.5rem;
+  align-items: start;
+  margin: 0;
 }
 
 .xamt-link {
@@ -323,6 +420,12 @@ body:has(.xamt-app) {
   text-decoration: underline;
 }
 
+.xamt-link-hint {
+  color: var(--xamt-accent-2);
+  font-size: 0.9rem;
+  align-self: start;
+}
+
 .xamt-toast {
   position: fixed;
   top: 1rem;
@@ -332,6 +435,9 @@ body:has(.xamt-app) {
   flex-direction: column;
   gap: 0.5rem;
   max-width: min(24rem, calc(100vw - 2rem));
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  font-family: var(--xamt-font-ui);
 }
 
 .xamt-alert {
@@ -344,6 +450,7 @@ body:has(.xamt-app) {
   background: var(--xamt-bg-2);
   color: var(--xamt-text);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+  max-inline-size: 18rem;
 }
 
 .xamt-alert--info {
@@ -375,7 +482,7 @@ body:has(.xamt-app) {
   display: flex;
   align-items: center;
   gap: 1rem;
-  margin: 1.25rem 0;
+  margin: 0.5rem 0;
   color: var(--xamt-muted);
   font-size: 0.875rem;
 }
@@ -384,7 +491,8 @@ body:has(.xamt-app) {
 .xamt-divider::after {
   content: "";
   flex: 1;
-  height: 1px;
+  block-size: 1px;
+  inline-size: auto;
   background: var(--xamt-line);
 }
 
@@ -430,6 +538,8 @@ body:has(.xamt-app) {
   border: 1px solid var(--xamt-line);
   background: var(--xamt-bg-3);
   border-radius: 999px;
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
 }
 
 .xamt-theme-toggle__indicator {
@@ -466,31 +576,66 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
 }
 
 .xamt-form {
-  margin-bottom: 1.25rem;
-  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.85rem;
+  margin: 0;
+  padding: 1rem 0.85rem;
   border: 1px solid var(--xamt-line);
   border-radius: 0.85rem;
   background: color-mix(in srgb, var(--xamt-bg-2) 88%, transparent);
+  flex: 0 0 auto;
+}
+
+.xamt-form--compact {
+  padding: 0.55rem;
 }
 
 .xamt-server-list {
   list-style: none;
   padding: 0;
   margin: 0;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 0.65rem;
 }
 
 .xamt-server-card {
   display: flex;
-  gap: 0.85rem;
+  flex-direction: column;
+  gap: 0.65rem;
   align-items: center;
-  padding: 0.85rem 1rem;
+  padding: 0.85rem 0.75rem;
   border-radius: 0.85rem;
   background: var(--xamt-bg-2);
   border: 1px solid var(--xamt-line);
   text-decoration: none;
   color: inherit;
+  block-size: 9.5rem;
+  max-inline-size: 100%;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.xamt-server-card:hover {
+  background: var(--xamt-bg-3);
+  border-color: color-mix(in srgb, var(--xamt-accent) 40%, var(--xamt-line));
+}
+
+.xamt-server-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-block-size: 0;
+  overflow: hidden;
+}
+
+.xamt-server-card__slug {
+  color: var(--xamt-muted);
+  font-family: var(--xamt-font-ui);
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  font-size: 0.8rem;
 }
 
 .xamt-server-card__icon,
@@ -503,6 +648,7 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
   place-items: center;
   background: var(--xamt-bg-3);
   font-family: var(--xamt-font-mongol);
+  flex: 0 0 auto;
 }
 
 .xamt-avatar--lg {
@@ -515,10 +661,14 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
   color: var(--xamt-muted);
 }
 
-/* Chat shell */
+/* Chat shell - Full Mongolian Vertical-LR Adaptation */
 .xamt-app {
+  /* 核心：将整个应用声明为垂直书写，从左向右 */
+  writing-mode: vertical-lr;
+  text-orientation: mixed;
   display: grid;
-  grid-template-columns: 4.25rem 15rem minmax(0, 1fr) 14rem;
+  /* 物理列切分：依然是从屏幕左向右分布的4个面板 */
+  grid-template-columns: 4.25rem 12rem minmax(0, 1fr) 12rem;
   height: 100dvh;
   overflow: hidden;
 }
@@ -527,11 +677,14 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
   background: color-mix(in srgb, var(--xamt-bg-2) 92%, black);
   border-right: 1px solid var(--xamt-line);
   display: flex;
+  /* 在 vertical-lr 中，column 代表容器的内容从左向右延展 */
   flex-direction: column;
-  min-height: 0;
+  min-width: 0;
 }
 
 .xamt-rail--servers {
+  /* row 代表容器内容从上到下排列，用于服务器图标 */
+  flex-direction: row;
   align-items: center;
   gap: 0.55rem;
   padding: 0.75rem 0;
@@ -551,12 +704,14 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
 .xamt-rail--channels,
 .xamt-rail--members {
   padding: 0.85rem;
-  overflow: auto;
+  overflow-x: auto; /* 频道过多时横向滚动 */
+  overflow-y: hidden;
 }
 
 .xamt-rail__title {
   margin: 0;
-  height: 7rem;
+  height: auto;
+  min-height: 7rem;
   font-size: 1.15rem;
 }
 
@@ -568,26 +723,28 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
 
 .xamt-rail__section-head {
   display: flex;
+  flex-direction: row; /* 从上到下 */
   justify-content: space-between;
   align-items: center;
   color: var(--xamt-muted);
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  margin: 1rem 0 0.5rem;
+  margin: 0 0.5rem 0 1rem;
 }
 
 .xamt-channel-nav {
   display: flex;
-  flex-direction: column;
+  flex-direction: column; /* 频道换行向右排列 */
   gap: 0.2rem;
 }
 
 .xamt-channel-link {
   display: flex;
+  flex-direction: row; /* 频道文字从上到下 */
   gap: 0.35rem;
   align-items: center;
-  padding: 0.4rem 0.5rem;
+  padding: 0.5rem 0.4rem;
   border-radius: 0.45rem;
   color: inherit;
   text-decoration: none;
@@ -620,26 +777,29 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
 }
 
 .xamt-main {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  display: flex;
+  /* 核心排版：标题栏在最左，消息在中，输入框在最右 */
+  flex-direction: column;
   min-width: 0;
   background: color-mix(in srgb, var(--xamt-bg) 80%, #101418);
 }
 
 .xamt-main__header {
   display: flex;
+  flex-direction: row; /* 标题文字从上到下 */
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--xamt-line);
+  padding: 1rem 0.75rem;
+  border-right: 1px solid var(--xamt-line); /* 边线在右边 */
+  border-bottom: none;
 }
 
 .xamt-main__title {
   margin: 0;
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 0.35rem;
-  height: 3.5rem;
 }
 
 .xamt-mobile-nav {
@@ -656,10 +816,12 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
 }
 
 .xamt-messages {
-  overflow: auto;
+  flex: 1;
+  overflow-x: auto; /* 消息区开启物理的横向滚动 */
+  overflow-y: hidden;
   padding: 1rem;
   display: flex;
-  flex-direction: column;
+  flex-direction: column; /* 消息按时间依次向右排列 */
   gap: 0.85rem;
 }
 
@@ -672,11 +834,13 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
 
 .xamt-message {
   display: flex;
+  flex-direction: column; /* 头像在左，正文在右 */
   gap: 0.75rem;
 }
 
 .xamt-message__meta {
   display: flex;
+  flex-direction: row; /* 名字和时间从上到下 */
   gap: 0.55rem;
   align-items: baseline;
   font-size: 0.85rem;
@@ -688,10 +852,12 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
 }
 
 .xamt-message__content {
-  margin-top: 0.35rem;
-  min-height: 4rem;
-  max-height: 16rem;
-  overflow: auto;
+  margin-top: 0;
+  margin-left: 0.35rem;
+  min-width: 4rem;
+  max-width: 40vw; /* 限制单条消息最大宽度，防止霸屏 */
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .xamt-message__actions {
@@ -715,7 +881,8 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
 }
 
 .xamt-composer-wrap {
-  border-top: 1px solid var(--xamt-line);
+  border-left: 1px solid var(--xamt-line); /* 输入框在右侧，左侧加边框分隔 */
+  border-top: none;
   padding: 0.75rem;
   background: var(--xamt-bg-2);
 }
@@ -788,8 +955,9 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
 }
 
 .xamt-composer__editor {
-  min-height: 9rem;
-  max-height: 40vh;
+  min-width: 9rem;
+  max-width: 35vw;
+  height: 100%; /* 填满垂直空间 */
   overflow: auto;
   border: 1px solid var(--xamt-line);
   border-radius: 0.75rem;
@@ -807,10 +975,12 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
 
 .xamt-composer__toolbar {
   display: flex;
+  flex-direction: row; /* 按钮从上到下排列 */
   justify-content: flex-end;
   align-items: center;
   gap: 0.5rem;
-  margin-top: 0.55rem;
+  margin-left: 0.55rem;
+  margin-top: 0;
 }
 
 .xamt-member-list {
@@ -823,6 +993,7 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
 
 .xamt-member {
   display: flex;
+  flex-direction: row;
   gap: 0.45rem;
   align-items: center;
 }
@@ -840,20 +1011,30 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
 
 .xamt-profile,
 .xamt-settings {
-  max-width: 36rem;
-  margin: 0 auto;
-  padding: 2rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1rem;
+  max-inline-size: 36rem;
+  padding-inline: 0.5rem 1.5rem;
 }
 
 .xamt-profile__header {
   display: flex;
-  gap: 1rem;
+  flex-direction: column;
+  gap: 0.85rem;
   align-items: center;
-  margin-bottom: 1rem;
 }
 
 .xamt-profile__username {
   color: var(--xamt-muted);
+  font-family: var(--xamt-font-ui);
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+}
+
+.xamt-profile__bio {
+  max-inline-size: 20rem;
 }
 
 .xamt-icon-btn {

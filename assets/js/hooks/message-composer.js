@@ -267,19 +267,17 @@ export const MessageComposer = {
 
 export const MessageList = {
   mounted() {
-    this.el.scrollTop = this.el.scrollHeight
-
+    this.el.scrollLeft = this.el.scrollWidth // 定位到最右侧
     this.handleEvent("messages:scroll_bottom", () => {
       requestAnimationFrame(() => {
-        // Smart sticky scroll: only auto-scroll when near bottom (~1–2 messages)
-        const distanceFromBottom =
-          this.el.scrollHeight - this.el.scrollTop - this.el.clientHeight
-        const isNearBottom = distanceFromBottom < 150
+        // 判断是否靠近右侧边缘
+        const distanceFromRight =
+          this.el.scrollWidth - this.el.scrollLeft - this.el.clientWidth
+        const isNearRight = distanceFromRight < 150
 
-        if (isNearBottom) {
-          this.el.scrollTop = this.el.scrollHeight
+        if (isNearRight) {
+          this.el.scrollLeft = this.el.scrollWidth
         } else {
-          // User is reading history — signal template/UI for "new messages ↓"
           this.el.dispatchEvent(
             new CustomEvent("messages:unread_below", { bubbles: true })
           )

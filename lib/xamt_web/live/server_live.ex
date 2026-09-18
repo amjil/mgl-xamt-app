@@ -476,7 +476,7 @@ defmodule XamtWeb.ServerLive do
                 MapSet.member?(@unread_channels, ch.id) && "has-unread"
               ]}
             >
-              <div class="flex items-center justify-between w-full gap-2">
+              <div class="flex items-center justify-between h-full gap-2">
                 <div class="flex items-center gap-1.5 min-w-0">
                   <span class="xamt-channel-hash">#</span>
                   <span class={[
