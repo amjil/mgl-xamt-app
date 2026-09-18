@@ -13,6 +13,7 @@ import {ToastHandler} from "./hooks/toast-handler"
 import {adoptImeElements} from "./utils/ime"
 import {trackViewportHeight} from "./utils/viewport"
 import {toast} from "./utils/offline-store"
+import {highlightMessageById} from "./utils/highlight-message"
 
 const Hooks = {
   ...colocatedHooks,
@@ -48,17 +49,14 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 })
 
-// Dispatched by JS.dispatch/2 on a quoted message so we can reveal it in the
-// horizontally scrolling message list.
-const HIGHLIGHT_MS = 1600
-
-window.addEventListener("xamt:scroll-to", (event) => {
-  const el = event.target
-  if (!(el instanceof HTMLElement)) return
-
-  el.scrollIntoView({behavior: "smooth", block: "nearest", inline: "center"})
-  el.classList.add("is-highlighted")
-  setTimeout(() => el.classList.remove("is-highlighted"), HIGHLIGHT_MS)
+// Dispatched by JS.dispatch/2 from quote buttons — no per-message Hook needed.
+window.addEventListener("xamt:highlight", (event) => {
+  const targetId = event.detail?.target_id
+  if (!highlightMessageById(targetId)) {
+    // Reply target may be outside the loaded stream window; MessageList can
+    // opt into loading history later via push_event.
+    console.warn(`Message ${targetId} not found in DOM.`)
+  }
 })
 
 window.addEventListener("xamt:copy", async (event) => {

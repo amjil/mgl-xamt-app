@@ -1129,7 +1129,11 @@ defmodule XamtWeb.ServerLive do
                     :if={message.reply_to}
                     type="button"
                     class="xamt-quote"
-                    phx-click={JS.dispatch("xamt:scroll-to", to: "#messages-#{message.reply_to_id}")}
+                    phx-click={
+                      JS.dispatch("xamt:highlight",
+                        detail: %{target_id: "messages-#{message.reply_to_id}"}
+                      )
+                    }
                     title={gettext("Jump to the quoted message")}
                   >
                     <span class="xamt-quote__mark" aria-hidden="true">↳</span>

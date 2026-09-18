@@ -6,6 +6,7 @@ import { createMongolianEditor } from "../../vendor/mongolian-editor.js"
 import { MglIME, createCustomAdapter } from "../../vendor/mgl-web-ime/mgl-web-ime.js"
 import { imeProvider } from "../utils/ime.js"
 import { OfflineStore, toast } from "../utils/offline-store.js"
+import { highlightMessage as flashHighlight } from "../utils/highlight-message.js"
 import { attachMongolianWheelScroll } from "./mongolian-scroll.js"
 
 function editorRoot(editorEl) {
@@ -336,8 +337,6 @@ export const MessageList = {
     if (!article) return
 
     this._highlighted = id
-    article.scrollIntoView({behavior: "smooth", block: "nearest", inline: "center"})
-    article.classList.add("is-highlighted")
-    setTimeout(() => article.classList.remove("is-highlighted"), 1600)
+    flashHighlight(article)
   },
 }

@@ -232,10 +232,25 @@
   align-self: stretch;
 }
 
-/* Landing target after following a quote */
+/* Landing flash after following a quote (replayable via reflow + class toggle) */
+@keyframes xamt-highlight-flash {
+  0% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+  15%,
+  50% {
+    background-color: var(--xamt-gold-soft);
+    box-shadow: inset 0 0 0 1px var(--xamt-accent-2);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+}
+
 .xamt-message.is-highlighted {
-  background: var(--xamt-gold-soft);
-  box-shadow: inset 0 0 0 1px var(--xamt-line-strong);
+  animation: xamt-highlight-flash 2.5s ease-in-out;
 }
 
 /* Reaction chips run down the column; the picker appears on hover/focus */
