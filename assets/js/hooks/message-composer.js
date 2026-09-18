@@ -4,6 +4,7 @@
  */
 import { createMongolianEditor } from "../../vendor/mongolian-editor.js"
 import { MglIME, createCustomAdapter } from "../../vendor/mgl-web-ime/mgl-web-ime.js"
+import { OfflineStore, toast } from "../utils/offline-store.js"
 import { attachMongolianWheelScroll } from "./mongolian-scroll.js"
 
 function editorRoot(editorEl) {
@@ -128,11 +129,17 @@ export const MessageComposer = {
     this._onSend = () => this.submit()
     this.sendBtn?.addEventListener("click", this._onSend)
 
+    this._flushing = false
+    this._onOnline = () => this.flushOfflineQueue()
+    window.addEventListener("online", this._onOnline)
+
     // Throttle typing events: one typing_started until idle timeout
     this._typingTimer = null
     this._isTyping = false
 
     this.host.addEventListener("input", () => {
+      if (!this._canPush()) return
+
       if (!this._isTyping) {
         this.pushEvent("typing_started", {})
         this._isTyping = true
@@ -140,7 +147,7 @@ export const MessageComposer = {
 
       clearTimeout(this._typingTimer)
       this._typingTimer = setTimeout(() => {
-        this.pushEvent("typing_stopped", {})
+        if (this._canPush()) this.pushEvent("typing_stopped", {})
         this._isTyping = false
       }, 1200)
     })
@@ -153,15 +160,24 @@ export const MessageComposer = {
 
     // vertical-lr: map wheel Y → scrollLeft, with edge + trackpad guards
     this._detachWheel = attachMongolianWheelScroll(this.host)
+
+    // Flush any messages left from a previous session once LiveView is up
+    this.flushOfflineQueue()
   },
 
   updated() {
     // Keep editor instance
   },
 
+  // LiveView WebSocket restored — retry queued pushEvents
+  reconnected() {
+    this.flushOfflineQueue()
+  },
+
   destroyed() {
     clearTimeout(this._typingTimer)
     this.sendBtn?.removeEventListener("click", this._onSend)
+    window.removeEventListener("online", this._onOnline)
     this._detachWheel?.()
     if (this.ime && typeof this.ime.destroy === "function") this.ime.destroy()
   },
@@ -174,9 +190,36 @@ export const MessageComposer = {
     }
     // Stop typing indicator immediately after send/clear
     if (this._isTyping) {
-      this.pushEvent("typing_stopped", {})
+      if (this._canPush()) this.pushEvent("typing_stopped", {})
       this._isTyping = false
       clearTimeout(this._typingTimer)
+    }
+  },
+
+  _canPush() {
+    if (navigator.onLine === false) return false
+    const ls = window.liveSocket
+    if (ls && typeof ls.isConnected === "function") return ls.isConnected()
+    return true
+  },
+
+  async flushOfflineQueue() {
+    if (this._flushing || !this._canPush()) return
+
+    this._flushing = true
+    try {
+      const pending = await OfflineStore.popAll()
+      if (pending.length === 0) return
+
+      for (const msg of pending) {
+        this.pushEvent(msg.event, msg.payload)
+      }
+
+      toast("success", `Synced ${pending.length} offline message${pending.length === 1 ? "" : "s"}`)
+    } catch (_err) {
+      // IndexedDB unavailable — ignore; next reconnect will retry
+    } finally {
+      this._flushing = false
     }
   },
 
@@ -189,11 +232,27 @@ export const MessageComposer = {
     if (!text && (!json || json.length === 0)) return
 
     const event = this.el.dataset.submitEvent || "send_message"
-    this.pushEvent(event, {
+    const payload = {
       content_html: html,
       content_json: JSON.stringify({ type: "rich_text", blocks: json }),
       content_type: "rich_text",
-    })
+    }
+
+    // Intercept when browser is offline or LiveView socket is down
+    if (!this._canPush()) {
+      OfflineStore.save({ event, payload })
+        .then(() => {
+          toast("warning", "You're offline — message saved to local drafts")
+          this.clear()
+        })
+        .catch(() => {
+          toast("error", "Failed to save offline — please try again later")
+        })
+      return
+    }
+
+    this.pushEvent(event, payload)
+    // Online clear is driven by server push_event("composer:clear")
   },
 }
 

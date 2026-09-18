@@ -7,6 +7,7 @@ import "../vendor/mgl-web-ime/mgl-web-ime.js"
 import {MongolianIME} from "./hooks/mongolian-ime"
 import {MessageComposer, MessageList} from "./hooks/message-composer"
 import {MongolianScroll} from "./hooks/mongolian-scroll"
+import {ToastHandler} from "./hooks/toast-handler"
 
 const Hooks = {
   ...colocatedHooks,
@@ -14,6 +15,7 @@ const Hooks = {
   MessageComposer,
   MessageList,
   MongolianScroll,
+  ToastHandler,
 }
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")

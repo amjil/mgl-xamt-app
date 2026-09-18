@@ -84,6 +84,16 @@ defmodule XamtWeb.Layouts do
         {gettext("Attempting to reconnect")}
         <.icon name="hero-arrow-path" class="ml-1 size-3 motion-safe:animate-spin" />
       </.flash>
+
+      <%!-- Client-side offline/sync toasts (MessageComposer → xamt:toast) --%>
+      <div
+        id="toast-container"
+        phx-update="ignore"
+        phx-hook="ToastHandler"
+        class="xamt-toast"
+        aria-live="polite"
+      >
+      </div>
     </div>
     """
   end

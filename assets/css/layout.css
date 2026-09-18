@@ -252,6 +252,16 @@ body:has(.xamt-app) {
   background: color-mix(in srgb, #d46a6a 14%, var(--xamt-bg-2));
 }
 
+.xamt-alert--warning {
+  border-color: color-mix(in srgb, #d4a017 55%, var(--xamt-line));
+  background: color-mix(in srgb, #d4a017 14%, var(--xamt-bg-2));
+}
+
+.xamt-alert--success {
+  border-color: color-mix(in srgb, #3dcc8c 55%, var(--xamt-line));
+  background: color-mix(in srgb, #3dcc8c 14%, var(--xamt-bg-2));
+}
+
 .xamt-alert--outline {
   background: transparent;
   box-shadow: none;
