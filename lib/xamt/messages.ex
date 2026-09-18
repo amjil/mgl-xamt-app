@@ -31,7 +31,7 @@ defmodule Xamt.Messages do
            })
            |> Repo.insert() do
       message = Repo.preload(message, @preloads)
-      LastMessageCache.put(channel_id, message.id)
+      LastMessageCache.put(channel_id, message.id, message.inserted_at)
       broadcast(channel_id, :new_message, strip_for_broadcast(message))
       {:ok, message}
     end

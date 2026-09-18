@@ -11,6 +11,7 @@ import {MongolianScroll, installGlobalMongolianWheelScroll} from "./hooks/mongol
 import {MessageScroll} from "./hooks/message-scroll"
 import {MobileDrawer} from "./hooks/mobile-drawer"
 import {ToastHandler} from "./hooks/toast-handler"
+import {ReadReceipt} from "./hooks/read-receipt"
 import {adoptImeElements} from "./utils/ime"
 import {trackViewportHeight} from "./utils/viewport"
 import {toast} from "./utils/offline-store"
@@ -26,6 +27,7 @@ const Hooks = {
   MongolianScroll,
   MobileDrawer,
   ToastHandler,
+  ReadReceipt,
 }
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")

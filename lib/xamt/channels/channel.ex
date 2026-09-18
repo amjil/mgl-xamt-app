@@ -11,6 +11,7 @@ defmodule Xamt.Channels.Channel do
     field :slug, :string
     field :type, :string, default: "text"
     field :position, :integer, default: 0
+    field :has_unread, :boolean, virtual: true, default: false
 
     belongs_to :server, Xamt.Servers.Server
     has_many :messages, Xamt.Messages.Message

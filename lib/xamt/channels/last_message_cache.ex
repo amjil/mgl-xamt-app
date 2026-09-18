@@ -1,6 +1,8 @@
 defmodule Xamt.Channels.LastMessageCache do
   @moduledoc """
-  ETS-backed cache of each channel's latest non-deleted message ID.
+  ETS-backed cache of each channel's latest non-deleted message id + inserted_at.
+
+  Timestamps are required because binary_id defaults to UUIDv4 (not time-ordered).
   """
 
   use GenServer
@@ -31,19 +33,20 @@ defmodule Xamt.Channels.LastMessageCache do
         where: is_nil(m.deleted_at),
         distinct: m.channel_id,
         order_by: [desc: m.channel_id, desc: m.inserted_at, desc: m.id],
-        select: {m.channel_id, m.id}
+        select: {m.channel_id, m.id, m.inserted_at}
 
     Repo.all(query)
-    |> Enum.each(fn {channel_id, message_id} ->
-      put(channel_id, message_id)
+    |> Enum.each(fn {channel_id, message_id, inserted_at} ->
+      put(channel_id, message_id, inserted_at)
     end)
 
     {:noreply, state}
   end
 
-  @doc "Updates the channel's latest message ID."
-  def put(channel_id, message_id) do
-    :ets.insert(@table, {channel_id, message_id})
+  @doc "Updates the channel's latest message id and inserted_at."
+  def put(channel_id, message_id, inserted_at)
+      when is_binary(channel_id) and is_binary(message_id) do
+    :ets.insert(@table, {channel_id, message_id, inserted_at})
   end
 
   @doc "Removes a channel entry from the cache."
@@ -51,10 +54,12 @@ defmodule Xamt.Channels.LastMessageCache do
     :ets.delete(@table, channel_id)
   end
 
-  @doc "Reads the channel's latest message ID from memory."
+  @doc """
+  Reads `{message_id, inserted_at}` for the channel, or `nil`.
+  """
   def get(channel_id) do
     case :ets.lookup(@table, channel_id) do
-      [{^channel_id, message_id}] -> message_id
+      [{^channel_id, message_id, inserted_at}] -> {message_id, inserted_at}
       [] -> nil
     end
   end
@@ -68,11 +73,11 @@ defmodule Xamt.Channels.LastMessageCache do
         where: m.channel_id == ^channel_id and is_nil(m.deleted_at),
         order_by: [desc: m.inserted_at, desc: m.id],
         limit: 1,
-        select: m.id
+        select: {m.id, m.inserted_at}
 
     case Repo.one(query) do
       nil -> delete(channel_id)
-      message_id -> put(channel_id, message_id)
+      {message_id, inserted_at} -> put(channel_id, message_id, inserted_at)
     end
   end
 end

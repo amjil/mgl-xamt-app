@@ -127,15 +127,6 @@ defmodule XamtWeb.ServerLive do
       end
 
     messages = Messages.list_messages(channel.id)
-    latest_msg = List.last(messages)
-
-    unread_channels =
-      if latest_msg do
-        Channels.mark_channel_as_read(scope.user.id, channel.id, latest_msg.id)
-        MapSet.delete(socket.assigns.unread_channels, channel.id)
-      else
-        MapSet.delete(socket.assigns.unread_channels, channel.id)
-      end
 
     {:noreply,
      socket
@@ -145,7 +136,6 @@ defmodule XamtWeb.ServerLive do
      |> assign(:editing_message_id, nil)
      |> assign(:replying_to, nil)
      |> assign(:mobile_panel, :messages)
-     |> assign(:unread_channels, unread_channels)
      |> assign(:search_q, "")
      |> assign(:search_results, nil)
      |> assign(:highlight_id, Map.get(params, "highlight"))
@@ -182,6 +172,33 @@ defmodule XamtWeb.ServerLive do
 
   def handle_event("cancel_upload", %{"ref" => ref}, socket) do
     {:noreply, cancel_upload(socket, :media, ref)}
+  end
+
+  def handle_event(
+        "mark_as_read",
+        %{"message_id" => message_id, "inserted_at" => inserted_at},
+        socket
+      ) do
+    user_id = socket.assigns.current_scope.user.id
+    channel = socket.assigns.active_channel
+
+    if channel do
+      channel_id = channel.id
+
+      # Persist off the LiveView process; UI updates immediately.
+      Task.start(fn ->
+        Channels.mark_as_read(user_id, channel_id, message_id, inserted_at)
+      end)
+
+      {:noreply,
+       assign(
+         socket,
+         :unread_channels,
+         MapSet.delete(socket.assigns.unread_channels, channel_id)
+       )}
+    else
+      {:noreply, socket}
+    end
   end
 
   def handle_event("send_message", params, socket) do
@@ -602,8 +619,8 @@ defmodule XamtWeb.ServerLive do
     socket =
       cond do
         active_channel && message.channel_id == active_channel.id ->
-          Channels.mark_channel_as_read(user_id, active_channel.id, message.id)
-
+          # Stay in the stream; IntersectionObserver advances the watermark
+          # only when the message actually enters the viewport.
           socket
           |> stream_insert(:messages, message)
           |> assign(:messages_empty?, false)
@@ -1107,6 +1124,7 @@ defmodule XamtWeb.ServerLive do
               phx-update="stream"
               phx-hook="MessageList"
               data-highlight={@highlight_id}
+              data-channel-id={@active_channel && @active_channel.id}
             >
               <div
                 :if={@has_more_messages}
@@ -1122,6 +1140,7 @@ defmodule XamtWeb.ServerLive do
                 id={dom_id}
                 class="xamt-message"
                 data-message-id={message.id}
+                data-inserted-at={DateTime.to_iso8601(message.inserted_at)}
               >
                 <.avatar user={message.user} class="xamt-message__avatar" />
                 <div class="xamt-message__body">

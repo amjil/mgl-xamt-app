@@ -144,28 +144,78 @@ defmodule Xamt.Channels do
   end
 
   @doc """
-  Upserts the user's last-read message for a channel.
+  Advances the user's read watermark for a channel.
+
+  Only moves forward: a concurrent or out-of-order mark with an older
+  `message_inserted_at` will not regress the watermark.
   """
-  def mark_channel_as_read(user_id, channel_id, message_id)
+  def mark_as_read(user_id, channel_id, message_id, message_inserted_at)
       when is_binary(user_id) and is_binary(channel_id) and is_binary(message_id) do
+    inserted_at = normalize_datetime(message_inserted_at)
     now = DateTime.utc_now(:second)
 
     %ChannelRead{}
     |> ChannelRead.changeset(%{
       user_id: user_id,
       channel_id: channel_id,
-      last_read_message_id: message_id
+      last_read_message_id: message_id,
+      last_read_at: inserted_at
     })
     |> Repo.insert(
-      on_conflict: [set: [last_read_message_id: message_id, updated_at: now]],
+      on_conflict:
+        from(cr in ChannelRead,
+          update: [
+            set: [
+              last_read_message_id: fragment("EXCLUDED.last_read_message_id"),
+              last_read_at: fragment("EXCLUDED.last_read_at"),
+              updated_at: ^now
+            ]
+          ],
+          where: is_nil(cr.last_read_at) or cr.last_read_at < fragment("EXCLUDED.last_read_at")
+        ),
       conflict_target: [:user_id, :channel_id]
     )
   end
 
   @doc """
+  Deprecated name — prefer `mark_as_read/4`.
+  """
+  def mark_channel_as_read(user_id, channel_id, message_id, message_inserted_at \\ nil)
+
+  def mark_channel_as_read(user_id, channel_id, message_id, nil)
+      when is_binary(user_id) and is_binary(channel_id) and is_binary(message_id) do
+    case Repo.get(Xamt.Messages.Message, message_id) do
+      %{inserted_at: inserted_at} ->
+        mark_as_read(user_id, channel_id, message_id, inserted_at)
+
+      nil ->
+        {:error, :not_found}
+    end
+  end
+
+  def mark_channel_as_read(user_id, channel_id, message_id, message_inserted_at)
+      when is_binary(user_id) and is_binary(channel_id) and is_binary(message_id) do
+    mark_as_read(user_id, channel_id, message_id, message_inserted_at)
+  end
+
+  @doc """
+  Lists channels for a server with a virtual `has_unread` flag for the user.
+  """
+  def list_channels_with_unread_status(server_id, user_id)
+      when is_binary(server_id) and is_binary(user_id) do
+    unread_ids = MapSet.new(get_unread_channel_ids(user_id, server_id))
+
+    server_id
+    |> list_channels()
+    |> Enum.map(fn channel ->
+      %{channel | has_unread: MapSet.member?(unread_ids, channel.id)}
+    end)
+  end
+
+  @doc """
   Returns channel IDs in the server that have unread messages.
 
-  Uses ETS last-message cache instead of scanning the messages table.
+  Compares ETS-cached latest message timestamps against each user's watermark.
   """
   def get_unread_channel_ids(user_id, server_id)
       when is_binary(user_id) and is_binary(server_id) do
@@ -179,22 +229,44 @@ defmodule Xamt.Channels do
       reads =
         from(cr in ChannelRead,
           where: cr.user_id == ^user_id and cr.channel_id in ^channel_ids,
-          select: {cr.channel_id, cr.last_read_message_id}
+          select: {cr.channel_id, cr.last_read_at}
         )
         |> Repo.all()
         |> Map.new()
 
       Enum.filter(channel_ids, fn cid ->
-        latest_msg_id = LastMessageCache.get(cid)
-        last_read_id = Map.get(reads, cid)
+        case LastMessageCache.get(cid) do
+          nil ->
+            false
 
-        cond do
-          is_nil(latest_msg_id) -> false
-          is_nil(last_read_id) -> true
-          latest_msg_id != last_read_id -> true
-          true -> false
+          {_latest_id, latest_at} ->
+            case Map.get(reads, cid) do
+              nil -> true
+              last_read_at -> DateTime.compare(latest_at, last_read_at) == :gt
+            end
         end
       end)
+    end
+  end
+
+  defp normalize_datetime(%DateTime{} = dt), do: DateTime.truncate(dt, :second)
+
+  defp normalize_datetime(%NaiveDateTime{} = ndt) do
+    ndt
+    |> DateTime.from_naive!("Etc/UTC")
+    |> DateTime.truncate(:second)
+  end
+
+  defp normalize_datetime(iso) when is_binary(iso) do
+    case DateTime.from_iso8601(iso) do
+      {:ok, dt, _} ->
+        DateTime.truncate(dt, :second)
+
+      {:error, _} ->
+        case NaiveDateTime.from_iso8601(iso) do
+          {:ok, ndt} -> normalize_datetime(ndt)
+          {:error, _} -> DateTime.utc_now(:second)
+        end
     end
   end
 end

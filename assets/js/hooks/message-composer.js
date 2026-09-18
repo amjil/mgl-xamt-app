@@ -8,6 +8,7 @@ import { imeProvider } from "../utils/ime.js"
 import { OfflineStore, toast } from "../utils/offline-store.js"
 import { highlightMessage as flashHighlight } from "../utils/highlight-message.js"
 import { attachMessageScrollLock } from "./message-scroll.js"
+import { attachReadReceipt } from "./read-receipt.js"
 
 function editorRoot(editorEl) {
   return editorEl?.querySelector?.(".editor-content") || editorEl
@@ -319,6 +320,7 @@ export const MessageList = {
 
     // Lock scrollLeft when older messages prepend and scrollWidth grows
     this._detachScrollLock = attachMessageScrollLock(this.el)
+    this._receipt = attachReadReceipt(this)
 
     this.scrollToLatest(false)
 
@@ -338,12 +340,14 @@ export const MessageList = {
 
   updated() {
     this.highlightFromDataset()
+    this._receipt?.updated()
   },
 
   destroyed() {
     this.jumpBtn?.removeEventListener("click", this._onJump)
     this.el.removeEventListener("scroll", this._onScroll)
     this._detachScrollLock?.()
+    this._receipt?.destroyed()
   },
 
   nearLatest() {
