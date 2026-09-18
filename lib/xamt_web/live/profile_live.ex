@@ -23,7 +23,7 @@ defmodule XamtWeb.ProfileLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="xamt-profile" :if={@profile_user}>
+    <div :if={@profile_user} class="xamt-profile">
       <Layouts.flash_group flash={@flash} />
       <header class="xamt-profile__header">
         <div class="xamt-avatar xamt-avatar--lg">{user_initial(@profile_user)}</div>

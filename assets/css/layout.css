@@ -118,7 +118,13 @@ body:has(.xamt-app) {
   text-decoration: none;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.35rem;
+  transition: background-color 160ms ease, border-color 160ms ease, opacity 160ms ease;
+}
+
+.xamt-btn:hover {
+  background: var(--xamt-bg-3);
 }
 
 .xamt-btn--primary {
@@ -127,18 +133,73 @@ body:has(.xamt-app) {
   color: #f4fff9;
 }
 
+.xamt-btn--primary:hover {
+  background: color-mix(in srgb, var(--xamt-accent) 88%, white);
+}
+
+.xamt-btn--soft {
+  background: color-mix(in srgb, var(--xamt-accent) 18%, var(--xamt-bg-2));
+  border-color: color-mix(in srgb, var(--xamt-accent) 35%, var(--xamt-line));
+  color: var(--xamt-text);
+}
+
+.xamt-btn--soft:hover {
+  background: color-mix(in srgb, var(--xamt-accent) 28%, var(--xamt-bg-2));
+}
+
 .xamt-btn--sm {
   padding: 0.35rem 0.7rem;
   font-size: 0.875rem;
 }
 
-.xamt-input {
+.xamt-input,
+.xamt-select,
+.xamt-textarea {
   width: 100%;
   border: 1px solid var(--xamt-line);
   background: var(--xamt-bg);
   color: var(--xamt-text);
   border-radius: 0.55rem;
   padding: 0.55rem 0.7rem;
+  font: inherit;
+}
+
+.xamt-textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+
+.xamt-input--error,
+.xamt-select--error,
+.xamt-textarea--error {
+  border-color: #d46a6a;
+}
+
+.xamt-checkbox {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--xamt-accent);
+  vertical-align: middle;
+}
+
+.xamt-field {
+  margin-bottom: 0.85rem;
+}
+
+.xamt-field__label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.875rem;
+  color: var(--xamt-muted);
+}
+
+.xamt-field-error {
+  margin-top: 0.4rem;
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  font-size: 0.875rem;
+  color: #e08a8a;
 }
 
 .xamt-label {
@@ -146,6 +207,148 @@ body:has(.xamt-app) {
   flex-direction: column;
   gap: 0.35rem;
   margin-bottom: 0.85rem;
+}
+
+.xamt-link {
+  color: var(--xamt-accent-2);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.xamt-link:hover {
+  text-decoration: underline;
+}
+
+.xamt-toast {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: min(24rem, calc(100vw - 2rem));
+}
+
+.xamt-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--xamt-line);
+  background: var(--xamt-bg-2);
+  color: var(--xamt-text);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+}
+
+.xamt-alert--info {
+  border-color: color-mix(in srgb, #5aa7d9 55%, var(--xamt-line));
+  background: color-mix(in srgb, #5aa7d9 14%, var(--xamt-bg-2));
+}
+
+.xamt-alert--error {
+  border-color: color-mix(in srgb, #d46a6a 55%, var(--xamt-line));
+  background: color-mix(in srgb, #d46a6a 14%, var(--xamt-bg-2));
+}
+
+.xamt-alert--outline {
+  background: transparent;
+  box-shadow: none;
+}
+
+.xamt-divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.25rem 0;
+  color: var(--xamt-muted);
+  font-size: 0.875rem;
+}
+
+.xamt-divider::before,
+.xamt-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--xamt-line);
+}
+
+.xamt-muted {
+  color: var(--xamt-muted);
+}
+
+.xamt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.925rem;
+}
+
+.xamt-table th,
+.xamt-table td {
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--xamt-line);
+  text-align: left;
+}
+
+.xamt-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--xamt-bg-2) 70%, transparent);
+}
+
+.xamt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.xamt-list__row {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--xamt-line);
+}
+
+.xamt-theme-toggle {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border: 1px solid var(--xamt-line);
+  background: var(--xamt-bg-3);
+  border-radius: 999px;
+}
+
+.xamt-theme-toggle__indicator {
+  position: absolute;
+  width: 33.333%;
+  height: 100%;
+  border-radius: 999px;
+  border: 1px solid var(--xamt-line);
+  background: var(--xamt-bg);
+  left: 0;
+  transition: left 180ms ease;
+}
+
+html[data-theme-mode="light"] .xamt-theme-toggle__indicator {
+  left: 33.333%;
+}
+
+html[data-theme-mode="dark"] .xamt-theme-toggle__indicator {
+  left: 66.666%;
+}
+
+html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
+  left: 0;
+}
+
+.xamt-theme-toggle button {
+  display: flex;
+  padding: 0.5rem;
+  cursor: pointer;
+  width: 33.333%;
+  background: transparent;
+  border: 0;
+  color: inherit;
 }
 
 .xamt-form {

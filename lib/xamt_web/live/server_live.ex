@@ -75,9 +75,15 @@ defmodule XamtWeb.ServerLive do
     channel = Channels.get_channel_by_slug!(server.id, channel_slug)
 
     socket =
-      if connected?(socket) and old_channel && old_channel.id != channel.id do
+      if (connected?(socket) and old_channel) && old_channel.id != channel.id do
         Phoenix.PubSub.unsubscribe(Xamt.PubSub, channel_topic(old_channel))
-        Presence.untrack_user(self(), channel_topic(old_channel), socket.assigns.current_scope.user)
+
+        Presence.untrack_user(
+          self(),
+          channel_topic(old_channel),
+          socket.assigns.current_scope.user
+        )
+
         Presence.track_user(self(), channel_topic(channel), socket.assigns.current_scope.user)
         Phoenix.PubSub.subscribe(Xamt.PubSub, channel_topic(channel))
         socket
@@ -518,7 +524,10 @@ defmodule XamtWeb.ServerLive do
 
   defp safe_html(%{content_html: html}) when is_binary(html) and html != "", do: html
   defp safe_html(%{content: %{"html" => html}}) when is_binary(html), do: html
-  defp safe_html(%{content: content}) when is_map(content), do: Phoenix.HTML.html_escape(inspect(content))
+
+  defp safe_html(%{content: content}) when is_map(content),
+    do: Phoenix.HTML.html_escape(inspect(content))
+
   defp safe_html(_), do: ""
 
   defp typing_label(typing_users) do

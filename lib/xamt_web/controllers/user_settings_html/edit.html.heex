@@ -21,7 +21,7 @@
     <.button variant="primary" phx-disable-with="Changing...">Change Email</.button>
   </.form>
 
-  <div class="divider" />
+  <div class="xamt-divider" />
 
   <.form :let={f} for={@password_changeset} action={~p"/users/settings"} id="update_password">
     <input type="hidden" name="action" value="update_password" />

@@ -5,14 +5,20 @@
         {gettext("Register")}
         <:subtitle>
           {gettext("Already registered?")}
-          <.link href={~p"/login"} class="font-semibold text-brand hover:underline">
+          <.link href={~p"/login"} class="xamt-link">
             {gettext("Log in")}
           </.link>
         </:subtitle>
       </.header>
     </div>
 
-    <.form :let={f} for={@changeset} action={~p"/register"} id="user-registration-form" class="xamt-form">
+    <.form
+      :let={f}
+      for={@changeset}
+      action={~p"/register"}
+      id="user-registration-form"
+      class="xamt-form"
+    >
       <.input
         field={f[:email]}
         type="email"
@@ -56,7 +62,7 @@
         required
       />
 
-      <.button class="btn btn-primary w-full">
+      <.button variant="primary" class="xamt-btn xamt-btn--primary w-full">
         {gettext("Create an account")}
       </.button>
     </.form>

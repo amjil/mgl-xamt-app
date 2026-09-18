@@ -28,6 +28,30 @@ window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 liveSocket.connect()
 window.liveSocket = liveSocket
 
+const applyTheme = (theme) => {
+  const root = document.documentElement
+  const mode = theme || "system"
+  root.setAttribute("data-theme-mode", mode)
+
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
+  const useDark = mode === "dark" || (mode === "system" && prefersDark)
+
+  root.classList.toggle("dark", useDark)
+  localStorage.setItem("phx:theme", mode)
+}
+
+applyTheme(localStorage.getItem("phx:theme") || "dark")
+
+window.addEventListener("phx:set-theme", (event) => {
+  applyTheme(event.target?.dataset?.phxTheme)
+})
+
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if (localStorage.getItem("phx:theme") === "system") {
+    applyTheme("system")
+  }
+})
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/pwa/service-worker.js").catch(() => {})
