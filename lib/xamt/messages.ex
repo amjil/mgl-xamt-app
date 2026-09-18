@@ -29,7 +29,7 @@ defmodule Xamt.Messages do
            |> Repo.insert() do
       message = Repo.preload(message, :user)
       LastMessageCache.put(channel_id, message.id)
-      broadcast(channel_id, :new_message, message)
+      broadcast(channel_id, :new_message, strip_for_broadcast(message))
       {:ok, message}
     end
   end
@@ -53,7 +53,7 @@ defmodule Xamt.Messages do
              })
              |> Repo.update() do
         message = Repo.preload(message, :user)
-        broadcast(message.channel_id, :updated_message, message)
+        broadcast(message.channel_id, :updated_message, strip_for_broadcast(message))
         {:ok, message}
       end
     end
@@ -155,6 +155,14 @@ defmodule Xamt.Messages do
       Map.get(attrs, :content_type) ||
       Map.get(content, "type") ||
       "rich_text"
+  end
+
+  # 剥离不需要的复杂嵌套数据。
+  # 前端 LiveView 渲染只依赖 `content_html` 和 `user`。
+  # 将 `content` (Map) 清空，避免 PubSub 广播时将复杂的 AST 树复制到所有订阅者的私有堆内存中。
+  # 大段的 `content_html` 作为 Refc Binary 会被虚拟机自动共享指针，无复制开销。
+  defp strip_for_broadcast(%Message{} = message) do
+    %{message | content: %{}}
   end
 
   defp broadcast(channel_id, event, message) do
