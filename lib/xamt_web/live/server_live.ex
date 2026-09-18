@@ -62,6 +62,12 @@ defmodule XamtWeb.ServerLive do
       |> assign(:mobile_panel, :messages)
       |> assign(:unread_channels, MapSet.new(unread_ids))
       |> assign_messages(messages)
+      |> allow_upload(:media,
+        accept: ~w(.jpg .jpeg .png .gif .webp),
+        max_entries: 4,
+        max_file_size: 10_000_000,
+        auto_upload: true
+      )
 
     if channel && is_nil(Map.get(params, "channel_slug")) do
       {:ok, push_navigate(socket, to: ~p"/servers/#{server.slug}/#{channel.slug}")}
@@ -112,25 +118,39 @@ defmodule XamtWeb.ServerLive do
   def handle_params(_params, _uri, socket), do: {:noreply, socket}
 
   @impl true
+  def handle_event("validate_upload", _params, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_event("cancel_upload", %{"ref" => ref}, socket) do
+    {:noreply, cancel_upload(socket, :media, ref)}
+  end
+
   def handle_event("send_message", params, socket) do
     scope = socket.assigns.current_scope
     channel = socket.assigns.active_channel
 
-    attrs = %{
-      "content" => decode_json(params["content_json"]),
-      "content_html" => params["content_html"],
-      "content_type" => params["content_type"] || "rich_text"
-    }
+    if Enum.any?(socket.assigns.uploads.media.entries, &(not &1.done?)) do
+      {:noreply, put_flash(socket, :error, gettext("Please wait for uploads to finish"))}
+    else
+      media_html = consume_media_html(socket)
 
-    case Messages.create_message(scope, channel.id, attrs) do
-      {:ok, _message} ->
-        {:noreply,
-         socket
-         |> assign(:editing_message_id, nil)
-         |> push_event("composer:clear", %{})}
+      attrs = %{
+        "content" => decode_json(params["content_json"]),
+        "content_html" => (params["content_html"] || "") <> media_html,
+        "content_type" => params["content_type"] || "rich_text"
+      }
 
-      {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, gettext("Could not send message"))}
+      case Messages.create_message(scope, channel.id, attrs) do
+        {:ok, _message} ->
+          {:noreply,
+           socket
+           |> assign(:editing_message_id, nil)
+           |> push_event("composer:clear", %{})}
+
+        {:error, _changeset} ->
+          {:noreply, put_flash(socket, :error, gettext("Could not send message"))}
+      end
     end
   end
 
@@ -153,21 +173,27 @@ defmodule XamtWeb.ServerLive do
     scope = socket.assigns.current_scope
     id = socket.assigns.editing_message_id
 
-    attrs = %{
-      "content" => decode_json(params["content_json"]),
-      "content_html" => params["content_html"],
-      "content_type" => params["content_type"] || "rich_text"
-    }
+    if Enum.any?(socket.assigns.uploads.media.entries, &(not &1.done?)) do
+      {:noreply, put_flash(socket, :error, gettext("Please wait for uploads to finish"))}
+    else
+      media_html = consume_media_html(socket)
 
-    case Messages.update_message(scope, id, attrs) do
-      {:ok, _message} ->
-        {:noreply,
-         socket
-         |> assign(:editing_message_id, nil)
-         |> push_event("composer:clear", %{})}
+      attrs = %{
+        "content" => decode_json(params["content_json"]),
+        "content_html" => (params["content_html"] || "") <> media_html,
+        "content_type" => params["content_type"] || "rich_text"
+      }
 
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, gettext("Could not update message"))}
+      case Messages.update_message(scope, id, attrs) do
+        {:ok, _message} ->
+          {:noreply,
+           socket
+           |> assign(:editing_message_id, nil)
+           |> push_event("composer:clear", %{})}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, gettext("Could not update message"))}
+      end
     end
   end
 
@@ -553,28 +579,73 @@ defmodule XamtWeb.ServerLive do
           {typing_label(@typing_users)}
         </div>
 
-        <div class="xamt-composer-wrap">
+        <div
+          class="xamt-composer-wrap"
+          data-has-uploads={to_string(@uploads.media.entries != [])}
+          data-submit-event={if @editing_message_id, do: "update_message", else: "send_message"}
+        >
+          <section
+            :if={@uploads.media.entries != []}
+            id="media-upload-preview"
+            class="xamt-upload-preview"
+          >
+            <div
+              :for={entry <- @uploads.media.entries}
+              class="xamt-upload-preview__item"
+            >
+              <.live_img_preview entry={entry} class="xamt-upload-preview__img" />
+              <div
+                :if={entry.progress < 100}
+                class="xamt-upload-preview__progress"
+                style={"width: #{entry.progress}%"}
+              >
+              </div>
+              <button
+                type="button"
+                id={"cancel-upload-#{entry.ref}"}
+                phx-click="cancel_upload"
+                phx-value-ref={entry.ref}
+                class="xamt-upload-preview__cancel"
+                aria-label={gettext("Cancel upload")}
+              >
+                <.icon name="hero-x-mark" class="size-3" />
+              </button>
+            </div>
+          </section>
+
+          <%!-- live_file_input must stay outside phx-update="ignore" so LiveView can patch upload state --%>
+          <form id="media-upload-form" phx-change="validate_upload" class="hidden">
+            <.live_file_input upload={@uploads.media} />
+          </form>
+
           <div
             id="message-composer"
             phx-hook="MessageComposer"
             phx-update="ignore"
-            data-editing={@editing_message_id}
-            data-submit-event={if @editing_message_id, do: "update_message", else: "send_message"}
           >
             <div class="xamt-composer__editor" id="composer-editor-host"></div>
-            <div class="xamt-composer__toolbar">
-              <button
-                :if={@editing_message_id}
-                type="button"
-                class="xamt-btn xamt-btn--sm"
-                phx-click="cancel_edit"
-              >
-                {gettext("Cancel")}
-              </button>
-              <button type="button" class="xamt-btn xamt-btn--primary" data-composer-send>
-                {if @editing_message_id, do: gettext("Save"), else: gettext("Send")}
-              </button>
-            </div>
+          </div>
+
+          <div class="xamt-composer__toolbar">
+            <label
+              for={@uploads.media.ref}
+              class="xamt-btn xamt-btn--soft cursor-pointer mr-auto"
+              title={gettext("Upload Media")}
+            >
+              <.icon name="hero-photo" class="size-5" />
+            </label>
+
+            <button
+              :if={@editing_message_id}
+              type="button"
+              class="xamt-btn xamt-btn--sm"
+              phx-click="cancel_edit"
+            >
+              {gettext("Cancel")}
+            </button>
+            <button type="button" class="xamt-btn xamt-btn--primary" data-composer-send>
+              {if @editing_message_id, do: gettext("Save"), else: gettext("Send")}
+            </button>
           </div>
         </div>
       </section>
@@ -704,4 +775,27 @@ defmodule XamtWeb.ServerLive do
   end
 
   defp decode_json(data) when is_map(data), do: data
+
+  defp consume_media_html(socket) do
+    socket
+    |> consume_uploaded_entries(:media, fn %{path: path}, entry ->
+      ext =
+        entry.client_name
+        |> Path.extname()
+        |> String.downcase()
+
+      if ext in ~w(.jpg .jpeg .png .gif .webp) do
+        filename = "#{entry.uuid}#{ext}"
+        dest = Path.join([:code.priv_dir(:xamt), "static", "uploads", filename])
+        File.mkdir_p!(Path.dirname(dest))
+        File.cp!(path, dest)
+        {:ok, "/uploads/#{filename}"}
+      else
+        {:ok, nil}
+      end
+    end)
+    |> Enum.filter(&is_binary/1)
+    |> Enum.map(fn url -> ~s(<div class="editor-image"><img src="#{url}" /></div>) end)
+    |> Enum.join()
+  end
 end

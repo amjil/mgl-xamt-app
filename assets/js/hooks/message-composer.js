@@ -113,6 +113,7 @@ function buildEditorAdapter(getRoot) {
 
 export const MessageComposer = {
   mounted() {
+    this.wrap = this.el.closest(".xamt-composer-wrap") || this.el
     this.host = this.el.querySelector(".xamt-composer__editor") || this.el
     this.editor = createMongolianEditor(this.host)
     this._root = () => editorRoot(this.host)
@@ -125,7 +126,7 @@ export const MessageComposer = {
       mount: document.body,
     })
 
-    this.sendBtn = this.el.querySelector("[data-composer-send]")
+    this.sendBtn = this.wrap.querySelector("[data-composer-send]")
     this._onSend = () => this.submit()
     this.sendBtn?.addEventListener("click", this._onSend)
 
@@ -166,7 +167,14 @@ export const MessageComposer = {
   },
 
   updated() {
-    // Keep editor instance
+    // Toolbar lives outside phx-update="ignore" and may be re-patched;
+    // re-bind send if LiveView replaced the button node.
+    const sendBtn = this.wrap.querySelector("[data-composer-send]")
+    if (sendBtn !== this.sendBtn) {
+      this.sendBtn?.removeEventListener("click", this._onSend)
+      this.sendBtn = sendBtn
+      this.sendBtn?.addEventListener("click", this._onSend)
+    }
   },
 
   // LiveView WebSocket restored — retry queued pushEvents
@@ -229,9 +237,10 @@ export const MessageComposer = {
 
     // Strip whitespace and zero-width chars so blank messages are rejected
     const text = (this._root()?.innerText || "").replace(/[\s\u200B-\u200D\uFEFF]/g, "")
-    if (!text && (!json || json.length === 0)) return
+    const hasUploads = this.wrap?.dataset?.hasUploads === "true"
+    if (!text && (!json || json.length === 0) && !hasUploads) return
 
-    const event = this.el.dataset.submitEvent || "send_message"
+    const event = this.wrap.dataset.submitEvent || this.el.dataset.submitEvent || "send_message"
     const payload = {
       content_html: html,
       content_json: JSON.stringify({ type: "rich_text", blocks: json }),
