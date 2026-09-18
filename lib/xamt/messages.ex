@@ -8,7 +8,7 @@ defmodule Xamt.Messages do
   alias Xamt.Accounts.Scope
   alias Xamt.Channels.LastMessageCache
   alias Xamt.Repo
-  alias Xamt.Messages.{Message, Reaction}
+  alias Xamt.Messages.{Message, RateLimiter, Reaction}
 
   @default_limit 50
   @preloads [:user, reply_to: :user]
@@ -17,7 +17,8 @@ defmodule Xamt.Messages do
     content = build_content(attrs)
     content_html = Map.get(attrs, "content_html") || Map.get(attrs, :content_html)
 
-    with {:ok, message} <-
+    with :ok <- RateLimiter.check_rate(user.id),
+         {:ok, message} <-
            %Message{}
            |> Message.changeset(%{
              channel_id: channel_id,

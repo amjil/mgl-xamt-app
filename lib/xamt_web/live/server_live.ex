@@ -208,6 +208,9 @@ defmodule XamtWeb.ServerLive do
            |> assign(:replying_to, nil)
            |> push_event("composer:clear", %{})}
 
+        {:error, :rate_limited} ->
+          {:noreply, put_flash(socket, :error, gettext("Messages sent too fast"))}
+
         {:error, _changeset} ->
           {:noreply, put_flash(socket, :error, gettext("Could not send message"))}
       end

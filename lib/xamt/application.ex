@@ -14,6 +14,7 @@ defmodule Xamt.Application do
       {Phoenix.PubSub, name: Xamt.PubSub},
       XamtWeb.Presence,
       Xamt.Channels.LastMessageCache,
+      Xamt.Messages.RateLimiter,
       XamtWeb.Endpoint
     ]
 

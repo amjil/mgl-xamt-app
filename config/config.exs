@@ -28,6 +28,9 @@ config :xamt,
 # bundled local dictionary only — the browser never attempts a request.
 config :xamt, :ime_base_url, nil
 
+# Message send rate limit (ETS sliding window). Tests override limit.
+config :xamt, Xamt.Messages.RateLimiter, limit: 5, window_seconds: 3
+
 # Configure the endpoint
 config :xamt, XamtWeb.Endpoint,
   url: [host: "localhost"],

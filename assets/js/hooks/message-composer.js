@@ -157,7 +157,7 @@ export const MessageComposer = {
       this._typingTimer = setTimeout(() => {
         if (this._canPush()) this.pushEvent("typing_stopped", {})
         this._isTyping = false
-      }, 1200)
+      }, 2000)
     })
 
     this.handleEvent("composer:clear", () => this.clear())

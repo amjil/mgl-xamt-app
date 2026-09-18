@@ -1,0 +1,83 @@
+defmodule Xamt.Messages.RateLimiter do
+  @moduledoc """
+  Lightweight sliding-window rate limit for message sends.
+
+  Keys are `{user_id, window}` buckets stored in ETS so checks stay in-process
+  and do not hit Postgres on the hot path.
+  """
+
+  use GenServer
+
+  @table :xamt_rate_limits
+  @default_limit 5
+  @default_window_seconds 3
+
+  def start_link(opts \\ []) do
+    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+  end
+
+  @impl true
+  def init(_opts) do
+    table =
+      case :ets.whereis(@table) do
+        :undefined ->
+          :ets.new(@table, [
+            :set,
+            :public,
+            :named_table,
+            read_concurrency: true,
+            write_concurrency: true
+          ])
+
+        _ref ->
+          @table
+      end
+
+    {:ok, %{table: table}}
+  end
+
+  @doc """
+  Returns `:ok` when the user is under the limit, or `{:error, :rate_limited}`.
+
+  Options:
+    * `:limit` — max events per window (default from app config, else 5)
+    * `:window_seconds` — bucket width in seconds (default 3)
+  """
+  def check_rate(user_id, opts \\ []) when not is_nil(user_id) do
+    {limit, window_seconds} = resolve_limits(opts)
+
+    if limit == :infinity or limit <= 0 do
+      :ok
+    else
+      now = System.system_time(:second)
+      key = {user_id, div(now, window_seconds)}
+
+      case :ets.update_counter(@table, key, {2, 1}, {key, 0}) do
+        count when count <= limit -> :ok
+        _ -> {:error, :rate_limited}
+      end
+    end
+  end
+
+  @doc false
+  def reset do
+    if :ets.whereis(@table) != :undefined, do: :ets.delete_all_objects(@table)
+    :ok
+  end
+
+  defp resolve_limits(opts) do
+    conf = Application.get_env(:xamt, __MODULE__, [])
+
+    limit =
+      Keyword.get(opts, :limit, Keyword.get(conf, :limit, @default_limit))
+
+    window =
+      Keyword.get(
+        opts,
+        :window_seconds,
+        Keyword.get(conf, :window_seconds, @default_window_seconds)
+      )
+
+    {limit, window}
+  end
+end

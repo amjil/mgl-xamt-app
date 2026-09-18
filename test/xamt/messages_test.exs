@@ -1,9 +1,9 @@
 defmodule Xamt.MessagesTest do
-  use Xamt.DataCase, async: true
+  use Xamt.DataCase, async: false
 
   alias Xamt.Accounts.Scope
   alias Xamt.{Channels, Messages, Servers}
-  alias Xamt.Messages.Reaction
+  alias Xamt.Messages.{RateLimiter, Reaction}
 
   setup do
     owner = Xamt.AccountsFixtures.user_fixture()
@@ -110,5 +110,29 @@ defmodule Xamt.MessagesTest do
 
     assert Messages.plain_text(message) == "hello there"
     assert Messages.excerpt(message, 5) == "hello…"
+  end
+
+  test "rate-limits rapid message creates", %{scope: scope, channel: channel, owner: owner} do
+    RateLimiter.reset()
+    previous = Application.get_env(:xamt, RateLimiter, [])
+
+    try do
+      Application.put_env(:xamt, RateLimiter, limit: 1, window_seconds: 60)
+
+      attrs = %{"content_html" => "<p>ok</p>", "content" => %{"type" => "rich_text"}}
+      assert {:ok, _} = Messages.create_message(scope, channel.id, attrs)
+      assert {:error, :rate_limited} = Messages.create_message(scope, channel.id, attrs)
+
+      # Direct check still respects explicit opts independently of app config
+      RateLimiter.reset()
+      assert :ok = RateLimiter.check_rate(owner.id, limit: 2, window_seconds: 60)
+      assert :ok = RateLimiter.check_rate(owner.id, limit: 2, window_seconds: 60)
+
+      assert {:error, :rate_limited} =
+               RateLimiter.check_rate(owner.id, limit: 2, window_seconds: 60)
+    after
+      RateLimiter.reset()
+      Application.put_env(:xamt, RateLimiter, previous)
+    end
   end
 end
