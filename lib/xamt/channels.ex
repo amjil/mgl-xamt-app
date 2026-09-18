@@ -7,8 +7,7 @@ defmodule Xamt.Channels do
 
   alias Xamt.Repo
   alias Xamt.Servers.Server
-  alias Xamt.Channels.{Channel, ChannelRead}
-  alias Xamt.Messages.Message
+  alias Xamt.Channels.{Channel, ChannelRead, LastMessageCache}
   alias Xamt.Slug
 
   def change_channel(%Channel{} = channel, attrs \\ %{}) do
@@ -65,26 +64,38 @@ defmodule Xamt.Channels do
   end
 
   @doc """
-  Returns channel IDs in the server that have messages newer than the user's last read.
-  Channels the user has never opened are unread if they contain any messages.
+  Returns channel IDs in the server that have unread messages.
+
+  Uses ETS last-message cache instead of scanning the messages table.
   """
   def get_unread_channel_ids(user_id, server_id)
       when is_binary(user_id) and is_binary(server_id) do
-    from(m in Message,
-      join: c in Channel,
-      on: c.id == m.channel_id and c.server_id == ^server_id,
-      left_join: cr in ChannelRead,
-      on: cr.channel_id == m.channel_id and cr.user_id == ^user_id,
-      left_join: lr in Message,
-      on: lr.id == cr.last_read_message_id,
-      where:
-        is_nil(m.deleted_at) and
-          (is_nil(cr.id) or
-             m.inserted_at > lr.inserted_at or
-             (m.inserted_at == lr.inserted_at and m.id > lr.id)),
-      distinct: true,
-      select: m.channel_id
-    )
-    |> Repo.all()
+    channel_ids =
+      from(c in Channel, where: c.server_id == ^server_id, select: c.id)
+      |> Repo.all()
+
+    if channel_ids == [] do
+      []
+    else
+      reads =
+        from(cr in ChannelRead,
+          where: cr.user_id == ^user_id and cr.channel_id in ^channel_ids,
+          select: {cr.channel_id, cr.last_read_message_id}
+        )
+        |> Repo.all()
+        |> Map.new()
+
+      Enum.filter(channel_ids, fn cid ->
+        latest_msg_id = LastMessageCache.get(cid)
+        last_read_id = Map.get(reads, cid)
+
+        cond do
+          is_nil(latest_msg_id) -> false
+          is_nil(last_read_id) -> true
+          latest_msg_id != last_read_id -> true
+          true -> false
+        end
+      end)
+    end
   end
 end

@@ -6,6 +6,7 @@ defmodule Xamt.Messages do
   import Ecto.Query, warn: false
 
   alias Xamt.Accounts.Scope
+  alias Xamt.Channels.LastMessageCache
   alias Xamt.Repo
   alias Xamt.Messages.Message
 
@@ -27,6 +28,7 @@ defmodule Xamt.Messages do
            })
            |> Repo.insert() do
       message = Repo.preload(message, :user)
+      LastMessageCache.put(channel_id, message.id)
       broadcast(channel_id, :new_message, message)
       {:ok, message}
     end
@@ -68,6 +70,7 @@ defmodule Xamt.Messages do
              |> Message.delete_changeset()
              |> Repo.update() do
         message = Repo.preload(message, :user)
+        LastMessageCache.refresh(message.channel_id)
         broadcast(message.channel_id, :deleted_message, message)
         {:ok, message}
       end

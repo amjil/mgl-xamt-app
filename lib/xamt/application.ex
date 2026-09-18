@@ -13,6 +13,7 @@ defmodule Xamt.Application do
       {DNSCluster, query: Application.get_env(:xamt, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Xamt.PubSub},
       XamtWeb.Presence,
+      Xamt.Channels.LastMessageCache,
       XamtWeb.Endpoint
     ]
 
