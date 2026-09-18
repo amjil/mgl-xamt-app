@@ -189,7 +189,7 @@ defmodule Xamt.Messages do
             fragment("search_tsv @@ plainto_tsquery('simple', ?)", ^normalized),
         order_by: [desc: m.inserted_at, desc: m.id],
         limit: ^limit,
-        preload: [:user]
+        preload: [:user, :channel]
       )
       |> Repo.all()
     end

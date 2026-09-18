@@ -12,6 +12,7 @@ import {MobileDrawer} from "./hooks/mobile-drawer"
 import {ToastHandler} from "./hooks/toast-handler"
 import {adoptImeElements} from "./utils/ime"
 import {trackViewportHeight} from "./utils/viewport"
+import {toast} from "./utils/offline-store"
 
 const Hooks = {
   ...colocatedHooks,
@@ -58,6 +59,22 @@ window.addEventListener("xamt:scroll-to", (event) => {
   el.scrollIntoView({behavior: "smooth", block: "nearest", inline: "center"})
   el.classList.add("is-highlighted")
   setTimeout(() => el.classList.remove("is-highlighted"), HIGHLIGHT_MS)
+})
+
+window.addEventListener("xamt:copy", async (event) => {
+  const el =
+    event.target instanceof HTMLElement ? event.target.closest("[data-copy]") : null
+  if (!el) return
+
+  const text = el.getAttribute("data-copy")
+  if (!text) return
+
+  try {
+    await navigator.clipboard.writeText(text)
+    toast("success", el.getAttribute("data-copied") || "Copied")
+  } catch {
+    toast("error", el.getAttribute("data-copy-failed") || "Could not copy")
+  }
 })
 
 trackViewportHeight()

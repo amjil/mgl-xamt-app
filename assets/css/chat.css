@@ -3,6 +3,7 @@
 .xamt-chat {
   position: relative;
   height: 100%;
+  max-height: var(--xamt-vh);
   overflow: hidden;
 }
 
@@ -13,6 +14,7 @@
   grid-template-columns: 4.75rem 20rem minmax(0, 1fr);
   grid-template-rows: minmax(0, 100%);
   height: 100%;
+  max-height: var(--xamt-vh);
   overflow: hidden;
   font-family: var(--xamt-font-mongol);
   background: var(--xamt-bg);
@@ -84,9 +86,19 @@
   font-size: 0.75rem;
 }
 
-.xamt-invite code {
+.xamt-invite code,
+.xamt-invite__uses {
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
   font-family: var(--xamt-font-ui);
   color: var(--xamt-accent-2);
+  flex: 0 0 auto;
+  inline-size: max-content;
+}
+
+.xamt-invite__uses {
+  color: var(--xamt-muted);
 }
 
 .xamt-rail__pane--top,
@@ -180,9 +192,19 @@
 
 .xamt-rail__sub,
 .xamt-role {
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
   color: var(--xamt-muted);
   font-size: 0.8rem;
   margin: 0.35rem 0 0;
+  flex: 0 0 auto;
+  inline-size: max-content;
+}
+
+.xamt-member > .mongol-text {
+  flex: 0 0 auto;
+  inline-size: max-content;
 }
 
 .xamt-rail--channels .xamt-rail__sub {
@@ -301,31 +323,43 @@
 .xamt-channel-item .xamt-channel-link {
   flex: 1 1 auto;
   min-height: 0;
+  height: auto;
 }
 
-.xamt-channel-item__tools,
-.xamt-member__tools {
-  display: flex;
+.xamt-menu {
+  position: relative;
+  flex: 0 0 auto;
+  z-index: 1;
+}
+
+.xamt-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.xamt-menu > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.xamt-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.xamt-menu > summary.xamt-icon-btn {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+}
+
+.xamt-menu__list {
+  display: none;
   flex-direction: row;
   align-items: center;
   gap: 0.1rem;
-  flex: 0 0 auto;
-  opacity: 0;
-  transition: opacity 140ms ease;
 }
 
-.xamt-channel-item:hover .xamt-channel-item__tools,
-.xamt-channel-item:focus-within .xamt-channel-item__tools,
-.xamt-member:hover .xamt-member__tools,
-.xamt-member:focus-within .xamt-member__tools {
-  opacity: 1;
-}
-
-@media (pointer: coarse) {
-  .xamt-channel-item__tools,
-  .xamt-member__tools {
-    opacity: 0.7;
-  }
+.xamt-menu[open] > .xamt-menu__list {
+  display: flex;
 }
 
 .xamt-channel-link,

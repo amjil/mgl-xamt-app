@@ -13,6 +13,7 @@ defmodule XamtWeb.Presence do
     track(pid, topic, to_string(user.id), %{
       username: user.username,
       display_name: user.display_name || user.username,
+      avatar: user.avatar,
       online_at: System.system_time(:second)
     })
   end

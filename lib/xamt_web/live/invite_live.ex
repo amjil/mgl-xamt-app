@@ -47,7 +47,7 @@ defmodule XamtWeb.InviteLive do
           <.header>
             <span class="mongol-text">{@invite.server.name}</span>
             <:subtitle>
-              <span class="xamt-upright">/{@invite.server.slug}</span>
+              <span>/{@invite.server.slug}</span>
             </:subtitle>
           </.header>
 

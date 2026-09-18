@@ -501,6 +501,9 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
 }
 
 .xamt-server-card__slug {
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
   color: var(--xamt-muted);
   font-size: 0.8rem;
 }
@@ -534,6 +537,8 @@ img.xamt-message__avatar {
   font-size: 0.7rem;
   border-radius: 0.4rem;
 }
+
+.xamt-avatar--lg {
   width: 4.4rem;
   height: 4.4rem;
   font-size: 1.6rem;

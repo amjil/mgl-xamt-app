@@ -125,6 +125,55 @@ defmodule XamtWeb.ServerLiveTest do
     assert render(view) =~ "unique-needle"
   end
 
+  test "search finds a message in another channel and patches to it", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    {:ok, other} = Channels.create_channel(scope, server, %{"name" => "second"})
+
+    {:ok, message} =
+      Messages.create_message(scope, other.id, %{
+        "content_html" => "<p>unique-needle</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    view |> form("#channel-search", %{q: "unique-needle"}) |> render_change()
+    assert has_element?(view, "#search-hit-#{message.id}")
+    assert render(view) =~ "second"
+
+    view |> element("#search-hit-#{message.id}") |> render_click()
+    assert_patch(view, ~p"/servers/#{server.slug}/#{other.slug}?highlight=#{message.id}")
+    assert has_element?(view, "#message-list[data-highlight='#{message.id}']")
+  end
+
+  test "channel admin menu is always reachable", %{
+    conn: conn,
+    server: server,
+    channel: channel
+  } do
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    assert has_element?(view, "#channel-menu-#{channel.id}")
+  end
+
+  test "invite settings expose a copyable absolute URL", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    {:ok, invite} = Servers.create_invite(scope, server.id)
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    view |> element("#toggle-server-settings") |> render_click()
+
+    assert has_element?(view, "#copy-invite-#{invite.id}")
+    html = render(view)
+    assert html =~ "/invite/#{invite.code}"
+    assert html =~ ~s(data-copy=")
+  end
+
   test "invite live redeems a code", %{scope: scope, server: server} do
     {:ok, invite} = Servers.create_invite(scope, server.id)
     stranger = user_fixture()

@@ -9,6 +9,7 @@ defmodule XamtWeb.ServerLive do
 
   @message_page_size 50
   @member_page_size 50
+  @mobile_panels ~w(servers channels messages members)
 
   @impl true
   def mount(%{"server_slug" => server_slug} = params, _session, socket) do
@@ -89,6 +90,7 @@ defmodule XamtWeb.ServerLive do
       |> assign(:unread_channels, MapSet.new(unread_ids))
       |> assign(:search_q, "")
       |> assign(:search_results, nil)
+      |> assign(:highlight_id, Map.get(params, "highlight"))
       |> assign_messages(messages)
       |> allow_upload(:media,
         accept: ~w(.jpg .jpeg .png .gif .webp),
@@ -146,8 +148,10 @@ defmodule XamtWeb.ServerLive do
      |> assign(:unread_channels, unread_channels)
      |> assign(:search_q, "")
      |> assign(:search_results, nil)
+     |> assign(:highlight_id, Map.get(params, "highlight"))
      |> assign_messages(messages)
-     |> maybe_push_composer_reset(params)}
+     |> maybe_push_composer_reset(params)
+     |> maybe_scroll_to_highlight(params)}
   end
 
   def handle_params(_params, _uri, socket), do: {:noreply, socket}
@@ -300,7 +304,7 @@ defmodule XamtWeb.ServerLive do
     oldest_id = socket.assigns[:oldest_message_id]
 
     if not socket.assigns.has_more_messages or is_nil(oldest_id) do
-      {:noreply, push_event(socket, "infinite_scroll:done", %{})}
+      {:noreply, done_loading(socket, "load_older")}
     else
       messages = Messages.list_messages(channel.id, before_id: oldest_id)
 
@@ -312,12 +316,12 @@ defmodule XamtWeb.ServerLive do
             |> assign(:has_more_messages, length(msgs) >= @message_page_size)
             |> merge_reactions(msgs)
             |> stream(:messages, msgs, at: 0)
-            |> maybe_done_loading(length(msgs) >= @message_page_size)
+            |> maybe_done_loading("load_older", length(msgs) >= @message_page_size)
 
           [] ->
             socket
             |> assign(:has_more_messages, false)
-            |> push_event("infinite_scroll:done", %{})
+            |> done_loading("load_older")
         end
 
       {:noreply, socket}
@@ -348,12 +352,12 @@ defmodule XamtWeb.ServerLive do
         if has_more do
           socket
         else
-          push_event(socket, "infinite_scroll:done", %{})
+          done_loading(socket, "load_more_members")
         end
 
       {:noreply, socket}
     else
-      {:noreply, push_event(socket, "infinite_scroll:done", %{})}
+      {:noreply, done_loading(socket, "load_more_members")}
     end
   end
 
@@ -536,10 +540,12 @@ defmodule XamtWeb.ServerLive do
     {:noreply, socket}
   end
 
-  def handle_event("set_mobile_panel", %{"panel" => panel}, socket) do
-    panel = String.to_existing_atom(panel)
-    {:noreply, assign(socket, :mobile_panel, panel)}
+  def handle_event("set_mobile_panel", %{"panel" => panel}, socket)
+      when panel in @mobile_panels do
+    {:noreply, assign(socket, :mobile_panel, String.to_existing_atom(panel))}
   end
+
+  def handle_event("set_mobile_panel", _params, socket), do: {:noreply, socket}
 
   def handle_event("search", %{"q" => q}, socket) do
     q = String.trim(q)
@@ -548,7 +554,7 @@ defmodule XamtWeb.ServerLive do
       if q == "" do
         nil
       else
-        Messages.search_messages([socket.assigns.active_channel.id], q)
+        Messages.search_messages(Enum.map(socket.assigns.channels, & &1.id), q)
       end
 
     {:noreply, assign(socket, search_q: q, search_results: results)}
@@ -558,12 +564,31 @@ defmodule XamtWeb.ServerLive do
     {:noreply, assign(socket, search_q: "", search_results: nil)}
   end
 
-  def handle_event("open_search_result", %{"id" => id}, socket) do
-    {:noreply,
-     socket
-     |> assign(:search_results, nil)
-     |> assign(:search_q, "")
-     |> push_event("messages:scroll_to", %{id: id})}
+  def handle_event("open_search_result", %{"id" => id} = params, socket) do
+    channel_id = params["channel-id"] || params["channel_id"]
+    active = socket.assigns.active_channel
+
+    socket =
+      socket
+      |> assign(:search_results, nil)
+      |> assign(:search_q, "")
+
+    cond do
+      is_nil(channel_id) or (active && active.id == channel_id) ->
+        {:noreply, push_event(socket, "messages:scroll_to", %{id: id})}
+
+      true ->
+        case Enum.find(socket.assigns.channels, &(&1.id == channel_id)) do
+          nil ->
+            {:noreply, socket}
+
+          channel ->
+            {:noreply,
+             push_patch(socket,
+               to: ~p"/servers/#{socket.assigns.server.slug}/#{channel.slug}?highlight=#{id}"
+             )}
+        end
+    end
   end
 
   @impl true
@@ -671,7 +696,7 @@ defmodule XamtWeb.ServerLive do
         <.header>
           <span class="mongol-text">{@server.name}</span>
           <:subtitle>
-            <span class="xamt-upright">/{@server.slug}</span>
+            <span>/{@server.slug}</span>
           </:subtitle>
         </.header>
 
@@ -744,7 +769,7 @@ defmodule XamtWeb.ServerLive do
           <div class="xamt-rail__pane xamt-rail__pane--top">
             <header class="xamt-rail__header">
               <h1 class="xamt-rail__title mongol-text">{@server.name}</h1>
-              <p class="xamt-rail__sub"><span class="xamt-upright">/{@server.slug}</span></p>
+              <p class="xamt-rail__sub">/{@server.slug}</p>
               <button
                 :if={@admin?}
                 type="button"
@@ -856,7 +881,11 @@ defmodule XamtWeb.ServerLive do
                     </span>
                   </.link>
 
-                  <div :if={@admin? and @editing_channel_id != ch.id} class="xamt-channel-item__tools">
+                  <.action_menu
+                    :if={@admin? and @editing_channel_id != ch.id}
+                    id={"channel-menu-#{ch.id}"}
+                    label={gettext("Channel actions")}
+                  >
                     <button
                       type="button"
                       class="xamt-icon-btn"
@@ -896,7 +925,7 @@ defmodule XamtWeb.ServerLive do
                     >
                       <.icon name="hero-trash" class="size-3" />
                     </button>
-                  </div>
+                  </.action_menu>
                 </div>
               </nav>
             </div>
@@ -907,8 +936,9 @@ defmodule XamtWeb.ServerLive do
               <h3 class="xamt-rail__section-head mongol-text">{gettext("Online")}</h3>
               <ul class="xamt-member-list">
                 <li :for={user <- @online_users} class="xamt-member">
+                  <.avatar user={user} class="xamt-avatar xamt-avatar--sm" />
                   <span class="xamt-presence is-online"></span>
-                  <span class="mongol-text">{user}</span>
+                  <span class="mongol-text">{user.display_name}</span>
                 </li>
               </ul>
 
@@ -918,15 +948,16 @@ defmodule XamtWeb.ServerLive do
                   <.avatar user={member.user} class="xamt-avatar xamt-avatar--sm" />
                   <span class="xamt-presence"></span>
                   <span class="mongol-text">{display_name(member.user)}</span>
-                  <span :if={member.role != "member"} class="xamt-role xamt-upright">
+                  <span :if={member.role != "member"} class="xamt-role">
                     {member.role}
                   </span>
 
-                  <span
+                  <.action_menu
                     :if={
                       @admin? and member.role != "owner" and member.user_id != @current_scope.user.id
                     }
-                    class="xamt-member__tools"
+                    id={"member-menu-#{member.user_id}"}
+                    label={gettext("Member actions")}
                   >
                     <button
                       type="button"
@@ -951,7 +982,7 @@ defmodule XamtWeb.ServerLive do
                     >
                       <.icon name="hero-user-minus" class="size-3" />
                     </button>
-                  </span>
+                  </.action_menu>
                 </li>
                 <li
                   :if={@has_more_members}
@@ -1048,8 +1079,13 @@ defmodule XamtWeb.ServerLive do
                 class="xamt-search-hit"
                 phx-click="open_search_result"
                 phx-value-id={message.id}
+                phx-value-channel-id={message.channel_id}
               >
                 <span class="xamt-quote__author mongol-text">{display_name(message.user)}</span>
+                <span :if={message.channel} class="xamt-search-hit__channel mongol-text">
+                  <span class="xamt-channel-hash">#</span>
+                  {message.channel.name}
+                </span>
                 <span class="xamt-quote__text mongol-text">{Messages.excerpt(message)}</span>
               </button>
             </div>
@@ -1062,11 +1098,18 @@ defmodule XamtWeb.ServerLive do
               <p class="mongol-text">{gettext("No messages yet. Write the first one.")}</p>
             </div>
 
-            <div id="message-list" class="xamt-messages" phx-update="stream" phx-hook="MessageList">
+            <div
+              id="message-list"
+              class="xamt-messages"
+              phx-update="stream"
+              phx-hook="MessageList"
+              data-highlight={@highlight_id}
+            >
               <div
                 :if={@has_more_messages}
                 id="messages-infinite-scroll"
                 phx-hook="InfiniteScroll"
+                data-event="load_older"
                 class="xamt-scroll-sentinel"
               >
               </div>
@@ -1289,14 +1332,42 @@ defmodule XamtWeb.ServerLive do
     |> Enum.sort_by(fn {emoji, _users} -> Enum.find_index(Reaction.emojis(), &(&1 == emoji)) end)
   end
 
-  defp maybe_done_loading(socket, true), do: socket
+  defp maybe_done_loading(socket, _event, true), do: socket
 
-  defp maybe_done_loading(socket, false) do
-    push_event(socket, "infinite_scroll:done", %{})
+  defp maybe_done_loading(socket, event, false) do
+    done_loading(socket, event)
   end
+
+  defp done_loading(socket, event) do
+    push_event(socket, "infinite_scroll:done", %{event: event})
+  end
+
+  defp maybe_scroll_to_highlight(socket, %{"highlight" => id})
+       when is_binary(id) and id != "" do
+    push_event(socket, "messages:scroll_to", %{id: id})
+  end
+
+  defp maybe_scroll_to_highlight(socket, _), do: socket
 
   defp maybe_push_composer_reset(socket, _params) do
     push_event(socket, "composer:clear", %{})
+  end
+
+  attr :id, :string, required: true
+  attr :label, :string, required: true
+  slot :inner_block, required: true
+
+  defp action_menu(assigns) do
+    ~H"""
+    <details id={@id} class="xamt-menu">
+      <summary class="xamt-icon-btn" aria-label={@label}>
+        <.icon name="hero-ellipsis-vertical" class="size-4" />
+      </summary>
+      <div class="xamt-menu__list">
+        {render_slot(@inner_block)}
+      </div>
+    </details>
+    """
   end
 
   # Overlays the whole channel rail so the rail keeps its width while open
@@ -1384,8 +1455,20 @@ defmodule XamtWeb.ServerLive do
 
       <ul class="xamt-invite-list">
         <li :for={invite <- @invites} class="xamt-invite">
-          <code class="xamt-upright">/invite/{invite.code}</code>
-          <span :if={invite.max_uses} class="xamt-upright">{invite.uses}/{invite.max_uses}</span>
+          <code>/invite/{invite.code}</code>
+          <span :if={invite.max_uses} class="xamt-invite__uses">{invite.uses}/{invite.max_uses}</span>
+          <button
+            type="button"
+            id={"copy-invite-#{invite.id}"}
+            class="xamt-icon-btn"
+            phx-click={JS.dispatch("xamt:copy")}
+            data-copy={url(~p"/invite/#{invite.code}")}
+            data-copied={gettext("Copied")}
+            data-copy-failed={gettext("Could not copy")}
+            aria-label={gettext("Copy invite link")}
+          >
+            <.icon name="hero-clipboard" class="size-3" />
+          </button>
           <button
             type="button"
             class="xamt-icon-btn"
@@ -1441,9 +1524,18 @@ defmodule XamtWeb.ServerLive do
   defp list_online(channel) do
     Presence.list(channel_topic(channel))
     |> Enum.map(fn {_id, %{metas: metas}} ->
-      List.first(metas)[:display_name] || List.first(metas)[:username]
+      meta = List.first(metas) || %{}
+
+      %{
+        display_name: presence_meta(meta, :display_name) || presence_meta(meta, :username) || "?",
+        username: presence_meta(meta, :username),
+        avatar: presence_meta(meta, :avatar)
+      }
     end)
-    |> Enum.reject(&is_nil/1)
+  end
+
+  defp presence_meta(meta, key) when is_atom(key) do
+    Map.get(meta, key) || Map.get(meta, Atom.to_string(key))
   end
 
   defp display_name(%{display_name: name}) when is_binary(name) and name != "", do: name

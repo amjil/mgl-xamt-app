@@ -124,7 +124,7 @@ defmodule XamtWeb.HomeLive do
                   <span class="xamt-server-card__icon">{server_initial(server.name)}</span>
                   <span class="xamt-server-card__meta">
                     <span class="xamt-server-card__name mongol-text">{server.name}</span>
-                    <span class="xamt-server-card__slug xamt-upright">/{server.slug}</span>
+                    <span class="xamt-server-card__slug">/{server.slug}</span>
                   </span>
                 </.link>
               </li>
@@ -149,7 +149,7 @@ defmodule XamtWeb.HomeLive do
                   <span class="xamt-server-card__icon">{server_initial(server.name)}</span>
                   <span class="xamt-server-card__meta">
                     <span class="xamt-server-card__name mongol-text">{server.name}</span>
-                    <span class="xamt-server-card__slug xamt-upright">/{server.slug}</span>
+                    <span class="xamt-server-card__slug">/{server.slug}</span>
                   </span>
                 </.link>
               </li>

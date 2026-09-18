@@ -81,6 +81,11 @@
   background: var(--xamt-accent-soft);
 }
 
+.xamt-search-hit__channel {
+  color: var(--xamt-muted);
+  font-size: 0.8rem;
+}
+
 .xamt-message__content {
   min-width: 4rem;
   max-width: 40vw;

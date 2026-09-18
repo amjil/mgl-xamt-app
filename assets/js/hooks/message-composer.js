@@ -299,13 +299,12 @@ export const MessageList = {
       })
     })
 
-    this.handleEvent("messages:scroll_to", ({id}) => {
-      const article = this.el.querySelector(`[data-message-id="${id}"]`)
-      if (!article) return
-      article.scrollIntoView({behavior: "smooth", block: "nearest", inline: "center"})
-      article.classList.add("is-highlighted")
-      setTimeout(() => article.classList.remove("is-highlighted"), 1600)
-    })
+    this.handleEvent("messages:scroll_to", ({id}) => this.highlightMessage(id))
+    this.highlightFromDataset()
+  },
+
+  updated() {
+    this.highlightFromDataset()
   },
 
   destroyed() {
@@ -324,5 +323,21 @@ export const MessageList = {
 
   showJump(visible) {
     this.jumpBtn?.classList.toggle("is-visible", visible)
+  },
+
+  highlightFromDataset() {
+    const id = this.el.dataset.highlight
+    if (id) this.highlightMessage(id)
+  },
+
+  highlightMessage(id) {
+    if (!id || this._highlighted === id) return
+    const article = this.el.querySelector(`[data-message-id="${CSS.escape(id)}"]`)
+    if (!article) return
+
+    this._highlighted = id
+    article.scrollIntoView({behavior: "smooth", block: "nearest", inline: "center"})
+    article.classList.add("is-highlighted")
+    setTimeout(() => article.classList.remove("is-highlighted"), 1600)
   },
 }

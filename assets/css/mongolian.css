@@ -68,8 +68,9 @@
   --mgl-ime-font: var(--xamt-font-mongol);
   color-scheme: light;
 
-  /* Usable viewport height. `svh` avoids the iOS URL-bar jump; the
-     ViewportKeyboard hook narrows it further while a keyboard is open. */
+  /* Usable viewport height. `dvh` tracks the dynamic toolbar; `svh` is the
+     fallback. The ViewportKeyboard hook narrows it further while a keyboard
+     is open. */
   --xamt-vh: 100svh;
   --xamt-safe-top: env(safe-area-inset-top, 0px);
   --xamt-safe-right: env(safe-area-inset-right, 0px);
@@ -110,6 +111,12 @@
   color-scheme: dark;
 }
 
+@supports (height: 100dvh) {
+  :root {
+    --xamt-vh: 100dvh;
+  }
+}
+
 *,
 *::before,
 *::after {
@@ -119,7 +126,7 @@
 html,
 body {
   margin: 0;
-  height: 100%;
+  height: var(--xamt-vh);
   overflow: hidden;
 }
 
@@ -200,6 +207,7 @@ body {
   -webkit-writing-mode: vertical-lr;
   text-orientation: mixed;
   line-height: 1.75;
+  letter-spacing: 0.06em;
 }
 
 /* Latin / UI chrome that must stay horizontal inside a vertical surface */

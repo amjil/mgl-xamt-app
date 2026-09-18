@@ -10,7 +10,7 @@ defmodule Xamt.MessagesTest do
     scope = Scope.for_user(owner)
     {:ok, server} = Servers.create_server(scope, %{"name" => "Test"})
     channel = hd(Channels.list_channels(server.id))
-    %{scope: scope, channel: channel, owner: owner}
+    %{scope: scope, channel: channel, owner: owner, server: server}
   end
 
   test "stores a reply_to_id and preloads the parent", %{scope: scope, channel: channel} do
@@ -79,6 +79,26 @@ defmodule Xamt.MessagesTest do
 
     assert Messages.search_messages([channel.id], "beta") != []
     assert Messages.search_messages([channel.id], "alpha") == []
+  end
+
+  test "search finds messages across the given channels", %{
+    scope: scope,
+    channel: channel,
+    server: server
+  } do
+    {:ok, other} = Channels.create_channel(scope, server, %{"name" => "other"})
+
+    {:ok, message} =
+      Messages.create_message(scope, other.id, %{
+        "content_html" => "<p>cross-channel-needle</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    hits = Messages.search_messages([channel.id, other.id], "cross-channel-needle")
+    assert length(hits) == 1
+    assert hd(hits).id == message.id
+    assert hd(hits).channel.name == "other"
+    assert Messages.search_messages([channel.id], "cross-channel-needle") == []
   end
 
   test "plain_text strips tags", %{scope: scope, channel: channel} do

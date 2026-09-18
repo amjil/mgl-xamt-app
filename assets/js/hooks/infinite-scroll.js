@@ -2,6 +2,7 @@ export const InfiniteScroll = {
   mounted() {
     this.loading = false
     this.oldScrollWidth = null
+    this.eventName = this.el.dataset.event || "load_older"
 
     this.observer = new IntersectionObserver(
       (entries) => {
@@ -9,10 +10,7 @@ export const InfiniteScroll = {
           if (entry.isIntersecting && !this.loading) {
             this.loading = true
             this.oldScrollWidth = this.el.parentNode.scrollWidth
-
-            // Read event name dynamically; fall back to load_older for compatibility
-            const eventName = this.el.dataset.event || "load_older"
-            this.pushEvent(eventName, {})
+            this.pushEvent(this.eventName, {})
           }
         })
       },
@@ -22,8 +20,8 @@ export const InfiniteScroll = {
 
     this.observer.observe(this.el)
 
-    this.handleEvent("infinite_scroll:done", () => {
-      this.observer.disconnect()
+    this.handleEvent("infinite_scroll:done", ({event} = {}) => {
+      if (!event || event === this.eventName) this.observer.disconnect()
     })
   },
 
