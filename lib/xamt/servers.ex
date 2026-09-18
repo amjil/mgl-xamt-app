@@ -93,10 +93,15 @@ defmodule Xamt.Servers do
     end
   end
 
-  def list_members(server_id) do
+  def list_members(server_id, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 50)
+    offset = Keyword.get(opts, :offset, 0)
+
     from(m in ServerMember,
       where: m.server_id == ^server_id,
       order_by: [asc: m.inserted_at],
+      limit: ^limit,
+      offset: ^offset,
       preload: [:user]
     )
     |> Repo.all()

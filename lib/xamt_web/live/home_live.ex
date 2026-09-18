@@ -50,8 +50,8 @@ defmodule XamtWeb.HomeLive do
       <Layouts.flash_group flash={@flash} />
       <header class="xamt-home__hero">
         <p class="xamt-brand">Xamt</p>
-        <h1 class="xamt-home__title mongol-text">{gettext("ᠮᠣᠩᠭᠣᠯ ᠨᠡᠢᠲᠡᠯᠡᠭᠡ")}</h1>
-        <p class="xamt-home__lead">
+        <h1 class="xamt-home__title mongol-text">{gettext("Mongolian community")}</h1>
+        <p class="xamt-home__lead mongol-text">
           {gettext("Traditional Mongolian community & realtime chat")}
         </p>
       </header>
@@ -59,8 +59,8 @@ defmodule XamtWeb.HomeLive do
       <%= if @current_scope && @current_scope.user do %>
         <section class="xamt-home__panel">
           <div class="xamt-home__toolbar">
-            <h2 class="xamt-section-title">{gettext("Your servers")}</h2>
-            <button type="button" class="xamt-btn" phx-click="toggle_create">
+            <h2 class="xamt-section-title mongol-text">{gettext("Your servers")}</h2>
+            <button type="button" class="xamt-btn mongol-text" phx-click="toggle_create">
               {if @show_create, do: gettext("Cancel"), else: gettext("Create server")}
             </button>
           </div>
@@ -93,7 +93,9 @@ defmodule XamtWeb.HomeLive do
                 phx-hook="MongolianIME"
               ></textarea>
             </label>
-            <button type="submit" class="xamt-btn xamt-btn--primary">{gettext("Create")}</button>
+            <button type="submit" class="xamt-btn xamt-btn--primary mongol-text">
+              {gettext("Create")}
+            </button>
           </form>
 
           <ul class="xamt-server-list">
@@ -114,8 +116,10 @@ defmodule XamtWeb.HomeLive do
         </section>
       <% else %>
         <section class="xamt-home__cta">
-          <.link navigate={~p"/login"} class="xamt-btn xamt-btn--primary">{gettext("Log in")}</.link>
-          <.link navigate={~p"/register"} class="xamt-btn">{gettext("Register")}</.link>
+          <.link navigate={~p"/login"} class="xamt-btn xamt-btn--primary mongol-text">
+            {gettext("Log in")}
+          </.link>
+          <.link navigate={~p"/register"} class="xamt-btn mongol-text">{gettext("Register")}</.link>
         </section>
       <% end %>
     </div>

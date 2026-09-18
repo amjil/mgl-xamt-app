@@ -9,7 +9,10 @@ export const InfiniteScroll = {
           if (entry.isIntersecting && !this.loading) {
             this.loading = true
             this.oldScrollHeight = this.el.parentNode.scrollHeight
-            this.pushEvent("load_older", {})
+
+            // 动态读取事件名称，默认降级为 load_older 保持兼容
+            const eventName = this.el.dataset.event || "load_older"
+            this.pushEvent(eventName, {})
           }
         })
       },

@@ -29,17 +29,19 @@
         <ul class="xamt-topnav__links">
           <%= if @current_scope && @current_scope.user do %>
             <li>
-              <.link navigate={~p"/settings"}>{gettext("Settings")}</.link>
+              <.link navigate={~p"/settings"} class="mongol-text">{gettext("Settings")}</.link>
             </li>
             <li>
-              <.link href={~p"/users/log-out"} method="delete">{gettext("Log out")}</.link>
+              <.link href={~p"/users/log-out"} method="delete" class="mongol-text">
+                {gettext("Log out")}
+              </.link>
             </li>
           <% else %>
             <li>
-              <.link navigate={~p"/register"}>{gettext("Register")}</.link>
+              <.link navigate={~p"/register"} class="mongol-text">{gettext("Register")}</.link>
             </li>
             <li>
-              <.link navigate={~p"/login"}>{gettext("Log in")}</.link>
+              <.link navigate={~p"/login"} class="mongol-text">{gettext("Log in")}</.link>
             </li>
           <% end %>
         </ul>

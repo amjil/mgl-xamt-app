@@ -6,6 +6,7 @@ defmodule XamtWeb.ServerLive do
   alias XamtWeb.Presence
 
   @message_page_size 50
+  @member_page_size 50
 
   @impl true
   def mount(%{"server_slug" => server_slug} = params, _session, socket) do
@@ -17,7 +18,7 @@ defmodule XamtWeb.ServerLive do
     end
 
     channels = Channels.list_channels(server.id)
-    members = Servers.list_members(server.id)
+    members = Servers.list_members(server.id, limit: @member_page_size, offset: 0)
 
     channel =
       case Map.get(params, "channel_slug") do
@@ -49,7 +50,9 @@ defmodule XamtWeb.ServerLive do
       |> assign(:server, server)
       |> assign(:user_servers, user_servers)
       |> assign(:channels, channels)
-      |> assign(:members, members)
+      |> assign(:members_offset, @member_page_size)
+      |> assign(:has_more_members, length(members) == @member_page_size)
+      |> stream(:members, members)
       |> assign(:active_channel, channel)
       |> assign(:online_users, list_online(channel))
       |> assign(:typing_users, %{})
@@ -207,6 +210,39 @@ defmodule XamtWeb.ServerLive do
         end
 
       {:noreply, socket}
+    end
+  end
+
+  def handle_event("load_more_members", _params, socket) do
+    if socket.assigns.has_more_members do
+      server = socket.assigns.server
+      offset = socket.assigns.members_offset
+
+      new_members =
+        Servers.list_members(server.id, limit: @member_page_size, offset: offset)
+
+      has_more = length(new_members) == @member_page_size
+
+      socket =
+        socket
+        |> assign(:members_offset, offset + @member_page_size)
+        |> assign(:has_more_members, has_more)
+
+      socket =
+        Enum.reduce(new_members, socket, fn member, acc ->
+          stream_insert(acc, :members, member)
+        end)
+
+      socket =
+        if has_more do
+          socket
+        else
+          push_event(socket, "infinite_scroll:done", %{})
+        end
+
+      {:noreply, socket}
+    else
+      {:noreply, push_event(socket, "infinite_scroll:done", %{})}
     end
   end
 
@@ -552,11 +588,20 @@ defmodule XamtWeb.ServerLive do
           </li>
         </ul>
         <h3 class="xamt-rail__section-head">{gettext("Members")}</h3>
-        <ul class="xamt-member-list">
-          <li :for={member <- @members} class="xamt-member">
+        <ul id="server-members-list" class="xamt-member-list" phx-update="stream">
+          <li :for={{dom_id, member} <- @streams.members} id={dom_id} class="xamt-member">
             <span class="xamt-presence"></span>
             <span class="mongol-text">{display_name(member.user)}</span>
             <span class="xamt-role">{member.role}</span>
+          </li>
+
+          <li
+            :if={@has_more_members}
+            id="members-infinite-scroll"
+            phx-hook="InfiniteScroll"
+            data-event="load_more_members"
+            class="h-2 w-full shrink-0"
+          >
           </li>
         </ul>
       </aside>

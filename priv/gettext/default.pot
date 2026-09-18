@@ -1,0 +1,273 @@
+## This file is a PO Template file.
+##
+## "msgid"s here are often extracted from source code.
+## Add new messages manually only if they're dynamic
+## messages that can't be statically extracted.
+##
+## Run "mix gettext.extract" to bring this file up to
+## date. Leave "msgstr"s empty as changing them here has no
+## effect: edit them in PO (.po) files instead.
+#
+msgid ""
+msgstr ""
+
+#: lib/xamt_web/live/server_live.ex:648
+#, elixir-autogen, elixir-format
+msgid "%{names} typing…"
+msgstr ""
+
+#: lib/xamt_web/live/settings_live.ex:90
+#, elixir-autogen, elixir-format
+msgid "Account / password"
+msgstr ""
+
+#: lib/xamt_web/components/core_components.ex:371
+#, elixir-autogen, elixir-format
+msgid "Actions"
+msgstr ""
+
+#: lib/xamt_web/live/server_live.ex:403
+#, elixir-autogen, elixir-format
+msgid "Add"
+msgstr ""
+
+#: lib/xamt_web/controllers/user_registration_html/new.html.heex:7
+#, elixir-autogen, elixir-format
+msgid "Already registered?"
+msgstr ""
+
+#: lib/xamt_web/components/layouts.ex:72
+#: lib/xamt_web/components/layouts.ex:84
+#, elixir-autogen, elixir-format
+msgid "Attempting to reconnect"
+msgstr ""
+
+#: lib/xamt_web/live/settings_live.ex:77
+#, elixir-autogen, elixir-format
+msgid "Avatar URL"
+msgstr ""
+
+#: lib/xamt_web/live/profile_live.ex:37
+#, elixir-autogen, elixir-format
+msgid "Back"
+msgstr ""
+
+#: lib/xamt_web/live/settings_live.ex:67
+#, elixir-autogen, elixir-format
+msgid "Bio"
+msgstr ""
+
+#: lib/xamt_web/live/home_live.ex:64
+#: lib/xamt_web/live/server_live.ex:536
+#, elixir-autogen, elixir-format
+msgid "Cancel"
+msgstr ""
+
+#: lib/xamt_web/live/server_live.ex:397
+#, elixir-autogen, elixir-format
+msgid "Channel name"
+msgstr ""
+
+#: lib/xamt_web/live/server_live.ex:375
+#, elixir-autogen, elixir-format
+msgid "Channels"
+msgstr ""
+
+#: lib/xamt_web/controllers/user_registration_html/new.html.heex:60
+#, elixir-autogen, elixir-format
+msgid "Confirm password"
+msgstr ""
+
+#: lib/xamt_web/live/server_live.ex:181
+#, elixir-autogen, elixir-format
+msgid "Could not delete message"
+msgstr ""
+
+#: lib/xamt_web/live/server_live.ex:130
+#, elixir-autogen, elixir-format
+msgid "Could not send message"
+msgstr ""
+
+#: lib/xamt_web/live/server_live.ex:167
+#, elixir-autogen, elixir-format
+msgid "Could not update message"
+msgstr ""
+
+#: lib/xamt_web/live/home_live.ex:96
+#, elixir-autogen, elixir-format
+msgid "Create"
+msgstr ""
+
+#: lib/xamt_web/controllers/user_registration_html/new.html.heex:66
+#, elixir-autogen, elixir-format
+msgid "Create an account"
+msgstr ""
+
+#: lib/xamt_web/live/home_live.ex:64
+#, elixir-autogen, elixir-format
+msgid "Create server"
+msgstr ""
+
+#: lib/xamt_web/live/server_live.ex:509
+#, elixir-autogen, elixir-format
+msgid "Delete"
+msgstr ""
+
+#: lib/xamt_web/live/server_live.ex:507
+#, elixir-autogen, elixir-format
+msgid "Delete this message?"
+msgstr ""
+
+#: lib/xamt_web/live/home_live.ex:87
+#, elixir-autogen, elixir-format
+msgid "Description"
+msgstr ""
+
+#: lib/xamt_web/controllers/user_registration_html/new.html.heex:39
+#: lib/xamt_web/live/settings_live.ex:55
+#, elixir-autogen, elixir-format
+msgid "Display name"
+msgstr ""
+
+#: lib/xamt_web/live/server_live.ex:501
+#, elixir-autogen, elixir-format
+msgid "Edit"
+msgstr ""
+
+#: lib/xamt_web/controllers/user_registration_html/new.html.heex:25
+#, elixir-autogen, elixir-format
+msgid "Email"
+msgstr ""
+
+#: lib/xamt_web/components/layouts/root.html.heex:42
+#: lib/xamt_web/controllers/user_registration_html/new.html.heex:9
+#: lib/xamt_web/live/home_live.ex:117
+#, elixir-autogen, elixir-format
+msgid "Log in"
+msgstr ""
+
+#: lib/xamt_web/components/layouts/root.html.heex:35
+#: lib/xamt_web/live/settings_live.ex:92
+#, elixir-autogen, elixir-format
+msgid "Log out"
+msgstr ""
+
+#: lib/xamt_web/live/server_live.ex:554
+#, elixir-autogen, elixir-format
+msgid "Members"
+msgstr ""
+
+#: lib/xamt_web/live/home_live.ex:53
+#, elixir-autogen, elixir-format
+msgid "Mongolian community"
+msgstr ""
+
+#: lib/xamt_web/live/home_live.ex:75
+#, elixir-autogen, elixir-format
+msgid "Name"
+msgstr ""
+
+#: lib/xamt_web/live/server_live.ex:380
+#, elixir-autogen, elixir-format
+msgid "New channel"
+msgstr ""
+
+#: lib/xamt_web/live/profile_live.ex:36
+#, elixir-autogen, elixir-format
+msgid "No bio yet."
+msgstr ""
+
+#: lib/xamt_web/live/home_live.ex:112
+#, elixir-autogen, elixir-format
+msgid "No servers yet. Create one to start chatting."
+msgstr ""
+
+#: lib/xamt_web/live/server_live.ex:547
+#, elixir-autogen, elixir-format
+msgid "Online"
+msgstr ""
+
+#: lib/xamt_web/controllers/user_registration_html/new.html.heex:53
+#, elixir-autogen, elixir-format
+msgid "Password"
+msgstr ""
+
+#: lib/xamt_web/live/settings_live.ex:34
+#, elixir-autogen, elixir-format
+msgid "Profile updated"
+msgstr ""
+
+#: lib/xamt_web/components/layouts/root.html.heex:39
+#: lib/xamt_web/controllers/user_registration_html/new.html.heex:5
+#: lib/xamt_web/live/home_live.ex:118
+#, elixir-autogen, elixir-format
+msgid "Register"
+msgstr ""
+
+#: lib/xamt_web/live/server_live.ex:539
+#: lib/xamt_web/live/settings_live.ex:86
+#, elixir-autogen, elixir-format
+msgid "Save"
+msgstr ""
+
+#: lib/xamt_web/live/server_live.ex:539
+#, elixir-autogen, elixir-format
+msgid "Send"
+msgstr ""
+
+#: lib/xamt_web/live/home_live.ex:38
+#, elixir-autogen, elixir-format
+msgid "Server created"
+msgstr ""
+
+#: lib/xamt_web/components/layouts/root.html.heex:32
+#: lib/xamt_web/live/settings_live.ex:13
+#: lib/xamt_web/live/settings_live.ex:46
+#, elixir-autogen, elixir-format
+msgid "Settings"
+msgstr ""
+
+#: lib/xamt_web/components/layouts.ex:79
+#, elixir-autogen, elixir-format
+msgid "Something went wrong!"
+msgstr ""
+
+#: lib/xamt_web/live/home_live.ex:55
+#, elixir-autogen, elixir-format
+msgid "Traditional Mongolian community & realtime chat"
+msgstr ""
+
+#: lib/xamt_web/live/server_live.ex:145
+#, elixir-autogen, elixir-format
+msgid "Unauthorized"
+msgstr ""
+
+#: lib/xamt_web/live/profile_live.ex:18
+#, elixir-autogen, elixir-format
+msgid "User not found"
+msgstr ""
+
+#: lib/xamt_web/controllers/user_registration_html/new.html.heex:33
+#, elixir-autogen, elixir-format
+msgid "Username"
+msgstr ""
+
+#: lib/xamt_web/components/layouts.ex:67
+#, elixir-autogen, elixir-format
+msgid "We can't find the internet"
+msgstr ""
+
+#: lib/xamt_web/live/home_live.ex:62
+#, elixir-autogen, elixir-format
+msgid "Your servers"
+msgstr ""
+
+#: lib/xamt_web/components/core_components.ex:70
+#, elixir-autogen, elixir-format
+msgid "close"
+msgstr ""
+
+#: lib/xamt_web/live/server_live.ex:487
+#, elixir-autogen, elixir-format
+msgid "edited"
+msgstr ""
