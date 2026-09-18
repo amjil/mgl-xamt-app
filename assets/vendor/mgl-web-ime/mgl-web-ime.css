@@ -1,0 +1,78 @@
+/* Shared theme tokens for host apps (optional import). */
+
+@font-face {
+  font-family: "Oyun Qagan Tig";
+  src: url("/fonts/OyunQaganTig.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --mgl-ime-font: "Oyun Qagan Tig", "Noto Sans Mongolian", "Mongolian Baiti", "Menksoft Qagan", serif;
+  --mgl-ime-background: #e8e4dc;
+  --mgl-ime-border: #bdb6a8;
+  --mgl-ime-text: #1c1c1c;
+  --mgl-ime-key-background: #faf8f4;
+  --mgl-ime-key-action: #d2cdc3;
+  --mgl-ime-key-active: #c5d8ef;
+  --mgl-ime-candidate-background: #f7f5f0;
+  --mgl-ime-accent: #3d6b9a;
+  --mgl-ime-candidate-size: 22px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --mgl-ime-background: #2a2a2e;
+    --mgl-ime-border: #4a4a50;
+    --mgl-ime-text: #f0eee8;
+    --mgl-ime-key-background: #3a3a40;
+    --mgl-ime-key-action: #505058;
+    --mgl-ime-key-active: #3d5a7a;
+    --mgl-ime-candidate-background: #323238;
+    --mgl-ime-accent: #7eb0e0;
+  }
+}
+
+.mgl-editor {
+  font-family: var(--mgl-ime-font);
+  writing-mode: vertical-lr;
+  text-orientation: mixed;
+  white-space: pre-wrap;
+  min-height: 240px;
+  min-width: 120px;
+  padding: 16px;
+  border: 1px solid var(--mgl-ime-border);
+  border-radius: 12px;
+  background: #fff;
+  outline: none;
+  line-height: 1.6;
+  font-size: 22px;
+}
+
+.mgl-editor:focus {
+  border-color: var(--mgl-ime-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mgl-ime-accent) 25%, transparent);
+}
+
+/* Desktop candidate popup host tweaks */
+
+mgl-candidates[variant="popup"] {
+  pointer-events: auto;
+}
+
+/* Mobile keyboard host tweaks */
+
+body.mgl-ime-mobile-open {
+  padding-bottom: 280px;
+}
+
+/* Candidate popup sits above the keyboard */
+mgl-candidates[variant="bar"] {
+  z-index: 10001;
+  pointer-events: auto;
+}
+
+mgl-keyboard {
+  z-index: 10000;
+}

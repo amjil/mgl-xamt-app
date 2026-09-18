@@ -1,0 +1,64 @@
+<Layouts.app flash={@flash} current_scope={@current_scope}>
+  <div class="mx-auto max-w-sm">
+    <div class="text-center">
+      <.header>
+        {gettext("Register")}
+        <:subtitle>
+          {gettext("Already registered?")}
+          <.link href={~p"/login"} class="font-semibold text-brand hover:underline">
+            {gettext("Log in")}
+          </.link>
+        </:subtitle>
+      </.header>
+    </div>
+
+    <.form :let={f} for={@changeset} action={~p"/register"} id="user-registration-form" class="xamt-form">
+      <.input
+        field={f[:email]}
+        type="email"
+        label={gettext("Email")}
+        autocomplete="email"
+        spellcheck="false"
+        required
+      />
+      <.input
+        field={f[:username]}
+        type="text"
+        label={gettext("Username")}
+        autocomplete="username"
+        spellcheck="false"
+        required
+      />
+      <div class="xamt-label">
+        <label for="user_display_name">{gettext("Display name")}</label>
+        <input
+          type="text"
+          name="user[display_name]"
+          id="user_display_name"
+          value={f[:display_name].value}
+          class="xamt-input mongol-input"
+          autocomplete="nickname"
+        />
+        <mgl-ime target="#user_display_name" profile="auto" keyboard="auto"></mgl-ime>
+      </div>
+      <.input
+        field={f[:password]}
+        type="password"
+        label={gettext("Password")}
+        autocomplete="new-password"
+        required
+      />
+      <.input
+        field={f[:password_confirmation]}
+        type="password"
+        label={gettext("Confirm password")}
+        autocomplete="new-password"
+        required
+      />
+
+      <.button class="btn btn-primary w-full">
+        {gettext("Create an account")}
+      </.button>
+    </.form>
+  </div>
+</Layouts.app>

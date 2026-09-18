@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="mn" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="csrf-token" content={get_csrf_token()} />
+    <meta name="theme-color" content="#1a1f24" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Xamt" />
+    <link rel="manifest" href={~p"/pwa/manifest.json"} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <.live_title default="Xamt" suffix=" · Xamt">
+      {assigns[:page_title]}
+    </.live_title>
+    <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
+    <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
+    </script>
+  </head>
+  <body class="xamt-body">
+    <header class="xamt-topnav">
+      <nav class="xamt-topnav__inner">
+        <.link navigate={~p"/"} class="xamt-topnav__brand">Xamt</.link>
+        <ul class="xamt-topnav__links">
+          <%= if @current_scope && @current_scope.user do %>
+            <li>
+              <.link navigate={~p"/settings"}>{gettext("Settings")}</.link>
+            </li>
+            <li>
+              <.link href={~p"/users/log-out"} method="delete">{gettext("Log out")}</.link>
+            </li>
+          <% else %>
+            <li>
+              <.link navigate={~p"/register"}>{gettext("Register")}</.link>
+            </li>
+            <li>
+              <.link navigate={~p"/login"}>{gettext("Log in")}</.link>
+            </li>
+          <% end %>
+        </ul>
+      </nav>
+    </header>
+    {@inner_content}
+  </body>
+</html>

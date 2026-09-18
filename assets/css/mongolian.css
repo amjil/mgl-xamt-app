@@ -1,0 +1,76 @@
+/* Traditional Mongolian UI adaptations */
+
+@font-face {
+  font-family: "Oyun Qagan Tig";
+  src: url("/fonts/OyunQaganTig.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --xamt-font-mongol: "Oyun Qagan Tig", "Noto Sans Mongolian", "Mongolian Baiti", "Menksoft Qagan", serif;
+  --xamt-font-ui: "IBM Plex Sans", "Source Sans 3", "Noto Sans", sans-serif;
+  --xamt-bg: #1a1f24;
+  --xamt-bg-2: #232a31;
+  --xamt-bg-3: #2c353e;
+  --xamt-line: #3a4652;
+  --xamt-text: #e8eef4;
+  --xamt-muted: #9aa8b5;
+  --xamt-accent: #3d8f6e;
+  --xamt-accent-2: #c4a35a;
+  --mgl-ime-font: var(--xamt-font-mongol);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  font-family: var(--xamt-font-ui);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, #2a4038 0%, transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, #3a3220 0%, transparent 50%),
+    var(--xamt-bg);
+  color: var(--xamt-text);
+}
+
+.mongol-text,
+.mongol-input,
+.xamt-message__content,
+.xamt-composer__editor,
+.xamt-server-card__name,
+.xamt-rail__title {
+  font-family: var(--xamt-font-mongol);
+}
+
+.mongol-text,
+.xamt-message__content {
+  writing-mode: vertical-lr;
+  text-orientation: mixed;
+  line-height: 1.7;
+}
+
+.mongol-input {
+  writing-mode: vertical-lr;
+  text-orientation: mixed;
+  min-height: 8rem;
+  min-width: 3.5rem;
+  font-size: 1.15rem;
+}
+
+/* Horizontal forms still usable: keep inputs tall enough for vertical glyphs */
+input.mongol-input {
+  min-height: 3rem;
+  min-width: 12rem;
+  writing-mode: horizontal-tb;
+}
+
+textarea.mongol-input {
+  writing-mode: vertical-lr;
+  height: 10rem;
+  width: 100%;
+  max-width: 8rem;
+}

@@ -1,0 +1,540 @@
+defmodule XamtWeb.ServerLive do
+  use XamtWeb, :live_view
+
+  alias Xamt.{Channels, Messages, Servers}
+  alias Xamt.Channels.Channel
+  alias XamtWeb.Presence
+
+  @impl true
+  def mount(%{"server_slug" => server_slug} = params, _session, socket) do
+    scope = socket.assigns.current_scope
+    server = Servers.get_server_by_slug!(server_slug)
+
+    unless Servers.member?(server.id, scope.user.id) do
+      {:ok, _} = Servers.join_server(scope, server.id)
+    end
+
+    channels = Channels.list_channels(server.id)
+    members = Servers.list_members(server.id)
+
+    channel =
+      case Map.get(params, "channel_slug") do
+        nil -> List.first(channels)
+        slug -> Channels.get_channel_by_slug!(server.id, slug)
+      end
+
+    if connected?(socket) do
+      Presence.track_user(self(), channel_topic(channel), scope.user)
+      Phoenix.PubSub.subscribe(Xamt.PubSub, channel_topic(channel))
+      Phoenix.PubSub.subscribe(Xamt.PubSub, presence_topic(channel))
+    end
+
+    messages =
+      if channel do
+        Messages.list_messages(channel.id)
+      else
+        []
+      end
+
+    oldest_id =
+      case messages do
+        [first | _] -> first.id
+        _ -> nil
+      end
+
+    user_servers = Servers.list_servers_for_user(scope)
+
+    socket =
+      socket
+      |> assign(:page_title, server.name)
+      |> assign(:server, server)
+      |> assign(:user_servers, user_servers)
+      |> assign(:channels, channels)
+      |> assign(:members, members)
+      |> assign(:active_channel, channel)
+      |> assign(:online_users, list_online(channel))
+      |> assign(:typing_users, %{})
+      |> assign(:editing_message_id, nil)
+      |> assign(:show_channel_form, false)
+      |> assign(:channel_form, to_form(Channels.change_channel(%Channel{}), as: :channel))
+      |> assign(:mobile_panel, :messages)
+      |> assign(:oldest_message_id, oldest_id)
+      |> stream(:messages, messages, reset: true)
+
+    if channel && is_nil(Map.get(params, "channel_slug")) do
+      {:ok, push_navigate(socket, to: ~p"/servers/#{server.slug}/#{channel.slug}")}
+    else
+      {:ok, socket}
+    end
+  end
+
+  @impl true
+  def handle_params(%{"channel_slug" => channel_slug} = params, _uri, socket) do
+    server = socket.assigns.server
+    old_channel = socket.assigns.active_channel
+    channel = Channels.get_channel_by_slug!(server.id, channel_slug)
+
+    socket =
+      if connected?(socket) and old_channel && old_channel.id != channel.id do
+        Phoenix.PubSub.unsubscribe(Xamt.PubSub, channel_topic(old_channel))
+        Presence.untrack_user(self(), channel_topic(old_channel), socket.assigns.current_scope.user)
+        Presence.track_user(self(), channel_topic(channel), socket.assigns.current_scope.user)
+        Phoenix.PubSub.subscribe(Xamt.PubSub, channel_topic(channel))
+        socket
+      else
+        socket
+      end
+
+    messages = Messages.list_messages(channel.id)
+
+    {:noreply,
+     socket
+     |> assign(:active_channel, channel)
+     |> assign(:online_users, list_online(channel))
+     |> assign(:typing_users, %{})
+     |> assign(:editing_message_id, nil)
+     |> assign(:mobile_panel, :messages)
+     |> stream(:messages, messages, reset: true)
+     |> maybe_push_composer_reset(params)}
+  end
+
+  def handle_params(_params, _uri, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_event("send_message", params, socket) do
+    scope = socket.assigns.current_scope
+    channel = socket.assigns.active_channel
+
+    attrs = %{
+      "content" => decode_json(params["content_json"]),
+      "content_html" => params["content_html"],
+      "content_type" => params["content_type"] || "rich_text"
+    }
+
+    case Messages.create_message(scope, channel.id, attrs) do
+      {:ok, _message} ->
+        {:noreply,
+         socket
+         |> assign(:editing_message_id, nil)
+         |> push_event("composer:clear", %{})}
+
+      {:error, _changeset} ->
+        {:noreply, put_flash(socket, :error, gettext("Could not send message"))}
+    end
+  end
+
+  def handle_event("edit_message", %{"id" => id}, socket) do
+    message = Messages.get_message!(id)
+
+    if message.user_id == socket.assigns.current_scope.user.id do
+      html = message.content_html || ""
+
+      {:noreply,
+       socket
+       |> assign(:editing_message_id, id)
+       |> push_event("composer:load", %{"html" => html})}
+    else
+      {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+    end
+  end
+
+  def handle_event("update_message", params, socket) do
+    scope = socket.assigns.current_scope
+    id = socket.assigns.editing_message_id
+
+    attrs = %{
+      "content" => decode_json(params["content_json"]),
+      "content_html" => params["content_html"],
+      "content_type" => params["content_type"] || "rich_text"
+    }
+
+    case Messages.update_message(scope, id, attrs) do
+      {:ok, _message} ->
+        {:noreply,
+         socket
+         |> assign(:editing_message_id, nil)
+         |> push_event("composer:clear", %{})}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, gettext("Could not update message"))}
+    end
+  end
+
+  def handle_event("cancel_edit", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:editing_message_id, nil)
+     |> push_event("composer:clear", %{})}
+  end
+
+  def handle_event("delete_message", %{"id" => id}, socket) do
+    case Messages.soft_delete_message(socket.assigns.current_scope, id) do
+      {:ok, _} -> {:noreply, socket}
+      {:error, _} -> {:noreply, put_flash(socket, :error, gettext("Could not delete message"))}
+    end
+  end
+
+  def handle_event("load_older", _params, socket) do
+    channel = socket.assigns.active_channel
+    oldest_id = socket.assigns[:oldest_message_id]
+
+    messages =
+      if oldest_id do
+        Messages.list_messages(channel.id, before_id: oldest_id)
+      else
+        []
+      end
+
+    socket =
+      case messages do
+        [first | _] = msgs ->
+          socket
+          |> assign(:oldest_message_id, first.id)
+          |> stream(:messages, msgs, at: 0)
+
+        [] ->
+          socket
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("toggle_channel_form", _params, socket) do
+    {:noreply, assign(socket, :show_channel_form, !socket.assigns.show_channel_form)}
+  end
+
+  def handle_event("create_channel", %{"channel" => params}, socket) do
+    server = socket.assigns.server
+
+    case Channels.create_channel(server, params) do
+      {:ok, channel} ->
+        channels = Channels.list_channels(server.id)
+
+        {:noreply,
+         socket
+         |> assign(:channels, channels)
+         |> assign(:show_channel_form, false)
+         |> push_navigate(to: ~p"/servers/#{server.slug}/#{channel.slug}")}
+
+      {:error, changeset} ->
+        {:noreply,
+         assign(socket, channel_form: to_form(changeset, as: :channel), show_channel_form: true)}
+    end
+  end
+
+  def handle_event("typing_started", _params, socket) do
+    channel = socket.assigns.active_channel
+    user = socket.assigns.current_scope.user
+
+    Phoenix.PubSub.broadcast(
+      Xamt.PubSub,
+      channel_topic(channel),
+      {:typing_started, user.id, display_name(user)}
+    )
+
+    {:noreply, socket}
+  end
+
+  def handle_event("typing_stopped", _params, socket) do
+    channel = socket.assigns.active_channel
+    user = socket.assigns.current_scope.user
+
+    Phoenix.PubSub.broadcast(
+      Xamt.PubSub,
+      channel_topic(channel),
+      {:typing_stopped, user.id}
+    )
+
+    {:noreply, socket}
+  end
+
+  def handle_event("set_mobile_panel", %{"panel" => panel}, socket) do
+    panel = String.to_existing_atom(panel)
+    {:noreply, assign(socket, :mobile_panel, panel)}
+  end
+
+  @impl true
+  def handle_info({:new_message, message}, socket) do
+    {:noreply,
+     socket
+     |> stream_insert(:messages, message)
+     |> assign(:oldest_message_id, socket.assigns[:oldest_message_id] || message.id)
+     |> push_event("messages:scroll_bottom", %{})}
+  end
+
+  def handle_info({:updated_message, message}, socket) do
+    {:noreply, stream_insert(socket, :messages, message)}
+  end
+
+  def handle_info({:deleted_message, message}, socket) do
+    {:noreply, stream_delete(socket, :messages, message)}
+  end
+
+  def handle_info({:typing_started, user_id, name}, socket) do
+    if user_id == socket.assigns.current_scope.user.id do
+      {:noreply, socket}
+    else
+      typing = Map.put(socket.assigns.typing_users, user_id, name)
+      {:noreply, assign(socket, :typing_users, typing)}
+    end
+  end
+
+  def handle_info({:typing_stopped, user_id}, socket) do
+    {:noreply, assign(socket, :typing_users, Map.delete(socket.assigns.typing_users, user_id))}
+  end
+
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
+    {:noreply, assign(socket, :online_users, list_online(socket.assigns.active_channel))}
+  end
+
+  @impl true
+  def render(assigns) do
+    ~H"""
+    <div class={"xamt-app xamt-app--panel-#{@mobile_panel}"} id="xamt-app">
+      <Layouts.flash_group flash={@flash} />
+      <aside class="xamt-rail xamt-rail--servers">
+        <div class="xamt-rail__brand">
+          <.link navigate={~p"/"} class="xamt-brand-mark">X</.link>
+        </div>
+        <.link
+          :for={s <- @user_servers}
+          navigate={~p"/servers/#{s.slug}"}
+          class={"xamt-server-dot #{if s.id == @server.id, do: "is-active"}"}
+          title={s.name}
+        >
+          {server_initial(s.name)}
+        </.link>
+      </aside>
+
+      <aside class="xamt-rail xamt-rail--channels">
+        <header class="xamt-rail__header">
+          <h1 class="xamt-rail__title mongol-text">{@server.name}</h1>
+          <p class="xamt-rail__sub">/{@server.slug}</p>
+        </header>
+
+        <div class="xamt-rail__section">
+          <div class="xamt-rail__section-head">
+            <span>{gettext("Channels")}</span>
+            <button
+              type="button"
+              class="xamt-icon-btn"
+              phx-click="toggle_channel_form"
+              title={gettext("New channel")}
+            >
+              +
+            </button>
+          </div>
+
+          <form
+            :if={@show_channel_form}
+            id="create-channel-form"
+            phx-submit="create_channel"
+            class="xamt-form xamt-form--compact"
+          >
+            <input
+              type="text"
+              name="channel[name]"
+              id="channel_name"
+              required
+              placeholder={gettext("Channel name")}
+              class="xamt-input mongol-input"
+              phx-hook="MongolianIME"
+              autocomplete="off"
+            />
+            <button type="submit" class="xamt-btn xamt-btn--primary xamt-btn--sm">
+              {gettext("Add")}
+            </button>
+          </form>
+
+          <nav class="xamt-channel-nav">
+            <.link
+              :for={ch <- @channels}
+              navigate={~p"/servers/#{@server.slug}/#{ch.slug}"}
+              class={"xamt-channel-link #{if @active_channel && ch.id == @active_channel.id, do: "is-active"}"}
+            >
+              <span class="xamt-channel-hash">#</span>
+              <span class="mongol-text">{ch.name}</span>
+            </.link>
+          </nav>
+        </div>
+
+        <div class="xamt-rail__footer">
+          <.link navigate={~p"/profile/#{@current_scope.user.username}"} class="xamt-user-chip">
+            <span class="xamt-avatar">{user_initial(@current_scope.user)}</span>
+            <span class="mongol-text">{display_name(@current_scope.user)}</span>
+          </.link>
+        </div>
+      </aside>
+
+      <section class="xamt-main">
+        <header class="xamt-main__header">
+          <div class="xamt-mobile-nav">
+            <button type="button" phx-click="set_mobile_panel" phx-value-panel="servers">☰</button>
+            <button type="button" phx-click="set_mobile_panel" phx-value-panel="channels">#</button>
+            <button type="button" phx-click="set_mobile_panel" phx-value-panel="messages">💬</button>
+            <button type="button" phx-click="set_mobile_panel" phx-value-panel="members">👥</button>
+          </div>
+          <h2 class="xamt-main__title">
+            <span class="xamt-channel-hash">#</span>
+            <span class="mongol-text">{@active_channel && @active_channel.name}</span>
+          </h2>
+        </header>
+
+        <div
+          id="message-list"
+          class="xamt-messages"
+          phx-update="stream"
+          phx-hook="MessageList"
+        >
+          <div id="messages-load-more" class="xamt-messages__load" phx-click="load_older">
+            {gettext("Load older messages")}
+          </div>
+          <article
+            :for={{dom_id, message} <- @streams.messages}
+            id={dom_id}
+            class="xamt-message"
+            data-message-id={message.id}
+          >
+            <div class="xamt-message__avatar">{user_initial(message.user)}</div>
+            <div class="xamt-message__body">
+              <header class="xamt-message__meta">
+                <strong class="mongol-text">{display_name(message.user)}</strong>
+                <time>{format_time(message.inserted_at)}</time>
+                <span :if={edited?(message)} class="xamt-message__edited">{gettext("edited")}</span>
+              </header>
+              <div class="xamt-message__content mongol-text">
+                {raw(safe_html(message))}
+              </div>
+              <div
+                :if={message.user_id == @current_scope.user.id}
+                class="xamt-message__actions"
+              >
+                <button type="button" phx-click="edit_message" phx-value-id={message.id}>
+                  {gettext("Edit")}
+                </button>
+                <button
+                  type="button"
+                  phx-click="delete_message"
+                  phx-value-id={message.id}
+                  data-confirm={gettext("Delete this message?")}
+                >
+                  {gettext("Delete")}
+                </button>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <div :if={map_size(@typing_users) > 0} class="xamt-typing">
+          {typing_label(@typing_users)}
+        </div>
+
+        <div class="xamt-composer-wrap">
+          <div
+            id="message-composer"
+            phx-hook="MessageComposer"
+            phx-update="ignore"
+            data-editing={@editing_message_id}
+            data-submit-event={if @editing_message_id, do: "update_message", else: "send_message"}
+          >
+            <div class="xamt-composer__editor" id="composer-editor-host"></div>
+            <div class="xamt-composer__toolbar">
+              <button
+                :if={@editing_message_id}
+                type="button"
+                class="xamt-btn xamt-btn--sm"
+                phx-click="cancel_edit"
+              >
+                {gettext("Cancel")}
+              </button>
+              <button type="button" class="xamt-btn xamt-btn--primary" data-composer-send>
+                {if @editing_message_id, do: gettext("Save"), else: gettext("Send")}
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="xamt-rail xamt-rail--members">
+        <h3 class="xamt-rail__section-head">{gettext("Online")}</h3>
+        <ul class="xamt-member-list">
+          <li :for={user <- @online_users} class="xamt-member">
+            <span class="xamt-presence is-online"></span>
+            <span class="mongol-text">{user}</span>
+          </li>
+        </ul>
+        <h3 class="xamt-rail__section-head">{gettext("Members")}</h3>
+        <ul class="xamt-member-list">
+          <li :for={member <- @members} class="xamt-member">
+            <span class="xamt-presence"></span>
+            <span class="mongol-text">{display_name(member.user)}</span>
+            <span class="xamt-role">{member.role}</span>
+          </li>
+        </ul>
+      </aside>
+    </div>
+    """
+  end
+
+  defp maybe_push_composer_reset(socket, _params) do
+    push_event(socket, "composer:clear", %{})
+  end
+
+  defp channel_topic(%Channel{id: id}), do: "xamt:channel:#{id}"
+  defp channel_topic(nil), do: "xamt:channel:none"
+  defp presence_topic(channel), do: channel_topic(channel)
+
+  defp list_online(nil), do: []
+
+  defp list_online(channel) do
+    Presence.list(channel_topic(channel))
+    |> Enum.map(fn {_id, %{metas: metas}} ->
+      List.first(metas)[:display_name] || List.first(metas)[:username]
+    end)
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp display_name(%{display_name: name}) when is_binary(name) and name != "", do: name
+  defp display_name(%{username: name}) when is_binary(name), do: name
+  defp display_name(%{email: email}), do: email
+  defp display_name(_), do: "?"
+
+  defp user_initial(user) do
+    display_name(user) |> String.trim() |> String.first() || "?"
+  end
+
+  defp server_initial(name) when is_binary(name) do
+    name |> String.trim() |> String.first() || "?"
+  end
+
+  defp format_time(nil), do: ""
+  defp format_time(%DateTime{} = dt), do: Calendar.strftime(dt, "%H:%M")
+
+  defp edited?(%{inserted_at: a, updated_at: b}) when not is_nil(a) and not is_nil(b) do
+    DateTime.diff(b, a, :second) > 1
+  end
+
+  defp edited?(_), do: false
+
+  defp safe_html(%{content_html: html}) when is_binary(html) and html != "", do: html
+  defp safe_html(%{content: %{"html" => html}}) when is_binary(html), do: html
+  defp safe_html(%{content: content}) when is_map(content), do: Phoenix.HTML.html_escape(inspect(content))
+  defp safe_html(_), do: ""
+
+  defp typing_label(typing_users) do
+    names = Map.values(typing_users) |> Enum.join(", ")
+    gettext("%{names} typing…", names: names)
+  end
+
+  defp decode_json(nil), do: %{}
+  defp decode_json(""), do: %{}
+
+  defp decode_json(str) when is_binary(str) do
+    case Jason.decode(str) do
+      {:ok, data} -> data
+      _ -> %{}
+    end
+  end
+
+  defp decode_json(data) when is_map(data), do: data
+end
