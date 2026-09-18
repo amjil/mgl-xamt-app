@@ -5,6 +5,8 @@
  */
 export function attachMongolianWheelScroll(el) {
   if (!el) return () => {}
+  // Touch devices scroll these surfaces natively; intercepting fights the gesture
+  if (window.matchMedia?.("(pointer: coarse)").matches) return () => {}
 
   const onWheel = (e) => {
     // Native trackpad horizontal swipe (or Shift+wheel → deltaX) — do not intervene

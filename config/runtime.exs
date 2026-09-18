@@ -22,6 +22,10 @@ end
 
 config :xamt, XamtWeb.Endpoint, http: [port: String.to_integer(System.get_env("PORT", "4002"))]
 
+if base_url = System.get_env("XAMT_IME_BASE_URL") do
+  config :xamt, :ime_base_url, base_url
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

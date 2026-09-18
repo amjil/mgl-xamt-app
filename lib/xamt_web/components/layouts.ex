@@ -12,6 +12,17 @@ defmodule XamtWeb.Layouts do
   embed_templates "layouts/*"
 
   @doc """
+  Remote candidate backend for mgl-web-ime, or `""` when the IME should stay
+  on its bundled local dictionary.
+  """
+  def ime_base_url do
+    case Application.get_env(:xamt, :ime_base_url) do
+      url when is_binary(url) -> String.trim(url)
+      _ -> ""
+    end
+  end
+
+  @doc """
   Renders your app layout.
 
   This function is typically invoked from every template,

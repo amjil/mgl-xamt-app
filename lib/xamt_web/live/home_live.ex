@@ -8,17 +8,18 @@ defmodule XamtWeb.HomeLive do
   def mount(_params, _session, socket) do
     scope = socket.assigns.current_scope
 
-    servers =
+    {servers, discoverable} =
       if scope && scope.user do
-        Servers.list_servers_for_user(scope)
+        {Servers.list_servers_for_user(scope), Servers.list_discoverable_servers(scope)}
       else
-        []
+        {[], []}
       end
 
     {:ok,
      socket
      |> assign(:page_title, "Xamt")
      |> assign(:servers, servers)
+     |> assign(:discoverable, discoverable)
      |> assign(:form, to_form(Servers.change_server(%Server{}), as: :server))
      |> assign(:show_create, false)}
   end
@@ -101,6 +102,13 @@ defmodule XamtWeb.HomeLive do
                   phx-hook="MongolianIME"
                 ></textarea>
               </label>
+              <label class="xamt-label">
+                <span class="xamt-field__label mongol-text">{gettext("Visibility")}</span>
+                <select name="server[visibility]" id="server_visibility" class="xamt-select">
+                  <option value="private">{gettext("Private — invite only")}</option>
+                  <option value="public">{gettext("Public — anyone can find and join")}</option>
+                </select>
+              </label>
               <button
                 type="submit"
                 id="create-server-submit"
@@ -116,7 +124,7 @@ defmodule XamtWeb.HomeLive do
                   <span class="xamt-server-card__icon">{server_initial(server.name)}</span>
                   <span class="xamt-server-card__meta">
                     <span class="xamt-server-card__name mongol-text">{server.name}</span>
-                    <span class="xamt-server-card__slug">/{server.slug}</span>
+                    <span class="xamt-server-card__slug xamt-upright">/{server.slug}</span>
                   </span>
                 </.link>
               </li>
@@ -128,6 +136,24 @@ defmodule XamtWeb.HomeLive do
                 {gettext("No servers yet. Create one to start chatting.")}
               </p>
             </div>
+          </section>
+
+          <section :if={@discoverable != []} class="xamt-home__panel" id="discover-panel">
+            <div class="xamt-home__toolbar">
+              <h2 class="xamt-section-title mongol-text">{gettext("Discover")}</h2>
+            </div>
+
+            <ul class="xamt-server-list">
+              <li :for={server <- @discoverable} class="xamt-server-list__item">
+                <.link navigate={~p"/servers/#{server.slug}"} class="xamt-server-card">
+                  <span class="xamt-server-card__icon">{server_initial(server.name)}</span>
+                  <span class="xamt-server-card__meta">
+                    <span class="xamt-server-card__name mongol-text">{server.name}</span>
+                    <span class="xamt-server-card__slug xamt-upright">/{server.slug}</span>
+                  </span>
+                </.link>
+              </li>
+            </ul>
           </section>
         <% else %>
           <section class="xamt-home__cta xamt-surface">

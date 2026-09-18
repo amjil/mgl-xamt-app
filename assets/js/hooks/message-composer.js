@@ -4,6 +4,7 @@
  */
 import { createMongolianEditor } from "../../vendor/mongolian-editor.js"
 import { MglIME, createCustomAdapter } from "../../vendor/mgl-web-ime/mgl-web-ime.js"
+import { imeProvider } from "../utils/ime.js"
 import { OfflineStore, toast } from "../utils/offline-store.js"
 import { attachMongolianWheelScroll } from "./mongolian-scroll.js"
 
@@ -128,7 +129,7 @@ export const MessageComposer = {
       adapter: buildEditorAdapter(this._root),
       profile: "auto",
       keyboard: "auto",
-      baseUrl: this.el.dataset.imeBaseUrl || "http://localhost:3003",
+      provider: imeProvider(),
       mount: document.body,
     })
 
@@ -160,6 +161,7 @@ export const MessageComposer = {
     })
 
     this.handleEvent("composer:clear", () => this.clear())
+    this.handleEvent("composer:focus", () => this.editor.focus())
     this.handleEvent("composer:load", ({ html }) => {
       if (html != null) this.editor.setHtml(html)
       this.editor.focus()
@@ -271,24 +273,56 @@ export const MessageComposer = {
   },
 }
 
+// vertical-lr: newest message is the right-most column
+const NEAR_LATEST_PX = 150
+
 export const MessageList = {
   mounted() {
-    this.el.scrollLeft = this.el.scrollWidth // 定位到最右侧
+    this.jumpBtn = document.getElementById("jump-latest")
+    this._onJump = () => this.scrollToLatest(true)
+    this.jumpBtn?.addEventListener("click", this._onJump)
+
+    this._onScroll = () => {
+      if (this.nearLatest()) this.showJump(false)
+    }
+    this.el.addEventListener("scroll", this._onScroll, { passive: true })
+
+    this.scrollToLatest(false)
+
     this.handleEvent("messages:scroll_bottom", () => {
       requestAnimationFrame(() => {
-        // 判断是否靠近右侧边缘
-        const distanceFromRight =
-          this.el.scrollWidth - this.el.scrollLeft - this.el.clientWidth
-        const isNearRight = distanceFromRight < 150
-
-        if (isNearRight) {
-          this.el.scrollLeft = this.el.scrollWidth
+        if (this.nearLatest()) {
+          this.scrollToLatest(true)
         } else {
-          this.el.dispatchEvent(
-            new CustomEvent("messages:unread_below", { bubbles: true })
-          )
+          this.showJump(true)
         }
       })
     })
+
+    this.handleEvent("messages:scroll_to", ({id}) => {
+      const article = this.el.querySelector(`[data-message-id="${id}"]`)
+      if (!article) return
+      article.scrollIntoView({behavior: "smooth", block: "nearest", inline: "center"})
+      article.classList.add("is-highlighted")
+      setTimeout(() => article.classList.remove("is-highlighted"), 1600)
+    })
+  },
+
+  destroyed() {
+    this.jumpBtn?.removeEventListener("click", this._onJump)
+    this.el.removeEventListener("scroll", this._onScroll)
+  },
+
+  nearLatest() {
+    return this.el.scrollWidth - this.el.scrollLeft - this.el.clientWidth < NEAR_LATEST_PX
+  },
+
+  scrollToLatest(smooth) {
+    this.el.scrollTo({ left: this.el.scrollWidth, behavior: smooth ? "smooth" : "auto" })
+    this.showJump(false)
+  },
+
+  showJump(visible) {
+    this.jumpBtn?.classList.toggle("is-visible", visible)
   },
 }

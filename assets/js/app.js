@@ -8,7 +8,10 @@ import {MongolianIME} from "./hooks/mongolian-ime"
 import {MessageComposer, MessageList} from "./hooks/message-composer"
 import {InfiniteScroll} from "./hooks/infinite-scroll"
 import {MongolianScroll, attachMongolianWheelScroll} from "./hooks/mongolian-scroll"
+import {MobileDrawer} from "./hooks/mobile-drawer"
 import {ToastHandler} from "./hooks/toast-handler"
+import {adoptImeElements} from "./utils/ime"
+import {trackViewportHeight} from "./utils/viewport"
 
 const Hooks = {
   ...colocatedHooks,
@@ -17,6 +20,7 @@ const Hooks = {
   MessageList,
   InfiniteScroll,
   MongolianScroll,
+  MobileDrawer,
   ToastHandler,
 }
 
@@ -43,8 +47,27 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 })
 
+// Dispatched by JS.dispatch/2 on a quoted message so we can reveal it in the
+// horizontally scrolling message list.
+const HIGHLIGHT_MS = 1600
+
+window.addEventListener("xamt:scroll-to", (event) => {
+  const el = event.target
+  if (!(el instanceof HTMLElement)) return
+
+  el.scrollIntoView({behavior: "smooth", block: "nearest", inline: "center"})
+  el.classList.add("is-highlighted")
+  setTimeout(() => el.classList.remove("is-highlighted"), HIGHLIGHT_MS)
+})
+
+trackViewportHeight()
+adoptImeElements()
+window.addEventListener("DOMContentLoaded", () => adoptImeElements())
+
 liveSocket.connect()
 window.liveSocket = liveSocket
+
+const THEME_COLORS = {dark: "#101412", light: "#f4efe4"}
 
 const applyTheme = (theme) => {
   const root = document.documentElement
@@ -55,6 +78,10 @@ const applyTheme = (theme) => {
   const useDark = mode === "dark" || (mode === "system" && prefersDark)
 
   root.classList.toggle("dark", useDark)
+
+  const themeColor = document.querySelector("meta[name='theme-color']")
+  if (themeColor) themeColor.setAttribute("content", THEME_COLORS[useDark ? "dark" : "light"])
+
   localStorage.setItem("phx:theme", mode)
 }
 

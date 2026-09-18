@@ -1,5 +1,23 @@
 /* Traditional Mongolian typography & writing-mode helpers
-   Pattern aligned with nomio: shell stays horizontal; reading surface uses vertical-lr. */
+   Pattern aligned with nomio: shell stays horizontal; reading surface uses vertical-lr.
+
+   Reading conventions — every surface in Xamt follows these:
+
+   1. Script runs top → bottom, columns advance left → right (`vertical-lr`).
+      The first column is on the LEFT, the newest content on the RIGHT.
+   2. Reading surfaces therefore scroll horizontally. Wheel input is mapped to
+      `scrollLeft` on pointer devices (see hooks/mongolian-scroll.js); touch
+      devices scroll natively.
+   3. In `vertical-lr` the logical axes swap against intuition:
+        inline-size  = physical HEIGHT   (how far a column runs down the screen)
+        block-size   = physical WIDTH    (how wide the element's columns are)
+        flex `column` stacks children LEFT → RIGHT
+      Size vertical fields with `--xamt-field-extent`, never a raw `16rem`,
+      or they will run off the bottom of a phone.
+   4. Chrome that is not Mongolian script (toasts, theme toggle, Latin fields)
+      stays `horizontal-tb` via `.latin-text` / `.xamt-latin`.
+   5. Short Latin or digit runs embedded in a column (12:34, /slug, @name) use
+      `.xamt-upright` so they read as one horizontal cluster. */
 
 @font-face {
   font-family: "Oyun Qagan Tig";
@@ -9,10 +27,70 @@
   font-display: swap;
 }
 
+/* Metric-matched fallback so font-display:swap does not jump column height */
+@font-face {
+  font-family: "Mongol Fallback";
+  src: local("Noto Sans Mongolian"), local("Mongolian Baiti"), local("serif");
+  size-adjust: 108%;
+  ascent-override: 90%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+}
+
+/* Light is the base palette; `.dark` on <html> overrides it. Keep every colour
+   behind a token so both themes stay in sync. */
 :root {
-  --xamt-font-mongol: "Oyun Qagan Tig", "Noto Sans Mongolian", "Mongolian Baiti", "Menksoft Qagan",
-    serif;
+  --xamt-font-mongol: "Oyun Qagan Tig", "Mongol Fallback", "Noto Sans Mongolian", "Mongolian Baiti",
+    "Menksoft Qagan", serif;
   --xamt-font-ui: "IBM Plex Sans", "Source Sans 3", "Noto Sans", sans-serif;
+  --xamt-bg: #f4efe4;
+  --xamt-bg-2: #fbf7ee;
+  --xamt-bg-3: #e7dfcf;
+  --xamt-line: rgba(120, 95, 50, 0.2);
+  --xamt-line-strong: rgba(120, 95, 50, 0.38);
+  --xamt-text: #1c221e;
+  --xamt-muted: #5f6a5c;
+  --xamt-accent: #2f7d5f;
+  --xamt-accent-2: #8a6a2c;
+  --xamt-accent-soft: rgba(47, 125, 95, 0.14);
+  --xamt-gold-soft: rgba(138, 106, 44, 0.12);
+  --xamt-shadow: 0 18px 44px rgba(72, 58, 32, 0.16);
+  /* Mixed into surfaces to add depth without a second palette */
+  --xamt-shade: #cfc6b2;
+  /* Ambient page glows */
+  --xamt-glow-1: #bfdac9;
+  --xamt-glow-2: #ead9b8;
+  --xamt-glow-3: #cfe0d4;
+  /* The composer stays "paper" in both themes — writing surface, not chrome */
+  --xamt-paper: #fffdf8;
+  --xamt-paper-ink: #171c19;
+  --xamt-radius: 0.95rem;
+  --mgl-ime-font: var(--xamt-font-mongol);
+  color-scheme: light;
+
+  /* Usable viewport height. `svh` avoids the iOS URL-bar jump; the
+     ViewportKeyboard hook narrows it further while a keyboard is open. */
+  --xamt-vh: 100svh;
+  --xamt-safe-top: env(safe-area-inset-top, 0px);
+  --xamt-safe-right: env(safe-area-inset-right, 0px);
+  --xamt-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --xamt-safe-left: env(safe-area-inset-left, 0px);
+
+  /* A vertical field's `inline-size` is its *physical height*, so it has to be
+     capped against the viewport or it runs off the bottom of a phone. */
+  --xamt-field-extent: clamp(7rem, calc(var(--xamt-vh) - 11rem), 16rem);
+  --xamt-field-extent-lg: clamp(8rem, calc(var(--xamt-vh) - 10rem), 18rem);
+
+  --xamt-leftnav-w: 4.75rem;
+  --xamt-z-jump: 15;
+  --xamt-z-settings: 20;
+  --xamt-z-drawer-backdrop: 25;
+  --xamt-z-drawer: 30;
+  --xamt-z-nav: 40;
+  --xamt-z-toast: 50;
+}
+
+:root.dark {
   --xamt-bg: #101412;
   --xamt-bg-2: #181e1c;
   --xamt-bg-3: #232b28;
@@ -25,11 +103,10 @@
   --xamt-accent-soft: rgba(74, 165, 132, 0.16);
   --xamt-gold-soft: rgba(201, 165, 106, 0.14);
   --xamt-shadow: 0 18px 44px rgba(0, 0, 0, 0.38);
-  --xamt-radius: 0.95rem;
-  --mgl-ime-font: var(--xamt-font-mongol);
-}
-
-html {
+  --xamt-shade: #0d1110;
+  --xamt-glow-1: #2a4a3e;
+  --xamt-glow-2: #3d3220;
+  --xamt-glow-3: #1c2e28;
   color-scheme: dark;
 }
 
@@ -47,15 +124,15 @@ body {
 }
 
 body {
-  min-height: 100dvh;
+  min-height: var(--xamt-vh);
   font-family: var(--xamt-font-mongol);
   font-size: 17px;
   -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
   background:
-    radial-gradient(1100px 640px at 8% -12%, #2a4a3e 0%, transparent 58%),
-    radial-gradient(860px 520px at 96% 4%, #3d3220 0%, transparent 52%),
-    radial-gradient(700px 380px at 70% 110%, #1c2e28 0%, transparent 55%),
+    radial-gradient(1100px 640px at 8% -12%, var(--xamt-glow-1) 0%, transparent 58%),
+    radial-gradient(860px 520px at 96% 4%, var(--xamt-glow-2) 0%, transparent 52%),
+    radial-gradient(700px 380px at 70% 110%, var(--xamt-glow-3) 0%, transparent 55%),
     var(--xamt-bg);
   color: var(--xamt-text);
 }
@@ -87,6 +164,19 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--xamt-accent);
+}
+
+/* On touch screens the horizontal bar of a vertical-lr surface sits right where
+   the thumb rests — hide it and rely on the native scroll gesture. */
+@media (pointer: coarse) {
+  * {
+    scrollbar-width: none;
+  }
+
+  ::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
 }
 
 ::selection {
@@ -122,6 +212,28 @@ body {
   font-family: var(--xamt-font-ui);
 }
 
+/* Tate-chu-yoko: short Latin / digit runs (12:34, @name, /slug) set as one
+   horizontal cluster inside the column instead of one rotated glyph per line. */
+.xamt-upright {
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  display: inline-block;
+  font-family: var(--xamt-font-ui);
+  font-variant-numeric: lining-nums tabular-nums;
+  line-height: 1;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* Bare two-digit runs (counts, badges) fit an em square and can truly combine */
+.xamt-upright--combine {
+  writing-mode: inherit;
+  -webkit-writing-mode: inherit;
+  display: inline;
+  text-combine-upright: all;
+  -webkit-text-combine: horizontal;
+}
+
 /* Form controls in vertical-lr: block = physical width, inline = physical height */
 .mongol-input,
 .xamt-input,
@@ -132,7 +244,7 @@ body {
   -webkit-writing-mode: vertical-lr;
   text-orientation: mixed;
   block-size: 2.75rem;
-  inline-size: 16rem;
+  inline-size: var(--xamt-field-extent);
   max-inline-size: 100%;
 }
 
@@ -140,7 +252,7 @@ textarea.mongol-input,
 .xamt-textarea,
 textarea.xamt-input {
   block-size: 7rem;
-  inline-size: 18rem;
+  inline-size: var(--xamt-field-extent-lg);
   resize: block;
 }
 
@@ -152,10 +264,7 @@ input[type="tel"] {
   writing-mode: horizontal-tb;
   -webkit-writing-mode: horizontal-tb;
   font-family: var(--xamt-font-ui);
-  width: 16rem;
-  max-width: 100%;
+  width: min(16rem, 70vw);
   min-height: 2.75rem;
   height: 2.75rem;
-  block-size: 2.75rem;
-  inline-size: 16rem;
 }

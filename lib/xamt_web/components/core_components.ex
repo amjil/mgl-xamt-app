@@ -9,7 +9,7 @@ defmodule XamtWeb.CoreComponents do
   them in any way you want, based on your application growth and needs.
 
   The foundation for styling is Tailwind CSS plus project-owned `xamt-*`
-  classes in `assets/css/layout.css`. Here are useful references:
+  classes in `assets/css/{layout,forms,chat,message}.css`. Here are useful references:
 
     * [Tailwind CSS](https://tailwindcss.com) - the foundational framework
       we build on. You will use it for layout, sizing, flexbox, grid, and
@@ -494,5 +494,42 @@ defmodule XamtWeb.CoreComponents do
   """
   def translate_errors(errors, field) when is_list(errors) do
     for {^field, {msg, opts}} <- errors, do: translate_error({msg, opts})
+  end
+
+  @doc """
+  User avatar image, falling back to the first letter of the display name.
+  """
+  attr :user, :map, required: true
+  attr :class, :string, default: "xamt-avatar"
+  attr :id, :string, default: nil
+
+  def avatar(assigns) do
+    ~H"""
+    <%= if avatar_url(@user) do %>
+      <img
+        id={@id}
+        src={avatar_url(@user)}
+        alt=""
+        class={[@class, "xamt-avatar--img"]}
+      />
+    <% else %>
+      <div id={@id} class={@class} aria-hidden="true">{user_initial(@user)}</div>
+    <% end %>
+    """
+  end
+
+  defp avatar_url(%{avatar: url}) when is_binary(url) and url != "", do: url
+  defp avatar_url(_), do: nil
+
+  defp user_initial(user) do
+    name =
+      case user do
+        %{display_name: name} when is_binary(name) and name != "" -> name
+        %{username: name} when is_binary(name) and name != "" -> name
+        %{email: email} when is_binary(email) -> email
+        _ -> "?"
+      end
+
+    name |> String.trim() |> String.first() || "?"
   end
 end

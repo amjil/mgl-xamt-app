@@ -3,6 +3,7 @@
  * Uses ../mgl-web-ime.js (vendored).
  */
 import { MglIME } from "../../vendor/mgl-web-ime/mgl-web-ime.js"
+import { imeProvider } from "../utils/ime.js"
 
 const instances = new WeakMap()
 
@@ -12,7 +13,7 @@ export const MongolianIME = {
       target: this.el,
       profile: "auto",
       keyboard: "auto",
-      baseUrl: this.el.dataset.imeBaseUrl || "http://dev1:3003",
+      provider: imeProvider(),
       mount: document.body,
     })
     instances.set(this.el, ime)

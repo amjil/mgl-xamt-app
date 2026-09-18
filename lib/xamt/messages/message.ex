@@ -8,6 +8,7 @@ defmodule Xamt.Messages.Message do
     field :content, :map, default: %{}
     field :content_type, :string, default: "rich_text"
     field :content_html, :string
+    field :search_text, :string
     field :deleted_at, :utc_datetime
 
     belongs_to :channel, Xamt.Channels.Channel
@@ -20,7 +21,15 @@ defmodule Xamt.Messages.Message do
   @doc false
   def changeset(message, attrs) do
     message
-    |> cast(attrs, [:channel_id, :user_id, :content, :content_type, :content_html, :reply_to_id])
+    |> cast(attrs, [
+      :channel_id,
+      :user_id,
+      :content,
+      :content_type,
+      :content_html,
+      :search_text,
+      :reply_to_id
+    ])
     |> validate_required([:channel_id, :user_id, :content])
     |> validate_inclusion(:content_type, ~w(plain_text rich_text))
   end

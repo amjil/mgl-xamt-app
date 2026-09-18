@@ -11,7 +11,13 @@ defmodule XamtWeb.SettingsLive do
     {:ok,
      socket
      |> assign(:page_title, gettext("Settings"))
-     |> assign(:form, to_form(changeset, as: :user))}
+     |> assign(:form, to_form(changeset, as: :user))
+     |> allow_upload(:avatar,
+       accept: ~w(.jpg .jpeg .png .gif .webp),
+       max_entries: 1,
+       max_file_size: 2_000_000,
+       auto_upload: true
+     )}
   end
 
   @impl true
@@ -24,7 +30,19 @@ defmodule XamtWeb.SettingsLive do
     {:noreply, assign(socket, form: to_form(changeset, as: :user))}
   end
 
+  def handle_event("validate", _params, socket), do: {:noreply, socket}
+
+  def handle_event("cancel_avatar", %{"ref" => ref}, socket) do
+    {:noreply, cancel_upload(socket, :avatar, ref)}
+  end
+
   def handle_event("save", %{"user" => params}, socket) do
+    params =
+      case XamtWeb.Uploads.consume_image(socket, :avatar) do
+        url when is_binary(url) -> Map.put(params, "avatar", url)
+        _ -> params
+      end
+
     case Accounts.update_user_profile(socket.assigns.current_scope.user, params) do
       {:ok, user} ->
         {:noreply,
@@ -63,6 +81,28 @@ defmodule XamtWeb.SettingsLive do
           phx-submit="save"
           class="xamt-form xamt-form--vertical"
         >
+          <div class="xamt-field">
+            <span class="xamt-field__label mongol-text">{gettext("Avatar")}</span>
+            <.avatar user={@current_scope.user} class="xamt-avatar xamt-avatar--lg" />
+            <label for={@uploads.avatar.ref} class="xamt-btn xamt-btn--soft mongol-text">
+              {gettext("Upload photo")}
+            </label>
+            <.live_file_input upload={@uploads.avatar} class="hidden" />
+            <div :for={entry <- @uploads.avatar.entries} class="xamt-upload-preview__item">
+              <.live_img_preview entry={entry} class="xamt-upload-preview__img" />
+              <button
+                type="button"
+                id={"cancel-avatar-#{entry.ref}"}
+                phx-click="cancel_avatar"
+                phx-value-ref={entry.ref}
+                class="xamt-upload-preview__cancel"
+                aria-label={gettext("Cancel upload")}
+              >
+                <.icon name="hero-x-mark" class="size-3" />
+              </button>
+            </div>
+          </div>
+
           <label class="xamt-field">
             <span class="xamt-field__label mongol-text">{gettext("Display name")}</span>
             <input
@@ -85,19 +125,6 @@ defmodule XamtWeb.SettingsLive do
               class="xamt-textarea mongol-input"
               phx-hook="MongolianIME"
             >{Phoenix.HTML.Form.normalize_value("textarea", @form[:bio].value)}</textarea>
-          </label>
-
-          <label class="xamt-field">
-            <span class="xamt-field__label mongol-text">{gettext("Avatar URL")}</span>
-            <input
-              type="url"
-              name={@form[:avatar].name}
-              id={@form[:avatar].id}
-              value={@form[:avatar].value}
-              class="xamt-input"
-              autocomplete="off"
-              spellcheck="false"
-            />
           </label>
 
           <button type="submit" id="settings-save" class="xamt-btn xamt-btn--primary mongol-text">

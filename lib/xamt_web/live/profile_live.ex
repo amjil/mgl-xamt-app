@@ -33,14 +33,12 @@ defmodule XamtWeb.ProfileLive do
         <.header>
           {display_name(@profile_user)}
           <:subtitle>
-            <span class="xamt-profile__username">@{@profile_user.username}</span>
+            <span class="xamt-profile__username xamt-upright">@{@profile_user.username}</span>
           </:subtitle>
         </.header>
 
         <div class="xamt-profile xamt-surface">
-          <div class="xamt-avatar xamt-avatar--lg" aria-hidden="true">
-            {user_initial(@profile_user)}
-          </div>
+          <.avatar user={@profile_user} class="xamt-avatar xamt-avatar--lg" />
 
           <div class="xamt-profile__col">
             <span class="xamt-field__label mongol-text">{gettext("Bio")}</span>
@@ -72,8 +70,4 @@ defmodule XamtWeb.ProfileLive do
 
   defp display_name(%{display_name: name}) when is_binary(name) and name != "", do: name
   defp display_name(%{username: name}), do: name
-
-  defp user_initial(user) do
-    display_name(user) |> String.trim() |> String.first() || "?"
-  end
 end

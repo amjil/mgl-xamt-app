@@ -19,7 +19,9 @@ Demo account (from seeds):
 - password: `hello world!!`
 - server: `/servers/mongol-bichig/general`
 
-IME candidate backend (optional): `http://dev1:3003` — configure via `data-ime-base-url` on composer / inputs.
+IME candidate backend (optional): set `XAMT_IME_BASE_URL` (e.g. `http://dev1:3003`). Unset, the IME
+uses its bundled local dictionary and makes no network requests. When set, it must be a host the
+client device can reach — `localhost` will not work from a phone on the LAN.
 
 ## Spec routes
 

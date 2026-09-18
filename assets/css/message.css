@@ -1,0 +1,326 @@
+/* Messages, quotes, reactions, search — extracted from layout.css */
+
+.xamt-messages {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Wraps the list + empty state so the jump button can be anchored to it */
+.xamt-messages-region {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.xamt-search {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.35rem;
+  margin-inline-start: auto;
+}
+
+.xamt-search__field .xamt-input {
+  inline-size: 8rem;
+  block-size: 2.35rem;
+}
+
+.xamt-search-results {
+  position: absolute;
+  inset: 0.6rem auto 0.6rem 0.6rem;
+  z-index: var(--xamt-z-jump);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.75rem;
+  max-inline-size: 16rem;
+  overflow: auto;
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  border: 1px solid var(--xamt-line-strong);
+  border-radius: var(--xamt-radius);
+  background: color-mix(in srgb, var(--xamt-bg-2) 94%, var(--xamt-shade));
+  box-shadow: var(--xamt-shadow);
+  animation: xamt-fade-in 180ms ease;
+}
+
+.xamt-search-results__head {
+  margin: 0;
+  color: var(--xamt-accent-2);
+  font-size: 0.85rem;
+}
+
+.xamt-search-hit {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  padding: 0.4rem 0.45rem;
+  border: 0;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: start;
+}
+
+.xamt-search-hit:hover {
+  background: var(--xamt-accent-soft);
+}
+
+.xamt-message__content {
+  min-width: 4rem;
+  max-width: 40vw;
+  max-block-size: calc(var(--xamt-vh) - 8rem);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Sits over the message list when new messages land off-screen */
+.xamt-jump-latest {
+  position: absolute;
+  top: 50%;
+  right: 0.75rem;
+  transform: translateY(-50%);
+  z-index: var(--xamt-z-jump);
+  display: none;
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  padding: 0.85rem 0.55rem;
+  border: 1px solid var(--xamt-line-strong);
+  border-radius: 999px;
+  background: var(--xamt-bg-2);
+  color: var(--xamt-text);
+  box-shadow: var(--xamt-shadow);
+  cursor: pointer;
+  animation: xamt-fade-in 180ms ease;
+}
+
+.xamt-jump-latest.is-visible {
+  display: block;
+}
+
+.xamt-messages__load {
+  align-self: center;
+  color: var(--xamt-muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.xamt-message {
+  display: flex;
+  flex-direction: row;
+  gap: 0.75rem;
+  flex: 0 0 auto;
+  padding: 0.45rem 0.4rem;
+  border-radius: 0.7rem;
+  transition: background-color 140ms ease;
+  animation: xamt-message-in 220ms ease;
+}
+
+@keyframes xamt-message-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.xamt-message:hover {
+  background: color-mix(in srgb, var(--xamt-bg-3) 55%, transparent);
+}
+
+.xamt-message__avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(160deg, var(--xamt-bg-3), color-mix(in srgb, var(--xamt-accent) 22%, var(--xamt-bg-3)));
+  border: 1px solid var(--xamt-line);
+  font-family: var(--xamt-font-mongol);
+  flex: 0 0 auto;
+  color: var(--xamt-accent-2);
+}
+
+.xamt-message__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.xamt-message__meta {
+  display: flex;
+  flex-direction: row;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--xamt-muted);
+}
+
+.xamt-message__meta strong {
+  color: var(--xamt-text);
+}
+
+/* Quoted parent, both inside a message and above the composer */
+.xamt-quote,
+.xamt-reply-bar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.45rem;
+  border: 0;
+  border-inline-start: 2px solid var(--xamt-accent);
+  border-radius: 0.4rem;
+  background: var(--xamt-accent-soft);
+  color: var(--xamt-muted);
+  font-size: 0.85rem;
+  text-align: start;
+  cursor: pointer;
+  max-block-size: 100%;
+  overflow: hidden;
+}
+
+.xamt-quote:hover {
+  background: color-mix(in srgb, var(--xamt-accent) 24%, transparent);
+}
+
+.xamt-quote__mark {
+  color: var(--xamt-accent);
+  flex: 0 0 auto;
+}
+
+.xamt-quote__author {
+  color: var(--xamt-text);
+  flex: 0 0 auto;
+}
+
+.xamt-quote__text {
+  min-height: 0;
+  max-block-size: 100%;
+  overflow: hidden;
+}
+
+.xamt-reply-bar {
+  cursor: default;
+  flex: 0 0 auto;
+  align-self: stretch;
+}
+
+/* Landing target after following a quote */
+.xamt-message.is-highlighted {
+  background: var(--xamt-gold-soft);
+  box-shadow: inset 0 0 0 1px var(--xamt-line-strong);
+}
+
+/* Reaction chips run down the column; the picker appears on hover/focus */
+.xamt-reactions {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+}
+
+.xamt-reaction {
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--xamt-line);
+  border-radius: 999px;
+  background: var(--xamt-bg-2);
+  color: var(--xamt-muted);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.xamt-reaction:hover {
+  transform: translateY(-1px);
+  border-color: var(--xamt-line-strong);
+}
+
+.xamt-reaction.is-mine {
+  background: var(--xamt-accent-soft);
+  border-color: color-mix(in srgb, var(--xamt-accent) 50%, transparent);
+  color: var(--xamt-text);
+}
+
+.xamt-reaction__count {
+  font-family: var(--xamt-font-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.xamt-reaction-picker {
+  display: flex;
+  flex-direction: row;
+  gap: 0.2rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+
+.xamt-message:hover .xamt-reaction-picker,
+.xamt-reaction-picker:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* No hover on touch — keep the picker reachable */
+@media (pointer: coarse) {
+  .xamt-reaction-picker {
+    opacity: 0.65;
+    pointer-events: auto;
+  }
+}
+
+.xamt-message__actions {
+  display: flex;
+  flex-direction: row;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.xamt-message__actions button {
+  background: transparent;
+  border: 0;
+  color: var(--xamt-muted);
+  cursor: pointer;
+  padding: 0.15rem 0;
+  transition: color 140ms ease;
+}
+
+.xamt-message__actions button:hover {
+  color: var(--xamt-accent-2);
+}
+
+.xamt-typing {
+  padding: 0 1rem 0.35rem;
+  color: var(--xamt-muted);
+  font-size: 0.85rem;
+}
+

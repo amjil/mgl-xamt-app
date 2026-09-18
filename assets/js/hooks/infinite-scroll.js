@@ -16,7 +16,7 @@ export const InfiniteScroll = {
           }
         })
       },
-      // 触发无限加载的距离
+      // Distance at which infinite load is triggered
       {root: this.el.parentNode, rootMargin: "200px"}
     )
 
@@ -28,7 +28,7 @@ export const InfiniteScroll = {
   },
 
   updated() {
-    // 渲染旧消息后，补偿水平滚动条，使用户视线停留
+    // After older messages render, adjust horizontal scroll so the viewport stays put
     if (this.oldScrollWidth != null) {
       const newScrollWidth = this.el.parentNode.scrollWidth
       this.el.parentNode.scrollLeft += newScrollWidth - this.oldScrollWidth

@@ -5,7 +5,9 @@ defmodule Xamt.Channels do
 
   import Ecto.Query, warn: false
 
+  alias Xamt.Accounts.Scope
   alias Xamt.Repo
+  alias Xamt.Servers
   alias Xamt.Servers.Server
   alias Xamt.Channels.{Channel, ChannelRead, LastMessageCache}
   alias Xamt.Slug
@@ -13,6 +15,103 @@ defmodule Xamt.Channels do
   def change_channel(%Channel{} = channel, attrs \\ %{}) do
     channel
     |> Ecto.Changeset.cast(attrs, [:name, :slug, :type, :position])
+  end
+
+  @doc """
+  Creates a channel on behalf of a user. Only server admins and owners may.
+  """
+  def create_channel(%Scope{user: user}, %Server{} = server, attrs) when is_map(attrs) do
+    if Servers.admin?(server.id, user.id) do
+      create_channel(server, attrs)
+    else
+      {:error, :unauthorized}
+    end
+  end
+
+  def update_channel(%Scope{user: user}, channel_id, attrs) when is_map(attrs) do
+    channel = get_channel!(channel_id)
+
+    if Servers.admin?(channel.server_id, user.id) do
+      name = Map.get(attrs, "name") || Map.get(attrs, :name)
+
+      channel
+      |> Channel.changeset(%{
+        server_id: channel.server_id,
+        name: name,
+        slug: Map.get(attrs, "slug") || Map.get(attrs, :slug) || Slug.slugify(name),
+        type: Map.get(attrs, "type") || Map.get(attrs, :type) || channel.type
+      })
+      |> Repo.update()
+    else
+      {:error, :unauthorized}
+    end
+  end
+
+  def delete_channel(%Scope{user: user}, channel_id) do
+    channel = get_channel!(channel_id)
+
+    cond do
+      not Servers.admin?(channel.server_id, user.id) ->
+        {:error, :unauthorized}
+
+      last_channel?(channel.server_id) ->
+        {:error, :last_channel}
+
+      true ->
+        with {:ok, channel} <- Repo.delete(channel) do
+          LastMessageCache.delete(channel.id)
+          {:ok, channel}
+        end
+    end
+  end
+
+  @doc """
+  Moves a channel one slot up or down, renumbering positions to stay dense.
+  """
+  def move_channel(%Scope{user: user}, channel_id, direction) when direction in [:up, :down] do
+    channel = get_channel!(channel_id)
+
+    if Servers.admin?(channel.server_id, user.id) do
+      ordered = list_channels(channel.server_id)
+      index = Enum.find_index(ordered, &(&1.id == channel.id))
+      target = if direction == :up, do: index - 1, else: index + 1
+
+      if target < 0 or target >= length(ordered) do
+        {:ok, ordered}
+      else
+        ordered
+        |> swap(index, target)
+        |> persist_positions()
+      end
+    else
+      {:error, :unauthorized}
+    end
+  end
+
+  defp swap(list, i, j) do
+    a = Enum.at(list, i)
+    b = Enum.at(list, j)
+
+    list
+    |> List.replace_at(i, b)
+    |> List.replace_at(j, a)
+  end
+
+  defp persist_positions(ordered) do
+    Repo.transact(fn ->
+      ordered
+      |> Enum.with_index()
+      |> Enum.each(fn {channel, position} ->
+        from(c in Channel, where: c.id == ^channel.id)
+        |> Repo.update_all(set: [position: position])
+      end)
+
+      {:ok, ordered}
+    end)
+  end
+
+  defp last_channel?(server_id) do
+    Repo.aggregate(from(c in Channel, where: c.server_id == ^server_id), :count) <= 1
   end
 
   def create_channel(%Server{} = server, attrs) when is_map(attrs) do

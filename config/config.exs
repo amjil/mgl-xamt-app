@@ -24,6 +24,10 @@ config :xamt,
   ecto_repos: [Xamt.Repo],
   generators: [timestamp_type: :utc_datetime, binary_id: true]
 
+# Remote candidate backend for mgl-web-ime. When nil the IME runs on its
+# bundled local dictionary only — the browser never attempts a request.
+config :xamt, :ime_base_url, nil
+
 # Configure the endpoint
 config :xamt, XamtWeb.Endpoint,
   url: [host: "localhost"],

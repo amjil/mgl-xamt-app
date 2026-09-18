@@ -3,6 +3,8 @@ defmodule XamtWeb.ServerLive do
 
   alias Xamt.{Channels, Messages, Servers}
   alias Xamt.Channels.Channel
+  alias Xamt.Messages.Reaction
+  alias Xamt.Servers.Server
   alias XamtWeb.Presence
 
   @message_page_size 50
@@ -13,10 +15,27 @@ defmodule XamtWeb.ServerLive do
     scope = socket.assigns.current_scope
     server = Servers.get_server_by_slug!(server_slug)
 
-    unless Servers.member?(server.id, scope.user.id) do
-      {:ok, _} = Servers.join_server(scope, server.id)
-    end
+    cond do
+      Servers.member?(server.id, scope.user.id) ->
+        mount_member(server, params, socket)
 
+      Server.public?(server) ->
+        {:ok,
+         socket
+         |> assign(:page_title, server.name)
+         |> assign(:server, server)
+         |> assign(:member?, false)}
+
+      true ->
+        {:ok,
+         socket
+         |> put_flash(:error, gettext("This server is invite only."))
+         |> push_navigate(to: ~p"/")}
+    end
+  end
+
+  defp mount_member(server, params, socket) do
+    scope = socket.assigns.current_scope
     channels = Channels.list_channels(server.id)
     members = Servers.list_members(server.id, limit: @member_page_size, offset: 0)
 
@@ -48,6 +67,7 @@ defmodule XamtWeb.ServerLive do
       socket
       |> assign(:page_title, server.name)
       |> assign(:server, server)
+      |> assign(:member?, true)
       |> assign(:user_servers, user_servers)
       |> assign(:channels, channels)
       |> assign(:members_offset, @member_page_size)
@@ -57,10 +77,18 @@ defmodule XamtWeb.ServerLive do
       |> assign(:online_users, list_online(channel))
       |> assign(:typing_users, %{})
       |> assign(:editing_message_id, nil)
+      |> assign(:replying_to, nil)
       |> assign(:show_channel_form, false)
       |> assign(:channel_form, to_form(Channels.change_channel(%Channel{}), as: :channel))
+      |> assign(:admin?, Servers.admin?(server.id, scope.user.id))
+      |> assign(:show_server_settings, false)
+      |> assign(:server_form, to_form(Servers.change_server(server), as: :server))
+      |> assign(:invites, Servers.list_invites(server.id))
+      |> assign(:editing_channel_id, nil)
       |> assign(:mobile_panel, :messages)
       |> assign(:unread_channels, MapSet.new(unread_ids))
+      |> assign(:search_q, "")
+      |> assign(:search_results, nil)
       |> assign_messages(messages)
       |> allow_upload(:media,
         accept: ~w(.jpg .jpeg .png .gif .webp),
@@ -77,6 +105,10 @@ defmodule XamtWeb.ServerLive do
   end
 
   @impl true
+  def handle_params(_params, _uri, %{assigns: %{member?: false}} = socket) do
+    {:noreply, socket}
+  end
+
   def handle_params(%{"channel_slug" => channel_slug} = params, _uri, socket) do
     server = socket.assigns.server
     scope = socket.assigns.current_scope
@@ -109,8 +141,11 @@ defmodule XamtWeb.ServerLive do
      |> assign(:online_users, list_online(channel))
      |> assign(:typing_users, %{})
      |> assign(:editing_message_id, nil)
+     |> assign(:replying_to, nil)
      |> assign(:mobile_panel, :messages)
      |> assign(:unread_channels, unread_channels)
+     |> assign(:search_q, "")
+     |> assign(:search_results, nil)
      |> assign_messages(messages)
      |> maybe_push_composer_reset(params)}
   end
@@ -118,6 +153,25 @@ defmodule XamtWeb.ServerLive do
   def handle_params(_params, _uri, socket), do: {:noreply, socket}
 
   @impl true
+  def handle_event("join_server", _params, socket) do
+    server = socket.assigns.server
+
+    if Server.public?(server) do
+      case Servers.join_server(socket.assigns.current_scope, server.id) do
+        {:ok, _} ->
+          {:noreply, push_navigate(socket, to: ~p"/servers/#{server.slug}")}
+
+        {:error, :already_member} ->
+          {:noreply, push_navigate(socket, to: ~p"/servers/#{server.slug}")}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, gettext("Could not join"))}
+      end
+    else
+      {:noreply, put_flash(socket, :error, gettext("This server is invite only."))}
+    end
+  end
+
   def handle_event("validate_upload", _params, socket) do
     {:noreply, socket}
   end
@@ -138,7 +192,8 @@ defmodule XamtWeb.ServerLive do
       attrs = %{
         "content" => decode_json(params["content_json"]),
         "content_html" => (params["content_html"] || "") <> media_html,
-        "content_type" => params["content_type"] || "rich_text"
+        "content_type" => params["content_type"] || "rich_text",
+        "reply_to_id" => socket.assigns.replying_to && socket.assigns.replying_to.id
       }
 
       case Messages.create_message(scope, channel.id, attrs) do
@@ -146,6 +201,7 @@ defmodule XamtWeb.ServerLive do
           {:noreply,
            socket
            |> assign(:editing_message_id, nil)
+           |> assign(:replying_to, nil)
            |> push_event("composer:clear", %{})}
 
         {:error, _changeset} ->
@@ -163,9 +219,36 @@ defmodule XamtWeb.ServerLive do
       {:noreply,
        socket
        |> assign(:editing_message_id, id)
+       |> assign(:replying_to, nil)
        |> push_event("composer:load", %{"html" => html})}
     else
       {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+    end
+  end
+
+  def handle_event("reply_message", %{"id" => id}, socket) do
+    message = Messages.get_message!(id)
+
+    if active_channel_message?(socket, message) do
+      {:noreply,
+       socket
+       |> assign(:replying_to, message)
+       |> assign(:editing_message_id, nil)
+       |> assign(:mobile_panel, :messages)
+       |> push_event("composer:focus", %{})}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("cancel_reply", _params, socket) do
+    {:noreply, assign(socket, :replying_to, nil)}
+  end
+
+  def handle_event("toggle_reaction", %{"id" => id, "emoji" => emoji}, socket) do
+    case Messages.toggle_reaction(socket.assigns.current_scope, id, emoji) do
+      {:ok, _summary} -> {:noreply, socket}
+      {:error, _} -> {:noreply, put_flash(socket, :error, gettext("Could not react"))}
     end
   end
 
@@ -201,6 +284,7 @@ defmodule XamtWeb.ServerLive do
     {:noreply,
      socket
      |> assign(:editing_message_id, nil)
+     |> assign(:replying_to, nil)
      |> push_event("composer:clear", %{})}
   end
 
@@ -226,6 +310,7 @@ defmodule XamtWeb.ServerLive do
             socket
             |> assign(:oldest_message_id, first.id)
             |> assign(:has_more_messages, length(msgs) >= @message_page_size)
+            |> merge_reactions(msgs)
             |> stream(:messages, msgs, at: 0)
             |> maybe_done_loading(length(msgs) >= @message_page_size)
 
@@ -279,7 +364,7 @@ defmodule XamtWeb.ServerLive do
   def handle_event("create_channel", %{"channel" => params}, socket) do
     server = socket.assigns.server
 
-    case Channels.create_channel(server, params) do
+    case Channels.create_channel(socket.assigns.current_scope, server, params) do
       {:ok, channel} ->
         channels = Channels.list_channels(server.id)
 
@@ -291,9 +376,137 @@ defmodule XamtWeb.ServerLive do
          |> assign(:show_channel_form, false)
          |> push_navigate(to: ~p"/servers/#{server.slug}/#{channel.slug}")}
 
+      {:error, :unauthorized} ->
+        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+
       {:error, changeset} ->
         {:noreply,
          assign(socket, channel_form: to_form(changeset, as: :channel), show_channel_form: true)}
+    end
+  end
+
+  def handle_event("edit_channel", %{"id" => id}, socket) do
+    {:noreply, assign(socket, :editing_channel_id, id)}
+  end
+
+  def handle_event("cancel_channel_edit", _params, socket) do
+    {:noreply, assign(socket, :editing_channel_id, nil)}
+  end
+
+  def handle_event("update_channel", %{"channel" => params}, socket) do
+    id = socket.assigns.editing_channel_id
+
+    case Channels.update_channel(socket.assigns.current_scope, id, params) do
+      {:ok, channel} ->
+        {:noreply,
+         socket
+         |> assign(:editing_channel_id, nil)
+         |> refresh_channels()
+         |> maybe_follow_renamed_channel(channel)}
+
+      {:error, :unauthorized} ->
+        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+
+      {:error, _changeset} ->
+        {:noreply, put_flash(socket, :error, gettext("Could not rename the channel"))}
+    end
+  end
+
+  def handle_event("delete_channel", %{"id" => id}, socket) do
+    active = socket.assigns.active_channel
+
+    case Channels.delete_channel(socket.assigns.current_scope, id) do
+      {:ok, _channel} ->
+        socket = refresh_channels(socket)
+
+        if active && active.id == id do
+          case List.first(socket.assigns.channels) do
+            nil -> {:noreply, socket}
+            next -> {:noreply, push_navigate(socket, to: channel_path(socket, next))}
+          end
+        else
+          {:noreply, socket}
+        end
+
+      {:error, :last_channel} ->
+        {:noreply, put_flash(socket, :error, gettext("A server needs at least one channel"))}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+    end
+  end
+
+  def handle_event("move_channel", %{"id" => id, "direction" => direction}, socket) do
+    direction = if direction == "up", do: :up, else: :down
+
+    case Channels.move_channel(socket.assigns.current_scope, id, direction) do
+      {:ok, _} -> {:noreply, refresh_channels(socket)}
+      {:error, _} -> {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+    end
+  end
+
+  def handle_event("toggle_server_settings", _params, socket) do
+    {:noreply, assign(socket, :show_server_settings, !socket.assigns.show_server_settings)}
+  end
+
+  def handle_event("save_server", %{"server" => params}, socket) do
+    case Servers.update_server(socket.assigns.current_scope, socket.assigns.server.id, params) do
+      {:ok, server} ->
+        {:noreply,
+         socket
+         |> assign(:server, server)
+         |> assign(:server_form, to_form(Servers.change_server(server), as: :server))
+         |> put_flash(:info, gettext("Server updated"))}
+
+      {:error, :unauthorized} ->
+        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+
+      {:error, changeset} ->
+        {:noreply, assign(socket, :server_form, to_form(changeset, as: :server))}
+    end
+  end
+
+  def handle_event("create_invite", _params, socket) do
+    case Servers.create_invite(socket.assigns.current_scope, socket.assigns.server.id) do
+      {:ok, _invite} ->
+        {:noreply, assign(socket, :invites, Servers.list_invites(socket.assigns.server.id))}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+    end
+  end
+
+  def handle_event("delete_invite", %{"id" => id}, socket) do
+    case Servers.delete_invite(socket.assigns.current_scope, id) do
+      {:ok, _} ->
+        {:noreply, assign(socket, :invites, Servers.list_invites(socket.assigns.server.id))}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+    end
+  end
+
+  def handle_event("kick_member", %{"user-id" => user_id}, socket) do
+    server = socket.assigns.server
+
+    case Servers.kick_member(socket.assigns.current_scope, server.id, user_id) do
+      {:ok, member} ->
+        {:noreply, stream_delete(socket, :members, member)}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+    end
+  end
+
+  def handle_event("set_member_role", %{"user-id" => user_id, "role" => role}, socket) do
+    server = socket.assigns.server
+
+    case Servers.change_role(socket.assigns.current_scope, server.id, user_id, role) do
+      {:ok, member} ->
+        {:noreply, stream_insert(socket, :members, Xamt.Repo.preload(member, :user))}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
     end
   end
 
@@ -326,6 +539,31 @@ defmodule XamtWeb.ServerLive do
   def handle_event("set_mobile_panel", %{"panel" => panel}, socket) do
     panel = String.to_existing_atom(panel)
     {:noreply, assign(socket, :mobile_panel, panel)}
+  end
+
+  def handle_event("search", %{"q" => q}, socket) do
+    q = String.trim(q)
+
+    results =
+      if q == "" do
+        nil
+      else
+        Messages.search_messages([socket.assigns.active_channel.id], q)
+      end
+
+    {:noreply, assign(socket, search_q: q, search_results: results)}
+  end
+
+  def handle_event("clear_search", _params, socket) do
+    {:noreply, assign(socket, search_q: "", search_results: nil)}
+  end
+
+  def handle_event("open_search_result", %{"id" => id}, socket) do
+    {:noreply,
+     socket
+     |> assign(:search_results, nil)
+     |> assign(:search_q, "")
+     |> push_event("messages:scroll_to", %{id: id})}
   end
 
   @impl true
@@ -361,6 +599,18 @@ defmodule XamtWeb.ServerLive do
   def handle_info({:updated_message, message}, socket) do
     if active_channel_message?(socket, message) do
       {:noreply, stream_insert(socket, :messages, message)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_info({:reaction_changed, message, summary}, socket) do
+    if active_channel_message?(socket, message) do
+      # The stream item has to be re-inserted for the new summary to render
+      {:noreply,
+       socket
+       |> assign(:reactions, Map.put(socket.assigns.reactions, message.id, summary))
+       |> stream_insert(:messages, message)}
     else
       {:noreply, socket}
     end
@@ -409,12 +659,59 @@ defmodule XamtWeb.ServerLive do
   end
 
   @impl true
+  def render(%{member?: false} = assigns) do
+    ~H"""
+    <Layouts.app flash={@flash} current_scope={@current_scope}>
+      <section class="xamt-stack" id="server-preview">
+        <div class="xamt-auth-intro">
+          <span class="xamt-ornament" aria-hidden="true"></span>
+          <p class="xamt-kicker mongol-text">{gettext("Public server")}</p>
+        </div>
+
+        <.header>
+          <span class="mongol-text">{@server.name}</span>
+          <:subtitle>
+            <span class="xamt-upright">/{@server.slug}</span>
+          </:subtitle>
+        </.header>
+
+        <p :if={@server.description} class="xamt-profile__bio mongol-text">
+          {@server.description}
+        </p>
+
+        <button
+          type="button"
+          id="join-server"
+          class="xamt-btn xamt-btn--primary mongol-text"
+          phx-click="join_server"
+        >
+          {gettext("Join server")}
+        </button>
+
+        <.link navigate={~p"/"} id="preview-back" class="xamt-btn mongol-text">
+          {gettext("Back")}
+        </.link>
+      </section>
+    </Layouts.app>
+    """
+  end
+
   def render(assigns) do
     ~H"""
-    <div class="xamt-chat" id="xamt-app">
+    <div class="xamt-chat" id="xamt-app" phx-hook="MobileDrawer">
       <Layouts.flash_group flash={@flash} />
 
       <div class={"xamt-app xamt-app--panel-#{@mobile_panel}"}>
+        <button
+          :if={@mobile_panel != :messages}
+          type="button"
+          id="drawer-backdrop"
+          class="xamt-drawer-backdrop"
+          phx-click="set_mobile_panel"
+          phx-value-panel="messages"
+          aria-label={gettext("Close panel")}
+        >
+        </button>
         <aside class="xamt-rail xamt-rail--servers">
           <.link navigate={~p"/"} class="xamt-brand-mark" title="Xamt">X</.link>
           <.link
@@ -431,22 +728,40 @@ defmodule XamtWeb.ServerLive do
             class="xamt-user-chip xamt-user-chip--rail"
             title={display_name(@current_scope.user)}
           >
-            <span class="xamt-avatar">{user_initial(@current_scope.user)}</span>
+            <.avatar user={@current_scope.user} />
             <span class="mongol-text">{display_name(@current_scope.user)}</span>
           </.link>
         </aside>
 
         <aside class="xamt-rail xamt-rail--channels">
+          <.server_settings
+            :if={@admin? and @show_server_settings}
+            server={@server}
+            form={@server_form}
+            invites={@invites}
+          />
+
           <div class="xamt-rail__pane xamt-rail__pane--top">
             <header class="xamt-rail__header">
               <h1 class="xamt-rail__title mongol-text">{@server.name}</h1>
-              <p class="xamt-rail__sub mongol-text">/{@server.slug}</p>
+              <p class="xamt-rail__sub"><span class="xamt-upright">/{@server.slug}</span></p>
+              <button
+                :if={@admin?}
+                type="button"
+                id="toggle-server-settings"
+                class="xamt-icon-btn"
+                phx-click="toggle_server_settings"
+                aria-label={gettext("Server settings")}
+              >
+                <.icon name="hero-cog-6-tooth" class="size-4" />
+              </button>
             </header>
 
             <div class="xamt-rail__section">
               <div class="xamt-rail__section-head">
                 <span class="mongol-text">{gettext("Channels")}</span>
                 <button
+                  :if={@admin?}
                   type="button"
                   id="toggle-channel-form"
                   class="xamt-icon-btn"
@@ -484,32 +799,105 @@ defmodule XamtWeb.ServerLive do
               </form>
 
               <nav class="xamt-channel-nav">
-                <.link
-                  :for={ch <- @channels}
-                  navigate={~p"/servers/#{@server.slug}/#{ch.slug}"}
-                  class={[
-                    "xamt-channel-link",
-                    @active_channel && ch.id == @active_channel.id && "is-active",
-                    MapSet.member?(@unread_channels, ch.id) && "has-unread"
-                  ]}
-                >
-                  <span class="xamt-channel-hash">#</span>
-                  <span class={[
-                    "mongol-text",
-                    MapSet.member?(@unread_channels, ch.id) && "font-bold text-[var(--xamt-text)]"
-                  ]}>
-                    {ch.name}
-                  </span>
-                  <span
-                    :if={
-                      MapSet.member?(@unread_channels, ch.id) &&
-                        !(@active_channel && ch.id == @active_channel.id)
-                    }
-                    class="xamt-unread-dot"
-                    aria-hidden="true"
+                <div :for={ch <- @channels} class="xamt-channel-item">
+                  <.form
+                    :if={@editing_channel_id == ch.id}
+                    for={@channel_form}
+                    id={"rename-channel-#{ch.id}"}
+                    phx-submit="update_channel"
+                    class="xamt-form xamt-form--compact"
                   >
-                  </span>
-                </.link>
+                    <input
+                      type="text"
+                      name="channel[name]"
+                      id={"rename-channel-name-#{ch.id}"}
+                      value={ch.name}
+                      required
+                      class="xamt-input mongol-input"
+                      phx-hook="MongolianIME"
+                    />
+                    <button type="submit" class="xamt-icon-btn" aria-label={gettext("Save")}>
+                      <.icon name="hero-check" class="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      class="xamt-icon-btn"
+                      phx-click="cancel_channel_edit"
+                      aria-label={gettext("Cancel")}
+                    >
+                      <.icon name="hero-x-mark" class="size-4" />
+                    </button>
+                  </.form>
+
+                  <.link
+                    :if={@editing_channel_id != ch.id}
+                    navigate={~p"/servers/#{@server.slug}/#{ch.slug}"}
+                    class={[
+                      "xamt-channel-link",
+                      @active_channel && ch.id == @active_channel.id && "is-active",
+                      MapSet.member?(@unread_channels, ch.id) && "has-unread"
+                    ]}
+                  >
+                    <span class="xamt-channel-hash">#</span>
+                    <span class={[
+                      "mongol-text",
+                      MapSet.member?(@unread_channels, ch.id) && "font-bold text-[var(--xamt-text)]"
+                    ]}>
+                      {ch.name}
+                    </span>
+                    <span
+                      :if={
+                        MapSet.member?(@unread_channels, ch.id) &&
+                          !(@active_channel && ch.id == @active_channel.id)
+                      }
+                      class="xamt-unread-dot"
+                      aria-hidden="true"
+                    >
+                    </span>
+                  </.link>
+
+                  <div :if={@admin? and @editing_channel_id != ch.id} class="xamt-channel-item__tools">
+                    <button
+                      type="button"
+                      class="xamt-icon-btn"
+                      phx-click="move_channel"
+                      phx-value-id={ch.id}
+                      phx-value-direction="up"
+                      aria-label={gettext("Move earlier")}
+                    >
+                      <.icon name="hero-chevron-up" class="size-3" />
+                    </button>
+                    <button
+                      type="button"
+                      class="xamt-icon-btn"
+                      phx-click="move_channel"
+                      phx-value-id={ch.id}
+                      phx-value-direction="down"
+                      aria-label={gettext("Move later")}
+                    >
+                      <.icon name="hero-chevron-down" class="size-3" />
+                    </button>
+                    <button
+                      type="button"
+                      class="xamt-icon-btn"
+                      phx-click="edit_channel"
+                      phx-value-id={ch.id}
+                      aria-label={gettext("Rename channel")}
+                    >
+                      <.icon name="hero-pencil" class="size-3" />
+                    </button>
+                    <button
+                      type="button"
+                      class="xamt-icon-btn"
+                      phx-click="delete_channel"
+                      phx-value-id={ch.id}
+                      data-confirm={gettext("Delete this channel and all its messages?")}
+                      aria-label={gettext("Delete channel")}
+                    >
+                      <.icon name="hero-trash" class="size-3" />
+                    </button>
+                  </div>
+                </div>
               </nav>
             </div>
           </div>
@@ -527,8 +915,43 @@ defmodule XamtWeb.ServerLive do
               <h3 class="xamt-rail__section-head mongol-text">{gettext("Members")}</h3>
               <ul id="server-members-list" class="xamt-member-list" phx-update="stream">
                 <li :for={{dom_id, member} <- @streams.members} id={dom_id} class="xamt-member">
+                  <.avatar user={member.user} class="xamt-avatar xamt-avatar--sm" />
                   <span class="xamt-presence"></span>
                   <span class="mongol-text">{display_name(member.user)}</span>
+                  <span :if={member.role != "member"} class="xamt-role xamt-upright">
+                    {member.role}
+                  </span>
+
+                  <span
+                    :if={
+                      @admin? and member.role != "owner" and member.user_id != @current_scope.user.id
+                    }
+                    class="xamt-member__tools"
+                  >
+                    <button
+                      type="button"
+                      class="xamt-icon-btn"
+                      phx-click="set_member_role"
+                      phx-value-user-id={member.user_id}
+                      phx-value-role={if member.role == "admin", do: "member", else: "admin"}
+                      aria-label={gettext("Change role")}
+                    >
+                      <.icon
+                        name={if member.role == "admin", do: "hero-arrow-down", else: "hero-arrow-up"}
+                        class="size-3"
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      class="xamt-icon-btn"
+                      phx-click="kick_member"
+                      phx-value-user-id={member.user_id}
+                      data-confirm={gettext("Remove this member?")}
+                      aria-label={gettext("Remove member")}
+                    >
+                      <.icon name="hero-user-minus" class="size-3" />
+                    </button>
+                  </span>
                 </li>
                 <li
                   :if={@has_more_members}
@@ -583,61 +1006,174 @@ defmodule XamtWeb.ServerLive do
               <span class="xamt-channel-hash">#</span>
               <span class="mongol-text">{@active_channel && @active_channel.name}</span>
             </h2>
+            <form id="channel-search" phx-change="search" phx-submit="search" class="xamt-search">
+              <label class="xamt-search__field">
+                <span class="sr-only">{gettext("Search")}</span>
+                <input
+                  type="search"
+                  name="q"
+                  id="channel-search-q"
+                  value={@search_q}
+                  placeholder={gettext("Search")}
+                  class="xamt-input mongol-input"
+                  phx-hook="MongolianIME"
+                  autocomplete="off"
+                />
+              </label>
+              <button
+                :if={@search_results}
+                type="button"
+                id="clear-search"
+                class="xamt-icon-btn"
+                phx-click="clear_search"
+                aria-label={gettext("Clear search")}
+              >
+                <.icon name="hero-x-mark" class="size-4" />
+              </button>
+            </form>
           </header>
 
-          <div
-            :if={@messages_empty?}
-            id="messages-empty"
-            class="xamt-empty xamt-empty--messages"
-          >
-            <span class="xamt-ornament" aria-hidden="true"></span>
-            <p class="mongol-text">{gettext("No messages yet. Write the first one.")}</p>
-          </div>
-
-          <div id="message-list" class="xamt-messages" phx-update="stream" phx-hook="MessageList">
+          <div class="xamt-messages-region">
+            <div :if={@search_results} id="search-results" class="xamt-search-results">
+              <p class="xamt-search-results__head mongol-text">
+                {gettext("Search results")}
+              </p>
+              <p :if={@search_results == []} class="xamt-empty mongol-text">
+                {gettext("No matches.")}
+              </p>
+              <button
+                :for={message <- @search_results}
+                type="button"
+                id={"search-hit-#{message.id}"}
+                class="xamt-search-hit"
+                phx-click="open_search_result"
+                phx-value-id={message.id}
+              >
+                <span class="xamt-quote__author mongol-text">{display_name(message.user)}</span>
+                <span class="xamt-quote__text mongol-text">{Messages.excerpt(message)}</span>
+              </button>
+            </div>
             <div
-              :if={@has_more_messages}
-              id="messages-infinite-scroll"
-              phx-hook="InfiniteScroll"
-              class="xamt-scroll-sentinel"
+              :if={@messages_empty?}
+              id="messages-empty"
+              class="xamt-empty xamt-empty--messages"
             >
+              <span class="xamt-ornament" aria-hidden="true"></span>
+              <p class="mongol-text">{gettext("No messages yet. Write the first one.")}</p>
             </div>
 
-            <article
-              :for={{dom_id, message} <- @streams.messages}
-              id={dom_id}
-              class="xamt-message"
-              data-message-id={message.id}
-            >
-              <div class="xamt-message__avatar">{user_initial(message.user)}</div>
-              <div class="xamt-message__body">
-                <header class="xamt-message__meta">
-                  <strong class="mongol-text">{display_name(message.user)}</strong>
-                  <time class="mongol-text">{format_time(message.inserted_at)}</time>
-                  <span :if={edited?(message)} class="xamt-message__edited">{gettext("edited")}</span>
-                </header>
-                <div
-                  id={"msg-content-#{message.id}"}
-                  class="xamt-message__content mongol-text"
-                  phx-hook="MongolianScroll"
-                >
-                  {raw(safe_html(message))}
-                </div>
-                <div :if={message.user_id == @current_scope.user.id} class="xamt-message__actions">
-                  <button type="button" phx-click="edit_message" phx-value-id={message.id}>
-                    {gettext("Edit")}
-                  </button>
-                  <button
-                    type="button"
-                    phx-click="delete_message"
-                    phx-value-id={message.id}
-                    data-confirm={gettext("Delete this message?")}
-                  >
-                    {gettext("Delete")}
-                  </button>
-                </div>
+            <div id="message-list" class="xamt-messages" phx-update="stream" phx-hook="MessageList">
+              <div
+                :if={@has_more_messages}
+                id="messages-infinite-scroll"
+                phx-hook="InfiniteScroll"
+                class="xamt-scroll-sentinel"
+              >
               </div>
-            </article>
+
+              <article
+                :for={{dom_id, message} <- @streams.messages}
+                id={dom_id}
+                class="xamt-message"
+                data-message-id={message.id}
+              >
+                <.avatar user={message.user} class="xamt-message__avatar" />
+                <div class="xamt-message__body">
+                  <button
+                    :if={message.reply_to}
+                    type="button"
+                    class="xamt-quote"
+                    phx-click={JS.dispatch("xamt:scroll-to", to: "#messages-#{message.reply_to_id}")}
+                    title={gettext("Jump to the quoted message")}
+                  >
+                    <span class="xamt-quote__mark" aria-hidden="true">↳</span>
+                    <span class="xamt-quote__author mongol-text">
+                      {display_name(message.reply_to.user)}
+                    </span>
+                    <span class="xamt-quote__text mongol-text">
+                      {Messages.excerpt(message.reply_to)}
+                    </span>
+                  </button>
+                  <header class="xamt-message__meta">
+                    <strong class="mongol-text">{display_name(message.user)}</strong>
+                    <time class="xamt-upright">{format_time(message.inserted_at)}</time>
+                    <span :if={edited?(message)} class="xamt-message__edited">
+                      {gettext("edited")}
+                    </span>
+                  </header>
+                  <div
+                    id={"msg-content-#{message.id}"}
+                    class="xamt-message__content mongol-text"
+                    phx-hook="MongolianScroll"
+                  >
+                    {raw(safe_html(message))}
+                  </div>
+                  <div class="xamt-reactions">
+                    <button
+                      :for={{emoji, user_ids} <- reactions_for(@reactions, message.id)}
+                      type="button"
+                      class={[
+                        "xamt-reaction",
+                        @current_scope.user.id in user_ids && "is-mine"
+                      ]}
+                      phx-click="toggle_reaction"
+                      phx-value-id={message.id}
+                      phx-value-emoji={emoji}
+                    >
+                      <span class="xamt-reaction__emoji">{emoji}</span>
+                      <span class="xamt-reaction__count">{length(user_ids)}</span>
+                    </button>
+
+                    <div class="xamt-reaction-picker">
+                      <button
+                        :for={emoji <- Reaction.emojis()}
+                        type="button"
+                        class="xamt-reaction xamt-reaction--add"
+                        phx-click="toggle_reaction"
+                        phx-value-id={message.id}
+                        phx-value-emoji={emoji}
+                        aria-label={emoji}
+                      >
+                        {emoji}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="xamt-message__actions">
+                    <button type="button" phx-click="reply_message" phx-value-id={message.id}>
+                      {gettext("Reply")}
+                    </button>
+                    <button
+                      :if={message.user_id == @current_scope.user.id}
+                      type="button"
+                      phx-click="edit_message"
+                      phx-value-id={message.id}
+                    >
+                      {gettext("Edit")}
+                    </button>
+                    <button
+                      :if={message.user_id == @current_scope.user.id}
+                      type="button"
+                      phx-click="delete_message"
+                      phx-value-id={message.id}
+                      data-confirm={gettext("Delete this message?")}
+                    >
+                      {gettext("Delete")}
+                    </button>
+                  </div>
+                </div>
+              </article>
+            </div>
+
+            <%!-- Toggled by the MessageList hook; kept out of LiveView patches --%>
+            <button
+              type="button"
+              id="jump-latest"
+              class="xamt-jump-latest mongol-text"
+              phx-update="ignore"
+            >
+              {gettext("New messages")}
+            </button>
           </div>
 
           <div :if={map_size(@typing_users) > 0} class="xamt-typing">
@@ -649,6 +1185,22 @@ defmodule XamtWeb.ServerLive do
             data-has-uploads={to_string(@uploads.media.entries != [])}
             data-submit-event={if @editing_message_id, do: "update_message", else: "send_message"}
           >
+            <div :if={@replying_to} id="reply-preview" class="xamt-reply-bar">
+              <span class="xamt-quote__mark" aria-hidden="true">↳</span>
+              <span class="xamt-quote__author mongol-text">
+                {display_name(@replying_to.user)}
+              </span>
+              <span class="xamt-quote__text mongol-text">{Messages.excerpt(@replying_to, 40)}</span>
+              <button
+                type="button"
+                id="cancel-reply"
+                class="xamt-icon-btn"
+                phx-click="cancel_reply"
+                aria-label={gettext("Cancel reply")}
+              >
+                <.icon name="hero-x-mark" class="size-4" />
+              </button>
+            </div>
             <section
               :if={@uploads.media.entries != []}
               id="media-upload-preview"
@@ -722,7 +1274,19 @@ defmodule XamtWeb.ServerLive do
     |> assign(:oldest_message_id, oldest_id)
     |> assign(:has_more_messages, length(messages) >= @message_page_size)
     |> assign(:messages_empty?, messages == [])
+    |> assign(:reactions, Messages.reaction_summary(Enum.map(messages, & &1.id)))
     |> stream(:messages, messages, reset: true)
+  end
+
+  defp merge_reactions(socket, messages) do
+    summary = Messages.reaction_summary(Enum.map(messages, & &1.id))
+    assign(socket, :reactions, Map.merge(socket.assigns.reactions, summary))
+  end
+
+  defp reactions_for(reactions, message_id) do
+    reactions
+    |> Map.get(message_id, %{})
+    |> Enum.sort_by(fn {emoji, _users} -> Enum.find_index(Reaction.emojis(), &(&1 == emoji)) end)
   end
 
   defp maybe_done_loading(socket, true), do: socket
@@ -733,6 +1297,127 @@ defmodule XamtWeb.ServerLive do
 
   defp maybe_push_composer_reset(socket, _params) do
     push_event(socket, "composer:clear", %{})
+  end
+
+  # Overlays the whole channel rail so the rail keeps its width while open
+  attr :server, :map, required: true
+  attr :form, :map, required: true
+  attr :invites, :list, required: true
+
+  defp server_settings(assigns) do
+    ~H"""
+    <div id="server-settings" class="xamt-settings-panel">
+      <div class="xamt-rail__section-head">
+        <span class="mongol-text">{gettext("Server settings")}</span>
+        <button
+          type="button"
+          id="close-server-settings"
+          class="xamt-icon-btn"
+          phx-click="toggle_server_settings"
+          aria-label={gettext("Close")}
+        >
+          <.icon name="hero-x-mark" class="size-4" />
+        </button>
+      </div>
+
+      <.form
+        for={@form}
+        id="server-settings-form"
+        phx-submit="save_server"
+        class="xamt-form xamt-form--vertical xamt-form--compact"
+      >
+        <label class="xamt-label">
+          <span class="xamt-field__label mongol-text">{gettext("Name")}</span>
+          <input
+            type="text"
+            name={@form[:name].name}
+            id="server-settings-name"
+            value={@form[:name].value}
+            class="xamt-input mongol-input"
+            phx-hook="MongolianIME"
+          />
+        </label>
+
+        <label class="xamt-label">
+          <span class="xamt-field__label mongol-text">{gettext("Description")}</span>
+          <textarea
+            name={@form[:description].name}
+            id="server-settings-description"
+            class="xamt-textarea mongol-input"
+            phx-hook="MongolianIME"
+          >{Phoenix.HTML.Form.normalize_value("textarea", @form[:description].value)}</textarea>
+        </label>
+
+        <label class="xamt-label">
+          <span class="xamt-field__label mongol-text">{gettext("Visibility")}</span>
+          <select name={@form[:visibility].name} id="server-settings-visibility" class="xamt-select">
+            <option value="private" selected={@server.visibility == "private"}>
+              {gettext("Private — invite only")}
+            </option>
+            <option value="public" selected={@server.visibility == "public"}>
+              {gettext("Public — anyone can find and join")}
+            </option>
+          </select>
+        </label>
+
+        <button
+          type="submit"
+          id="server-settings-save"
+          class="xamt-btn xamt-btn--primary xamt-btn--sm mongol-text"
+        >
+          {gettext("Save")}
+        </button>
+      </.form>
+
+      <div class="xamt-rail__section-head">
+        <span class="mongol-text">{gettext("Invites")}</span>
+        <button
+          type="button"
+          id="create-invite"
+          class="xamt-icon-btn"
+          phx-click="create_invite"
+          aria-label={gettext("Create invite")}
+        >
+          +
+        </button>
+      </div>
+
+      <ul class="xamt-invite-list">
+        <li :for={invite <- @invites} class="xamt-invite">
+          <code class="xamt-upright">/invite/{invite.code}</code>
+          <span :if={invite.max_uses} class="xamt-upright">{invite.uses}/{invite.max_uses}</span>
+          <button
+            type="button"
+            class="xamt-icon-btn"
+            phx-click="delete_invite"
+            phx-value-id={invite.id}
+            aria-label={gettext("Delete invite")}
+          >
+            <.icon name="hero-x-mark" class="size-3" />
+          </button>
+        </li>
+      </ul>
+    </div>
+    """
+  end
+
+  defp refresh_channels(socket) do
+    assign(socket, :channels, Channels.list_channels(socket.assigns.server.id))
+  end
+
+  defp channel_path(socket, channel) do
+    ~p"/servers/#{socket.assigns.server.slug}/#{channel.slug}"
+  end
+
+  # Renaming regenerates the slug, so the current URL would 404 on reconnect
+  defp maybe_follow_renamed_channel(socket, channel) do
+    active = socket.assigns.active_channel
+
+    if active && active.id == channel.id && active.slug != channel.slug do
+      push_navigate(socket, to: channel_path(socket, channel))
+    else
+      socket
+    end
   end
 
   defp subscribe_channel(%Channel{} = channel) do
@@ -765,10 +1450,6 @@ defmodule XamtWeb.ServerLive do
   defp display_name(%{username: name}) when is_binary(name), do: name
   defp display_name(%{email: email}), do: email
   defp display_name(_), do: "?"
-
-  defp user_initial(user) do
-    display_name(user) |> String.trim() |> String.first() || "?"
-  end
 
   defp server_initial(name) when is_binary(name) do
     name |> String.trim() |> String.first() || "?"
@@ -810,23 +1491,7 @@ defmodule XamtWeb.ServerLive do
 
   defp consume_media_html(socket) do
     socket
-    |> consume_uploaded_entries(:media, fn %{path: path}, entry ->
-      ext =
-        entry.client_name
-        |> Path.extname()
-        |> String.downcase()
-
-      if ext in ~w(.jpg .jpeg .png .gif .webp) do
-        filename = "#{entry.uuid}#{ext}"
-        dest = Path.join([:code.priv_dir(:xamt), "static", "uploads", filename])
-        File.mkdir_p!(Path.dirname(dest))
-        File.cp!(path, dest)
-        {:ok, "/uploads/#{filename}"}
-      else
-        {:ok, nil}
-      end
-    end)
-    |> Enum.filter(&is_binary/1)
+    |> XamtWeb.Uploads.consume_images(:media)
     |> Enum.map(fn url -> ~s(<div class="editor-image"><img src="#{url}" /></div>) end)
     |> Enum.join()
   end
