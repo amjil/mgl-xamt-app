@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="csrf-token" content={get_csrf_token()} />
-    <meta name="theme-color" content="#1a1f24" />
+    <meta name="theme-color" content="#101412" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Xamt" />
@@ -31,40 +31,17 @@
   </head>
   <body class="xamt-body">
     <div class="xamt-shell">
-      <%!-- Mobile top bar (small screens only; stays horizontal-tb) --%>
-      <div class="xamt-mobile-header">
-        <.link
-          navigate={~p"/"}
-          class="xamt-latin"
-          style="font-family: Fraunces, serif; font-size: 1.35rem; color: var(--xamt-accent-2); text-decoration: none;"
-        >
-          Xamt
-        </.link>
-        <button
-          type="button"
-          onclick="document.getElementById('leftnav').classList.toggle('is-open')"
-          class="xamt-mobile-toggle"
-          aria-label={gettext("Open menu")}
-        >
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M4 6h16M4 12h16M4 18h16"
-            >
-            </path>
-          </svg>
-        </button>
-      </div>
-
-      <%!-- Left rail: shell stays horizontal; link glyphs are vertical-lr --%>
+      <%!-- Left rail: always on the left so labels read top→bottom --%>
       <aside id="leftnav" class="xamt-leftnav">
         <nav class="xamt-leftnav__inner">
-          <.link navigate={~p"/"} class="xamt-brand-mark">X</.link>
+          <.link navigate={~p"/"} class="xamt-brand-mark" title="Xamt">X</.link>
+          <span class="xamt-leftnav__rule" aria-hidden="true"></span>
 
           <ul class="xamt-leftnav__links">
             <%= if @current_scope && @current_scope.user do %>
+              <li>
+                <.link navigate={~p"/"} class="mongol-text">{gettext("Home")}</.link>
+              </li>
               <li>
                 <.link navigate={~p"/settings"} class="mongol-text">{gettext("Settings")}</.link>
               </li>
@@ -75,21 +52,17 @@
               </li>
             <% else %>
               <li>
-                <.link navigate={~p"/register"} class="mongol-text">{gettext("Register")}</.link>
+                <.link navigate={~p"/login"} class="mongol-text">{gettext("Log in")}</.link>
               </li>
               <li>
-                <.link navigate={~p"/login"} class="mongol-text">{gettext("Log in")}</.link>
+                <.link navigate={~p"/register"} class="mongol-text">{gettext("Register")}</.link>
               </li>
             <% end %>
           </ul>
 
-          <button
-            type="button"
-            onclick="document.getElementById('leftnav').classList.remove('is-open')"
-            class="xamt-leftnav__close xamt-btn xamt-btn--soft mongol-text"
-          >
-            {gettext("Close")}
-          </button>
+          <div class="xamt-leftnav__foot">
+            <.theme_toggle />
+          </div>
         </nav>
       </aside>
 

@@ -43,19 +43,28 @@ defmodule XamtWeb.SettingsLive do
     ~H"""
     <div class="xamt-page-inner">
       <Layouts.flash_group flash={@flash} />
-      <div class="xamt-settings">
-        <header class="xamt-page-head">
-          <h1 class="xamt-section-title mongol-text">{gettext("Settings")}</h1>
-        </header>
+
+      <section class="xamt-stack" id="settings-panel">
+        <div class="xamt-auth-intro">
+          <span class="xamt-ornament" aria-hidden="true"></span>
+          <p class="xamt-kicker mongol-text">{gettext("Profile")}</p>
+        </div>
+        <.header>
+          <span class="mongol-text">{gettext("Settings")}</span>
+          <:subtitle>
+            {gettext("Update how you appear in the community.")}
+          </:subtitle>
+        </.header>
+
         <.form
           for={@form}
           id="settings-form"
           phx-change="validate"
           phx-submit="save"
-          class="xamt-form"
+          class="xamt-form xamt-form--vertical"
         >
-          <label class="xamt-label">
-            <span class="xamt-field__label">{gettext("Display name")}</span>
+          <label class="xamt-field">
+            <span class="xamt-field__label mongol-text">{gettext("Display name")}</span>
             <input
               type="text"
               name={@form[:display_name].name}
@@ -66,40 +75,45 @@ defmodule XamtWeb.SettingsLive do
               autocomplete="nickname"
             />
           </label>
-          <label class="xamt-label">
-            <span class="xamt-field__label">{gettext("Bio")}</span>
+
+          <label class="xamt-field">
+            <span class="xamt-field__label mongol-text">{gettext("Bio")}</span>
             <textarea
               name={@form[:bio].name}
               id={@form[:bio].id}
               rows="4"
-              class="xamt-input mongol-input"
+              class="xamt-textarea mongol-input"
               phx-hook="MongolianIME"
             >{Phoenix.HTML.Form.normalize_value("textarea", @form[:bio].value)}</textarea>
           </label>
-          <label class="xamt-label">
-            <span class="xamt-field__label">{gettext("Avatar URL")}</span>
+
+          <label class="xamt-field">
+            <span class="xamt-field__label mongol-text">{gettext("Avatar URL")}</span>
             <input
               type="url"
               name={@form[:avatar].name}
               id={@form[:avatar].id}
               value={@form[:avatar].value}
-              class="xamt-input xamt-input--latin"
+              class="xamt-input"
+              autocomplete="off"
+              spellcheck="false"
             />
           </label>
-          <button type="submit" class="xamt-btn xamt-btn--primary mongol-text">
+
+          <button type="submit" id="settings-save" class="xamt-btn xamt-btn--primary mongol-text">
             {gettext("Save")}
           </button>
         </.form>
 
-        <div class="xamt-settings__links">
+        <nav class="xamt-settings__links">
           <.link href={~p"/users/settings"} class="xamt-btn mongol-text">
             {gettext("Account / password")}
           </.link>
           <.link href={~p"/users/log-out"} method="delete" class="xamt-btn mongol-text">
             {gettext("Log out")}
           </.link>
-        </div>
-      </div>
+        </nav>
+      </section>
     </div>
     """
   end

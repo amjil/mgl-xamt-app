@@ -50,6 +50,8 @@ defmodule XamtWeb.HomeLive do
       <Layouts.flash_group flash={@flash} />
       <div class="xamt-home">
         <header class="xamt-home__hero">
+          <span class="xamt-ornament" aria-hidden="true"></span>
+          <p class="xamt-kicker mongol-text">{gettext("Community")}</p>
           <p class="xamt-brand">Xamt</p>
           <h1 class="xamt-home__title mongol-text">{gettext("Mongolian community")}</h1>
           <p class="xamt-home__lead mongol-text">
@@ -61,7 +63,12 @@ defmodule XamtWeb.HomeLive do
           <section class="xamt-home__panel">
             <div class="xamt-home__toolbar">
               <h2 class="xamt-section-title mongol-text">{gettext("Your servers")}</h2>
-              <button type="button" class="xamt-btn mongol-text" phx-click="toggle_create">
+              <button
+                type="button"
+                id="toggle-create-server"
+                class="xamt-btn xamt-btn--soft mongol-text"
+                phx-click="toggle_create"
+              >
                 {if @show_create, do: gettext("Cancel"), else: gettext("Create server")}
               </button>
             </div>
@@ -70,10 +77,10 @@ defmodule XamtWeb.HomeLive do
               :if={@show_create}
               id="create-server-form"
               phx-submit="create_server"
-              class="xamt-form"
+              class="xamt-form xamt-form--vertical"
             >
               <label class="xamt-label">
-                <span class="xamt-field__label">{gettext("Name")}</span>
+                <span class="xamt-field__label mongol-text">{gettext("Name")}</span>
                 <input
                   type="text"
                   name="server[name]"
@@ -85,7 +92,7 @@ defmodule XamtWeb.HomeLive do
                 />
               </label>
               <label class="xamt-label">
-                <span class="xamt-field__label">{gettext("Description")}</span>
+                <span class="xamt-field__label mongol-text">{gettext("Description")}</span>
                 <textarea
                   name="server[description]"
                   id="server_description"
@@ -94,7 +101,11 @@ defmodule XamtWeb.HomeLive do
                   phx-hook="MongolianIME"
                 ></textarea>
               </label>
-              <button type="submit" class="xamt-btn xamt-btn--primary mongol-text">
+              <button
+                type="submit"
+                id="create-server-submit"
+                class="xamt-btn xamt-btn--primary mongol-text"
+              >
                 {gettext("Create")}
               </button>
             </form>
@@ -111,12 +122,18 @@ defmodule XamtWeb.HomeLive do
               </li>
             </ul>
 
-            <p :if={@servers == []} class="xamt-empty mongol-text">
-              {gettext("No servers yet. Create one to start chatting.")}
-            </p>
+            <div :if={@servers == []} class="xamt-empty xamt-empty--card">
+              <span class="xamt-ornament" aria-hidden="true"></span>
+              <p class="mongol-text">
+                {gettext("No servers yet. Create one to start chatting.")}
+              </p>
+            </div>
           </section>
         <% else %>
-          <section class="xamt-home__cta">
+          <section class="xamt-home__cta xamt-surface">
+            <p class="xamt-home__cta-copy mongol-text">
+              {gettext("Join a community and start writing in traditional Mongolian.")}
+            </p>
             <.link navigate={~p"/login"} class="xamt-btn xamt-btn--primary mongol-text">
               {gettext("Log in")}
             </.link>

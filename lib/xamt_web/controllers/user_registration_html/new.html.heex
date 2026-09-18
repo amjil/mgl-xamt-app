@@ -1,5 +1,9 @@
 <Layouts.app flash={@flash} current_scope={@current_scope}>
   <section class="xamt-stack" id="register-panel">
+    <div class="xamt-auth-intro">
+      <span class="xamt-ornament" aria-hidden="true"></span>
+      <p class="xamt-kicker mongol-text">{gettext("New account")}</p>
+    </div>
     <.header>
       {gettext("Register")}
       <:subtitle>
@@ -15,26 +19,10 @@
       for={@changeset}
       action={~p"/register"}
       id="user-registration-form"
-      class="xamt-form"
+      class="xamt-form xamt-form--vertical"
     >
-      <.input
-        field={f[:email]}
-        type="email"
-        label={gettext("Email")}
-        autocomplete="email"
-        spellcheck="false"
-        required
-      />
-      <.input
-        field={f[:username]}
-        type="text"
-        label={gettext("Username")}
-        autocomplete="username"
-        spellcheck="false"
-        required
-      />
       <label class="xamt-label">
-        <span class="xamt-field__label">{gettext("Display name")}</span>
+        <span class="xamt-field__label mongol-text">{gettext("Display name")}</span>
         <input
           type="text"
           name="user[display_name]"
@@ -45,6 +33,23 @@
         />
         <mgl-ime target="#user_display_name" profile="auto" keyboard="auto"></mgl-ime>
       </label>
+
+      <.input
+        field={f[:username]}
+        type="text"
+        label={gettext("Username")}
+        autocomplete="username"
+        spellcheck="false"
+        required
+      />
+      <.input
+        field={f[:email]}
+        type="email"
+        label={gettext("Email")}
+        autocomplete="email"
+        spellcheck="false"
+        required
+      />
       <.input
         field={f[:password]}
         type="password"
@@ -60,7 +65,7 @@
         required
       />
 
-      <.button variant="primary" class="xamt-btn xamt-btn--primary">
+      <.button variant="primary" class="xamt-btn xamt-btn--primary mongol-text">
         {gettext("Create an account")}
       </.button>
     </.form>

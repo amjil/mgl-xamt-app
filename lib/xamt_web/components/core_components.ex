@@ -60,13 +60,12 @@ defmodule XamtWeb.CoreComponents do
         @kind == :info && "xamt-alert--info",
         @kind == :error && "xamt-alert--error"
       ]}>
-        <.icon :if={@kind == :info} name="hero-information-circle" class="size-5 shrink-0" />
-        <.icon :if={@kind == :error} name="hero-exclamation-circle" class="size-5 shrink-0" />
+        <.icon :if={@kind == :info} name="hero-information-circle" class="size-5" />
+        <.icon :if={@kind == :error} name="hero-exclamation-circle" class="size-5" />
         <div>
           <p :if={@title} class="font-semibold">{@title}</p>
           <p>{msg}</p>
         </div>
-        <div class="flex-1" />
         <button type="button" class="group self-start cursor-pointer" aria-label={gettext("close")}>
           <.icon name="hero-x-mark" class="size-5 opacity-40 group-hover:opacity-70" />
         </button>
@@ -301,7 +300,7 @@ defmodule XamtWeb.CoreComponents do
   # Helper used by inputs to generate form errors
   defp error(assigns) do
     ~H"""
-    <p class="xamt-field-error">
+    <p class="xamt-field-error mongol-text">
       <.icon name="hero-exclamation-circle" class="size-5" />
       {render_slot(@inner_block)}
     </p>
@@ -317,15 +316,13 @@ defmodule XamtWeb.CoreComponents do
 
   def header(assigns) do
     ~H"""
-    <header class={["xamt-page-head", @actions != [] && "xamt-page-head--with-actions"]}>
-      <div>
-        <h1>
-          {render_slot(@inner_block)}
-        </h1>
-        <p :if={@subtitle != []} class="xamt-page-head__lede">
-          {render_slot(@subtitle)}
-        </p>
-      </div>
+    <header class="xamt-page-head">
+      <h1 class="mongol-text">
+        {render_slot(@inner_block)}
+      </h1>
+      <p :if={@subtitle != []} class="xamt-page-head__lede mongol-text">
+        {render_slot(@subtitle)}
+      </p>
       <div :if={@actions != []} class="xamt-page-head__actions">{render_slot(@actions)}</div>
     </header>
     """
@@ -381,8 +378,8 @@ defmodule XamtWeb.CoreComponents do
           >
             {render_slot(col, @row_item.(row))}
           </td>
-          <td :if={@action != []} class="w-0 font-semibold">
-            <div class="flex gap-4">
+          <td :if={@action != []} class="font-semibold">
+            <div class="xamt-table__actions">
               <%= for action <- @action do %>
                 {render_slot(action, @row_item.(row))}
               <% end %>

@@ -33,22 +33,23 @@
       className: null,
     },
     repaint = function () {
-      canvas.width = window.innerWidth;
-      canvas.height = options.barThickness * 5; // need space for shadow
+      // Vertical bar on the left (Traditional Mongolian column flow)
+      canvas.width = options.barThickness * 5; // need space for shadow
+      canvas.height = window.innerHeight;
 
       var ctx = canvas.getContext("2d");
       ctx.shadowBlur = options.shadowBlur;
       ctx.shadowColor = options.shadowColor;
 
-      var lineGradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+      var lineGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
       for (var stop in options.barColors)
         lineGradient.addColorStop(stop, options.barColors[stop]);
       ctx.lineWidth = options.barThickness;
       ctx.beginPath();
-      ctx.moveTo(0, options.barThickness / 2);
+      ctx.moveTo(options.barThickness / 2, 0);
       ctx.lineTo(
-        Math.ceil(currentProgress * canvas.width),
-        options.barThickness / 2
+        options.barThickness / 2,
+        Math.ceil(currentProgress * canvas.height)
       );
       ctx.strokeStyle = lineGradient;
       ctx.stroke();
@@ -57,7 +58,8 @@
       canvas = document.createElement("canvas");
       var style = canvas.style;
       style.position = "fixed";
-      style.top = style.left = style.right = style.margin = style.padding = 0;
+      style.top = style.left = style.bottom = style.margin = style.padding = 0;
+      style.right = "auto";
       style.zIndex = 100001;
       style.display = "none";
       if (options.className) canvas.classList.add(options.className);

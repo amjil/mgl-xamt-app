@@ -4,8 +4,8 @@
   "description": "Traditional Mongolian community & realtime chat",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1a1f24",
-  "theme_color": "#1a1f24",
+  "background_color": "#101412",
+  "theme_color": "#101412",
   "lang": "mn",
   "icons": [
     {

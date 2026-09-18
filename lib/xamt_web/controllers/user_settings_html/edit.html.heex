@@ -1,5 +1,9 @@
 <Layouts.app flash={@flash} current_scope={@current_scope}>
   <section class="xamt-stack" id="account-settings-panel">
+    <div class="xamt-auth-intro">
+      <span class="xamt-ornament" aria-hidden="true"></span>
+      <p class="xamt-kicker mongol-text">{gettext("Account")}</p>
+    </div>
     <.header>
       {gettext("Account Settings")}
       <:subtitle>
@@ -12,7 +16,7 @@
       for={@email_changeset}
       action={~p"/users/settings"}
       id="update_email"
-      class="xamt-form"
+      class="xamt-form xamt-form--vertical"
     >
       <input type="hidden" name="action" value="update_email" />
 
@@ -25,19 +29,23 @@
         required
       />
 
-      <.button variant="primary" phx-disable-with={gettext("Changing...")}>
+      <.button
+        variant="primary"
+        class="xamt-btn xamt-btn--primary mongol-text"
+        phx-disable-with={gettext("Changing...")}
+      >
         {gettext("Change Email")}
       </.button>
     </.form>
 
-    <div class="xamt-divider" />
+    <div class="xamt-divider">{gettext("or")}</div>
 
     <.form
       :let={f}
       for={@password_changeset}
       action={~p"/users/settings"}
       id="update_password"
-      class="xamt-form"
+      class="xamt-form xamt-form--vertical"
     >
       <input type="hidden" name="action" value="update_password" />
 
@@ -57,7 +65,11 @@
         spellcheck="false"
         required
       />
-      <.button variant="primary" phx-disable-with={gettext("Changing...")}>
+      <.button
+        variant="primary"
+        class="xamt-btn xamt-btn--primary mongol-text"
+        phx-disable-with={gettext("Changing...")}
+      >
         {gettext("Save Password")}
       </.button>
     </.form>

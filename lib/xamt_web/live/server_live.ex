@@ -340,6 +340,7 @@ defmodule XamtWeb.ServerLive do
 
           socket
           |> stream_insert(:messages, message)
+          |> assign(:messages_empty?, false)
           |> assign(:oldest_message_id, socket.assigns[:oldest_message_id] || message.id)
           |> push_event("messages:scroll_bottom", %{})
 
@@ -410,272 +411,302 @@ defmodule XamtWeb.ServerLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class={"xamt-app xamt-app--panel-#{@mobile_panel}"} id="xamt-app">
+    <div class="xamt-chat" id="xamt-app">
       <Layouts.flash_group flash={@flash} />
-      <aside class="xamt-rail xamt-rail--servers">
-        <div class="xamt-rail__brand">
-          <.link navigate={~p"/"} class="xamt-brand-mark">X</.link>
-        </div>
-        <.link
-          :for={s <- @user_servers}
-          navigate={~p"/servers/#{s.slug}"}
-          class={"xamt-server-dot #{if s.id == @server.id, do: "is-active"}"}
-          title={s.name}
-        >
-          {server_initial(s.name)}
-        </.link>
-      </aside>
 
-      <aside class="xamt-rail xamt-rail--channels">
-        <header class="xamt-rail__header">
-          <h1 class="xamt-rail__title mongol-text">{@server.name}</h1>
-          <p class="xamt-rail__sub">/{@server.slug}</p>
-        </header>
-
-        <div class="xamt-rail__section">
-          <div class="xamt-rail__section-head">
-            <span>{gettext("Channels")}</span>
-            <button
-              type="button"
-              class="xamt-icon-btn"
-              phx-click="toggle_channel_form"
-              title={gettext("New channel")}
-            >
-              +
-            </button>
-          </div>
-
-          <form
-            :if={@show_channel_form}
-            id="create-channel-form"
-            phx-submit="create_channel"
-            class="xamt-form xamt-form--compact"
+      <div class={"xamt-app xamt-app--panel-#{@mobile_panel}"}>
+        <aside class="xamt-rail xamt-rail--servers">
+          <.link navigate={~p"/"} class="xamt-brand-mark" title="Xamt">X</.link>
+          <.link
+            :for={s <- @user_servers}
+            navigate={~p"/servers/#{s.slug}"}
+            class={"xamt-server-dot #{if s.id == @server.id, do: "is-active"}"}
+            title={s.name}
           >
-            <input
-              type="text"
-              name="channel[name]"
-              id="channel_name"
-              required
-              placeholder={gettext("Channel name")}
-              class="xamt-input mongol-input"
-              phx-hook="MongolianIME"
-              autocomplete="off"
-            />
-            <button type="submit" class="xamt-btn xamt-btn--primary xamt-btn--sm">
-              {gettext("Add")}
-            </button>
-          </form>
+            {server_initial(s.name)}
+          </.link>
+          <.link
+            navigate={~p"/profile/#{@current_scope.user.username}"}
+            id="current-user-chip"
+            class="xamt-user-chip xamt-user-chip--rail"
+            title={display_name(@current_scope.user)}
+          >
+            <span class="xamt-avatar">{user_initial(@current_scope.user)}</span>
+            <span class="mongol-text">{display_name(@current_scope.user)}</span>
+          </.link>
+        </aside>
 
-          <nav class="xamt-channel-nav">
-            <.link
-              :for={ch <- @channels}
-              navigate={~p"/servers/#{@server.slug}/#{ch.slug}"}
-              class={[
-                "xamt-channel-link",
-                @active_channel && ch.id == @active_channel.id && "is-active",
-                MapSet.member?(@unread_channels, ch.id) && "has-unread"
-              ]}
-            >
-              <div class="flex items-center justify-between h-full gap-2">
-                <div class="flex items-center gap-1.5 min-w-0">
+        <aside class="xamt-rail xamt-rail--channels">
+          <div class="xamt-rail__pane xamt-rail__pane--top">
+            <header class="xamt-rail__header">
+              <h1 class="xamt-rail__title mongol-text">{@server.name}</h1>
+              <p class="xamt-rail__sub mongol-text">/{@server.slug}</p>
+            </header>
+
+            <div class="xamt-rail__section">
+              <div class="xamt-rail__section-head">
+                <span class="mongol-text">{gettext("Channels")}</span>
+                <button
+                  type="button"
+                  id="toggle-channel-form"
+                  class="xamt-icon-btn"
+                  phx-click="toggle_channel_form"
+                >
+                  +
+                </button>
+              </div>
+
+              <form
+                :if={@show_channel_form}
+                id="create-channel-form"
+                phx-submit="create_channel"
+                class="xamt-form xamt-form--vertical xamt-form--compact"
+              >
+                <label class="xamt-label">
+                  <span class="xamt-field__label mongol-text">{gettext("Name")}</span>
+                  <input
+                    type="text"
+                    name="channel[name]"
+                    id="channel_name"
+                    required
+                    class="xamt-input mongol-input"
+                    phx-hook="MongolianIME"
+                    autocomplete="off"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  id="add-channel-submit"
+                  class="xamt-btn xamt-btn--primary xamt-btn--sm mongol-text"
+                >
+                  {gettext("Add")}
+                </button>
+              </form>
+
+              <nav class="xamt-channel-nav">
+                <.link
+                  :for={ch <- @channels}
+                  navigate={~p"/servers/#{@server.slug}/#{ch.slug}"}
+                  class={[
+                    "xamt-channel-link",
+                    @active_channel && ch.id == @active_channel.id && "is-active",
+                    MapSet.member?(@unread_channels, ch.id) && "has-unread"
+                  ]}
+                >
                   <span class="xamt-channel-hash">#</span>
                   <span class={[
-                    "mongol-text truncate",
+                    "mongol-text",
                     MapSet.member?(@unread_channels, ch.id) && "font-bold text-[var(--xamt-text)]"
                   ]}>
                     {ch.name}
                   </span>
-                </div>
-                <span
-                  :if={
-                    MapSet.member?(@unread_channels, ch.id) &&
-                      !(@active_channel && ch.id == @active_channel.id)
-                  }
-                  class="w-2 h-2 shrink-0 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"
-                  aria-hidden="true"
-                >
-                </span>
-              </div>
-            </.link>
-          </nav>
-        </div>
-
-        <div class="xamt-rail__footer">
-          <.link navigate={~p"/profile/#{@current_scope.user.username}"} class="xamt-user-chip">
-            <span class="xamt-avatar">{user_initial(@current_scope.user)}</span>
-            <span class="mongol-text">{display_name(@current_scope.user)}</span>
-          </.link>
-        </div>
-      </aside>
-
-      <section class="xamt-main">
-        <header class="xamt-main__header">
-          <div class="xamt-mobile-nav">
-            <button type="button" phx-click="set_mobile_panel" phx-value-panel="servers">☰</button>
-            <button type="button" phx-click="set_mobile_panel" phx-value-panel="channels">#</button>
-            <button type="button" phx-click="set_mobile_panel" phx-value-panel="messages">💬</button>
-            <button type="button" phx-click="set_mobile_panel" phx-value-panel="members">👥</button>
-          </div>
-          <h2 class="xamt-main__title">
-            <span class="xamt-channel-hash">#</span>
-            <span class="mongol-text">{@active_channel && @active_channel.name}</span>
-          </h2>
-        </header>
-
-        <div
-          id="message-list"
-          class="xamt-messages"
-          phx-update="stream"
-          phx-hook="MessageList"
-        >
-          <div
-            :if={@has_more_messages}
-            id="messages-infinite-scroll"
-            phx-hook="InfiniteScroll"
-            class="h-2 w-full shrink-0"
-          >
-          </div>
-          <article
-            :for={{dom_id, message} <- @streams.messages}
-            id={dom_id}
-            class="xamt-message"
-            data-message-id={message.id}
-          >
-            <div class="xamt-message__avatar">{user_initial(message.user)}</div>
-            <div class="xamt-message__body">
-              <header class="xamt-message__meta">
-                <strong class="mongol-text">{display_name(message.user)}</strong>
-                <time>{format_time(message.inserted_at)}</time>
-                <span :if={edited?(message)} class="xamt-message__edited">{gettext("edited")}</span>
-              </header>
-              <div
-                id={"msg-content-#{message.id}"}
-                class="xamt-message__content mongol-text"
-                phx-hook="MongolianScroll"
-              >
-                {raw(safe_html(message))}
-              </div>
-              <div
-                :if={message.user_id == @current_scope.user.id}
-                class="xamt-message__actions"
-              >
-                <button type="button" phx-click="edit_message" phx-value-id={message.id}>
-                  {gettext("Edit")}
-                </button>
-                <button
-                  type="button"
-                  phx-click="delete_message"
-                  phx-value-id={message.id}
-                  data-confirm={gettext("Delete this message?")}
-                >
-                  {gettext("Delete")}
-                </button>
-              </div>
+                  <span
+                    :if={
+                      MapSet.member?(@unread_channels, ch.id) &&
+                        !(@active_channel && ch.id == @active_channel.id)
+                    }
+                    class="xamt-unread-dot"
+                    aria-hidden="true"
+                  >
+                  </span>
+                </.link>
+              </nav>
             </div>
-          </article>
-        </div>
+          </div>
 
-        <div :if={map_size(@typing_users) > 0} class="xamt-typing">
-          {typing_label(@typing_users)}
-        </div>
+          <div class="xamt-rail__pane xamt-rail__pane--members">
+            <div class="xamt-rail__section">
+              <h3 class="xamt-rail__section-head mongol-text">{gettext("Online")}</h3>
+              <ul class="xamt-member-list">
+                <li :for={user <- @online_users} class="xamt-member">
+                  <span class="xamt-presence is-online"></span>
+                  <span class="mongol-text">{user}</span>
+                </li>
+              </ul>
 
-        <div
-          class="xamt-composer-wrap"
-          data-has-uploads={to_string(@uploads.media.entries != [])}
-          data-submit-event={if @editing_message_id, do: "update_message", else: "send_message"}
-        >
-          <section
-            :if={@uploads.media.entries != []}
-            id="media-upload-preview"
-            class="xamt-upload-preview"
-          >
-            <div
-              :for={entry <- @uploads.media.entries}
-              class="xamt-upload-preview__item"
-            >
-              <.live_img_preview entry={entry} class="xamt-upload-preview__img" />
-              <div
-                :if={entry.progress < 100}
-                class="xamt-upload-preview__progress"
-                style={"width: #{entry.progress}%"}
-              >
-              </div>
+              <h3 class="xamt-rail__section-head mongol-text">{gettext("Members")}</h3>
+              <ul id="server-members-list" class="xamt-member-list" phx-update="stream">
+                <li :for={{dom_id, member} <- @streams.members} id={dom_id} class="xamt-member">
+                  <span class="xamt-presence"></span>
+                  <span class="mongol-text">{display_name(member.user)}</span>
+                </li>
+                <li
+                  :if={@has_more_members}
+                  id="members-infinite-scroll"
+                  phx-hook="InfiniteScroll"
+                  data-event="load_more_members"
+                  class="xamt-scroll-sentinel"
+                >
+                </li>
+              </ul>
+            </div>
+          </div>
+        </aside>
+
+        <section class="xamt-main">
+          <header class="xamt-main__header">
+            <div class="xamt-mobile-nav">
               <button
                 type="button"
-                id={"cancel-upload-#{entry.ref}"}
-                phx-click="cancel_upload"
-                phx-value-ref={entry.ref}
-                class="xamt-upload-preview__cancel"
-                aria-label={gettext("Cancel upload")}
+                phx-click="set_mobile_panel"
+                phx-value-panel="servers"
+                aria-label={gettext("Servers")}
               >
-                <.icon name="hero-x-mark" class="size-3" />
+                <.icon name="hero-bars-3" class="size-5" />
+              </button>
+              <button
+                type="button"
+                phx-click="set_mobile_panel"
+                phx-value-panel="channels"
+                aria-label={gettext("Channels")}
+              >
+                <.icon name="hero-hashtag" class="size-5" />
+              </button>
+              <button
+                type="button"
+                phx-click="set_mobile_panel"
+                phx-value-panel="messages"
+                aria-label={gettext("Messages")}
+              >
+                <.icon name="hero-chat-bubble-left-right" class="size-5" />
+              </button>
+              <button
+                type="button"
+                phx-click="set_mobile_panel"
+                phx-value-panel="members"
+                aria-label={gettext("Members")}
+              >
+                <.icon name="hero-users" class="size-5" />
               </button>
             </div>
-          </section>
-
-          <%!-- live_file_input must stay outside phx-update="ignore" so LiveView can patch upload state --%>
-          <form id="media-upload-form" phx-change="validate_upload" class="hidden">
-            <.live_file_input upload={@uploads.media} />
-          </form>
+            <h2 class="xamt-main__title">
+              <span class="xamt-channel-hash">#</span>
+              <span class="mongol-text">{@active_channel && @active_channel.name}</span>
+            </h2>
+          </header>
 
           <div
-            id="message-composer"
-            phx-hook="MessageComposer"
-            phx-update="ignore"
+            :if={@messages_empty?}
+            id="messages-empty"
+            class="xamt-empty xamt-empty--messages"
           >
-            <div class="xamt-composer__editor" id="composer-editor-host"></div>
+            <span class="xamt-ornament" aria-hidden="true"></span>
+            <p class="mongol-text">{gettext("No messages yet. Write the first one.")}</p>
           </div>
 
-          <div class="xamt-composer__toolbar">
-            <label
-              for={@uploads.media.ref}
-              class="xamt-btn xamt-btn--soft cursor-pointer mr-auto"
-              title={gettext("Upload Media")}
+          <div id="message-list" class="xamt-messages" phx-update="stream" phx-hook="MessageList">
+            <div
+              :if={@has_more_messages}
+              id="messages-infinite-scroll"
+              phx-hook="InfiniteScroll"
+              class="xamt-scroll-sentinel"
             >
-              <.icon name="hero-photo" class="size-5" />
-            </label>
+            </div>
 
-            <button
-              :if={@editing_message_id}
-              type="button"
-              class="xamt-btn xamt-btn--sm"
-              phx-click="cancel_edit"
+            <article
+              :for={{dom_id, message} <- @streams.messages}
+              id={dom_id}
+              class="xamt-message"
+              data-message-id={message.id}
             >
-              {gettext("Cancel")}
-            </button>
-            <button type="button" class="xamt-btn xamt-btn--primary" data-composer-send>
-              {if @editing_message_id, do: gettext("Save"), else: gettext("Send")}
-            </button>
+              <div class="xamt-message__avatar">{user_initial(message.user)}</div>
+              <div class="xamt-message__body">
+                <header class="xamt-message__meta">
+                  <strong class="mongol-text">{display_name(message.user)}</strong>
+                  <time class="mongol-text">{format_time(message.inserted_at)}</time>
+                  <span :if={edited?(message)} class="xamt-message__edited">{gettext("edited")}</span>
+                </header>
+                <div
+                  id={"msg-content-#{message.id}"}
+                  class="xamt-message__content mongol-text"
+                  phx-hook="MongolianScroll"
+                >
+                  {raw(safe_html(message))}
+                </div>
+                <div :if={message.user_id == @current_scope.user.id} class="xamt-message__actions">
+                  <button type="button" phx-click="edit_message" phx-value-id={message.id}>
+                    {gettext("Edit")}
+                  </button>
+                  <button
+                    type="button"
+                    phx-click="delete_message"
+                    phx-value-id={message.id}
+                    data-confirm={gettext("Delete this message?")}
+                  >
+                    {gettext("Delete")}
+                  </button>
+                </div>
+              </div>
+            </article>
           </div>
-        </div>
-      </section>
 
-      <aside class="xamt-rail xamt-rail--members">
-        <h3 class="xamt-rail__section-head">{gettext("Online")}</h3>
-        <ul class="xamt-member-list">
-          <li :for={user <- @online_users} class="xamt-member">
-            <span class="xamt-presence is-online"></span>
-            <span class="mongol-text">{user}</span>
-          </li>
-        </ul>
-        <h3 class="xamt-rail__section-head">{gettext("Members")}</h3>
-        <ul id="server-members-list" class="xamt-member-list" phx-update="stream">
-          <li :for={{dom_id, member} <- @streams.members} id={dom_id} class="xamt-member">
-            <span class="xamt-presence"></span>
-            <span class="mongol-text">{display_name(member.user)}</span>
-            <span class="xamt-role">{member.role}</span>
-          </li>
+          <div :if={map_size(@typing_users) > 0} class="xamt-typing">
+            {typing_label(@typing_users)}
+          </div>
 
-          <li
-            :if={@has_more_members}
-            id="members-infinite-scroll"
-            phx-hook="InfiniteScroll"
-            data-event="load_more_members"
-            class="h-2 w-full shrink-0"
+          <div
+            class="xamt-composer-wrap"
+            data-has-uploads={to_string(@uploads.media.entries != [])}
+            data-submit-event={if @editing_message_id, do: "update_message", else: "send_message"}
           >
-          </li>
-        </ul>
-      </aside>
+            <section
+              :if={@uploads.media.entries != []}
+              id="media-upload-preview"
+              class="xamt-upload-preview"
+            >
+              <div :for={entry <- @uploads.media.entries} class="xamt-upload-preview__item">
+                <.live_img_preview entry={entry} class="xamt-upload-preview__img" />
+                <div
+                  :if={entry.progress < 100}
+                  class="xamt-upload-preview__progress"
+                  style={"width: #{entry.progress}%"}
+                >
+                </div>
+                <button
+                  type="button"
+                  id={"cancel-upload-#{entry.ref}"}
+                  phx-click="cancel_upload"
+                  phx-value-ref={entry.ref}
+                  class="xamt-upload-preview__cancel"
+                  aria-label={gettext("Cancel upload")}
+                >
+                  <.icon name="hero-x-mark" class="size-3" />
+                </button>
+              </div>
+            </section>
+
+            <%!-- live_file_input must stay outside phx-update="ignore" so LiveView can patch upload state --%>
+            <form id="media-upload-form" phx-change="validate_upload" class="hidden">
+              <.live_file_input upload={@uploads.media} />
+            </form>
+
+            <div id="message-composer" phx-hook="MessageComposer" phx-update="ignore">
+              <div class="xamt-composer__editor" id="composer-editor-host"></div>
+            </div>
+
+            <div class="xamt-composer__toolbar">
+              <label
+                for={@uploads.media.ref}
+                class="xamt-btn xamt-btn--soft"
+                title={gettext("Upload Media")}
+              >
+                <.icon name="hero-photo" class="size-5" />
+              </label>
+              <button
+                :if={@editing_message_id}
+                type="button"
+                class="xamt-btn xamt-btn--sm"
+                phx-click="cancel_edit"
+              >
+                {gettext("Cancel")}
+              </button>
+              <button type="button" class="xamt-btn xamt-btn--primary mongol-text" data-composer-send>
+                {if @editing_message_id, do: gettext("Save"), else: gettext("Send")}
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
     """
   end
@@ -690,6 +721,7 @@ defmodule XamtWeb.ServerLive do
     socket
     |> assign(:oldest_message_id, oldest_id)
     |> assign(:has_more_messages, length(messages) >= @message_page_size)
+    |> assign(:messages_empty?, messages == [])
     |> stream(:messages, messages, reset: true)
   end
 

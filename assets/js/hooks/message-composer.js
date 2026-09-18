@@ -117,6 +117,12 @@ export const MessageComposer = {
     this.host = this.el.querySelector(".xamt-composer__editor") || this.el
     this.editor = createMongolianEditor(this.host)
     this._root = () => editorRoot(this.host)
+    const starter = this._root()?.innerText?.trim() || ""
+    if (starter === "Type traditional Mongolian here...") {
+      this.editor.setHtml(
+        '<div class="block-wrapper" data-block-type="paragraph"><p class="block-content" contenteditable="true"></p></div>'
+      )
+    }
 
     this.ime = new MglIME({
       adapter: buildEditorAdapter(this._root),

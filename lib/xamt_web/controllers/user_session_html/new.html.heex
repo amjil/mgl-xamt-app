@@ -1,5 +1,9 @@
 <Layouts.app flash={@flash} current_scope={@current_scope}>
   <section class="xamt-stack" id="login-panel">
+    <div class="xamt-auth-intro">
+      <span class="xamt-ornament" aria-hidden="true"></span>
+      <p class="xamt-kicker mongol-text">{gettext("Welcome back")}</p>
+    </div>
     <.header>
       {gettext("Log in")}
       <:subtitle>
@@ -12,24 +16,13 @@
       </:subtitle>
     </.header>
 
-    <div :if={local_mail_adapter?()} class="xamt-alert xamt-alert--info">
-      <.icon name="hero-information-circle" class="size-6 shrink-0" />
-      <div class="xamt-latin">
-        <p>{gettext("You are running the local mail adapter.")}</p>
-        <p>
-          {gettext("To see sent emails, visit")}
-          <.link href="/dev/mailbox" class="underline">{gettext("the mailbox page")}</.link>.
-        </p>
-      </div>
-    </div>
-
     <.form
       :let={f}
       for={@form}
       as={:user}
       id="login_form_magic"
       action={~p"/login"}
-      class="xamt-form"
+      class="xamt-form xamt-form--vertical"
     >
       <.input
         readonly={!!@current_scope}
@@ -39,9 +32,8 @@
         autocomplete="username"
         spellcheck="false"
         required
-        phx-mounted={JS.focus()}
       />
-      <.button variant="primary" class="xamt-btn xamt-btn--primary">
+      <.button variant="primary" class="xamt-btn xamt-btn--primary mongol-text">
         {gettext("Log in with email")}
       </.button>
     </.form>
@@ -54,7 +46,7 @@
       as={:user}
       id="login_form_password"
       action={~p"/login"}
-      class="xamt-form"
+      class="xamt-form xamt-form--vertical"
     >
       <.input
         readonly={!!@current_scope}
@@ -74,15 +66,26 @@
       />
       <.button
         variant="primary"
-        class="xamt-btn xamt-btn--primary"
+        class="xamt-btn xamt-btn--primary mongol-text"
         name={@form[:remember_me].name}
         value="true"
       >
         {gettext("Log in and stay logged in")}
       </.button>
-      <.button class="xamt-btn xamt-btn--soft">
+      <.button class="xamt-btn xamt-btn--soft mongol-text">
         {gettext("Log in only this time")}
       </.button>
     </.form>
+
+    <div :if={local_mail_adapter?()} class="xamt-alert xamt-alert--info">
+      <.icon name="hero-information-circle" class="size-6 shrink-0" />
+      <div class="xamt-latin">
+        <p>{gettext("You are running the local mail adapter.")}</p>
+        <p>
+          {gettext("To see sent emails, visit")}
+          <.link href="/dev/mailbox" class="underline">{gettext("the mailbox page")}</.link>.
+        </p>
+      </div>
+    </div>
   </section>
 </Layouts.app>
