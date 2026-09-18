@@ -84,6 +84,7 @@ defmodule XamtWeb.ServerLive do
       |> assign(:server_form, to_form(Servers.change_server(server), as: :server))
       |> assign(:invites, Servers.list_invites(server.id))
       |> assign(:editing_channel, nil)
+      |> assign(:show_server_menu, false)
       |> assign(:mobile_panel, :messages)
       |> assign(:unread_channels, MapSet.new(unread_ids))
       |> assign(:search_q, "")
@@ -351,6 +352,18 @@ defmodule XamtWeb.ServerLive do
     else
       {:noreply, done_loading(socket, "load_more_members")}
     end
+  end
+
+  def handle_event("toggle_server_menu", _params, socket) do
+    if socket.assigns.admin? do
+      {:noreply, assign(socket, :show_server_menu, !socket.assigns.show_server_menu)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("close_server_menu", _params, socket) do
+    {:noreply, assign(socket, :show_server_menu, false)}
   end
 
   def handle_event("save_channel", %{"channel" => params}, socket) do
@@ -698,32 +711,19 @@ defmodule XamtWeb.ServerLive do
         <aside class="xamt-rail xamt-rail--channels">
           <div class="xamt-rail__pane xamt-rail__pane--top">
             <header class="xamt-rail__header">
-              <details :if={@admin?} id="server-menu" class="xamt-menu xamt-server-menu">
-                <summary class="xamt-server-menu__summary" aria-label={gettext("Server menu")}>
-                  <h1 class="xamt-rail__title mongol-text">{@server.name}</h1>
-                  <.icon name="hero-chevron-down" class="size-3" />
-                </summary>
-                <div class="xamt-server-menu__list">
-                  <.link
-                    :if={@active_channel}
-                    id="server-menu-new-channel"
-                    patch={~p"/servers/#{@server.slug}/#{@active_channel.slug}/new"}
-                    class="xamt-server-menu__item mongol-text"
-                    phx-click={JS.remove_attribute("open", to: "#server-menu")}
-                  >
-                    {gettext("Create channel")}
-                  </.link>
-                  <.link
-                    :if={@active_channel}
-                    id="server-menu-settings"
-                    patch={~p"/servers/#{@server.slug}/#{@active_channel.slug}/settings"}
-                    class="xamt-server-menu__item mongol-text"
-                    phx-click={JS.remove_attribute("open", to: "#server-menu")}
-                  >
-                    {gettext("Server settings")}
-                  </.link>
-                </div>
-              </details>
+              <button
+                :if={@admin?}
+                type="button"
+                id="server-menu"
+                class="xamt-server-menu__summary"
+                phx-click="toggle_server_menu"
+                aria-label={gettext("Server menu")}
+                aria-expanded={@show_server_menu}
+                aria-haspopup="dialog"
+              >
+                <h1 class="xamt-rail__title mongol-text">{@server.name}</h1>
+                <.icon name="hero-chevron-down" class="size-3" />
+              </button>
               <h1 :if={not @admin?} class="xamt-rail__title mongol-text">{@server.name}</h1>
               <p class="xamt-rail__sub">/{@server.slug}</p>
             </header>
@@ -1198,6 +1198,12 @@ defmodule XamtWeb.ServerLive do
         </section>
       </div>
 
+      <.server_menu_overlay
+        :if={@show_server_menu && @active_channel}
+        server={@server}
+        active_channel={@active_channel}
+      />
+
       <.server_overlay
         :if={@admin? and @active_channel}
         live_action={@live_action}
@@ -1273,6 +1279,40 @@ defmodule XamtWeb.ServerLive do
         {render_slot(@inner_block)}
       </div>
     </details>
+    """
+  end
+
+  attr :server, :map, required: true
+  attr :active_channel, :map, required: true
+
+  defp server_menu_overlay(assigns) do
+    ~H"""
+    <.drawer
+      id="server-menu-drawer"
+      class="xamt-sheet--menu"
+      show
+      on_cancel={JS.push("close_server_menu")}
+    >
+      <div class="xamt-sheet-form xamt-server-menu-sheet">
+        <h2 id="server-menu-title" class="xamt-section-title mongol-text">{@server.name}</h2>
+        <nav class="xamt-server-menu-sheet__nav" aria-labelledby="server-menu-title">
+          <.link
+            id="server-menu-new-channel"
+            patch={~p"/servers/#{@server.slug}/#{@active_channel.slug}/new"}
+            class="xamt-btn xamt-btn--soft mongol-text"
+          >
+            {gettext("Create channel")}
+          </.link>
+          <.link
+            id="server-menu-settings"
+            patch={~p"/servers/#{@server.slug}/#{@active_channel.slug}/settings"}
+            class="xamt-btn mongol-text"
+          >
+            {gettext("Server settings")}
+          </.link>
+        </nav>
+      </div>
+    </.drawer>
     """
   end
 
@@ -1518,6 +1558,7 @@ defmodule XamtWeb.ServerLive do
   defp apply_action(socket, :new_channel, _params) do
     if socket.assigns.admin? do
       assign(socket,
+        show_server_menu: false,
         editing_channel: nil,
         channel_form: to_form(Channels.change_channel(%Channel{}), as: :channel)
       )
@@ -1540,6 +1581,7 @@ defmodule XamtWeb.ServerLive do
 
       true ->
         assign(socket,
+          show_server_menu: false,
           editing_channel: channel,
           channel_form: to_form(Channels.change_channel(channel), as: :channel)
         )
@@ -1548,11 +1590,9 @@ defmodule XamtWeb.ServerLive do
 
   defp apply_action(socket, :edit_server, _params) do
     if socket.assigns.admin? do
-      assign(
-        socket,
-        :server_form,
-        to_form(Servers.change_server(socket.assigns.server), as: :server)
-      )
+      socket
+      |> assign(:show_server_menu, false)
+      |> assign(:server_form, to_form(Servers.change_server(socket.assigns.server), as: :server))
     else
       deny_overlay(socket)
     end

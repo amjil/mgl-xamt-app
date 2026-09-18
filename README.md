@@ -19,9 +19,10 @@ Demo account (from seeds):
 - password: `hello world!!`
 - server: `/servers/mongol-bichig/general`
 
-IME candidate backend (optional): set `XAMT_IME_BASE_URL` (e.g. `http://dev1:3003`). Unset, the IME
-uses its bundled local dictionary and makes no network requests. When set, it must be a host the
-client device can reach — `localhost` will not work from a phone on the LAN.
+IME candidate backend: development defaults to `http://dev1:3003`. Override with
+`XAMT_IME_BASE_URL`; set it to empty or `local` to stay on the bundled dictionary.
+The host must be reachable from the client device — `localhost` will not work from
+a phone on the LAN.
 
 ## Spec routes
 

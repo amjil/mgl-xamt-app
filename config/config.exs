@@ -24,8 +24,8 @@ config :xamt,
   ecto_repos: [Xamt.Repo],
   generators: [timestamp_type: :utc_datetime, binary_id: true]
 
-# Remote candidate backend for mgl-web-ime. When nil the IME runs on its
-# bundled local dictionary only — the browser never attempts a request.
+# Remote candidate backend for mgl-web-ime. Dev defaults to http://dev1:3003;
+# set XAMT_IME_BASE_URL to override, or empty / "local" for the bundled dictionary.
 config :xamt, :ime_base_url, nil
 
 # Message send rate limit (ETS sliding window). Tests override limit.

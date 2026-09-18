@@ -69,9 +69,10 @@ config :xamt, XamtWeb.Endpoint,
 # Enable dev routes for dashboard and mailbox
 config :xamt, dev_routes: true
 
-# Phones on the LAN cannot resolve "localhost", so this must be a host the
-# device can actually reach. Unset it to fall back to the local dictionary.
-config :xamt, :ime_base_url, System.get_env("XAMT_IME_BASE_URL")
+# Candidate backend for mgl-web-ime. Override with XAMT_IME_BASE_URL; set it to
+# empty / "local" to stay on the bundled dictionary. Phones on the LAN must be
+# able to resolve this host — "localhost" will not work from a device.
+config :xamt, :ime_base_url, System.get_env("XAMT_IME_BASE_URL", "http://dev1:3003")
 
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"

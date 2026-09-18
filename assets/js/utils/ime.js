@@ -1,10 +1,11 @@
 /**
  * Shared candidate provider for every mgl-web-ime instance on the page.
  *
- * The vendored RemoteCandidateProvider swallows network errors and returns an
- * empty list, so an unreachable backend costs a full timeout on every lookup.
- * Typing always hits the local dictionary until a probe has confirmed the
- * remote is up; three consecutive remote failures trip it for the session.
+ * Typing hits the remote backend when a base URL is configured. The vendored
+ * RemoteCandidateProvider swallows network errors, so a dead backend would
+ * otherwise cost a full timeout on every keystroke — three consecutive
+ * timeouts trip the circuit for the session (reset when the browser comes
+ * back online).
  */
 import {
   CandidateProvider,
@@ -12,13 +13,16 @@ import {
   RemoteCandidateProvider,
 } from "../../vendor/mgl-web-ime/mgl-web-ime.js"
 
+const DEFAULT_IME_BASE_URL = "http://dev1:3003"
 const REMOTE_TIMEOUT_MS = 800
-const PROBE_TIMEOUT_MS = 800
 const FAILURES_BEFORE_TRIP = 3
 
 export function imeBaseUrl() {
   const meta = document.querySelector('meta[name="ime-base-url"]')
-  return (meta?.getAttribute("content") || "").trim()
+  const raw = (meta?.getAttribute("content") || DEFAULT_IME_BASE_URL).trim()
+  if (!raw || raw === "local") return ""
+  const withScheme = /^https?:\/\//i.test(raw) ? raw : `http://${raw}`
+  return withScheme.replace(/\/+$/, "")
 }
 
 class GatedRemoteProvider extends CandidateProvider {
@@ -30,67 +34,24 @@ class GatedRemoteProvider extends CandidateProvider {
       baseUrl: this.baseUrl,
       timeoutMs: REMOTE_TIMEOUT_MS,
     })
-    this._ready = false
-    this._probing = false
     this._failures = 0
     this._open = false
     this._onOnline = () => this.reset()
     window.addEventListener("online", this._onOnline)
-    this._startProbe()
   }
 
   reset() {
     this._open = false
-    this._ready = false
     this._failures = 0
-    this._startProbe()
-  }
-
-  _startProbe() {
-    if (this._open || this._probing || this._ready) return
-    this._probing = true
-    this._runProbe().finally(() => {
-      this._probing = false
-    })
-  }
-
-  async _runProbe() {
-    if (navigator.onLine === false) {
-      this._open = true
-      this._ready = false
-      return
-    }
-
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT_MS)
-    try {
-      const res = await fetch(`${this.baseUrl}/api/next_word/candidates`, {
-        method: "POST",
-        headers: {"Content-Type": "application/json; charset=UTF-8"},
-        body: JSON.stringify({word: "ᠠ"}),
-        signal: ctrl.signal,
-      })
-      if (res.ok) {
-        this._failures = 0
-        this._ready = true
-        return
-      }
-      this._noteFailure()
-    } catch {
-      this._noteFailure()
-    } finally {
-      clearTimeout(timer)
-    }
   }
 
   _noteFailure() {
-    this._ready = false
     this._failures += 1
     if (this._failures >= FAILURES_BEFORE_TRIP) this._open = true
   }
 
   async getCandidates(input, context = {}) {
-    if (!this._ready || this._open || navigator.onLine === false) {
+    if (this._open || navigator.onLine === false) {
       return this.local.getCandidates(input, context)
     }
 
@@ -110,7 +71,7 @@ class GatedRemoteProvider extends CandidateProvider {
   }
 
   async getNextWords(word) {
-    if (!this._ready || this._open) return []
+    if (this._open || navigator.onLine === false) return []
     return this.remote.getNextWords(word)
   }
 }
@@ -118,8 +79,8 @@ class GatedRemoteProvider extends CandidateProvider {
 let shared = null
 
 /**
- * One provider for the whole page so the candidate cache, reachability probe
- * and circuit state are shared between the composer and plain inputs.
+ * One provider for the whole page so the candidate cache and circuit state
+ * are shared between the composer and plain inputs.
  */
 export function imeProvider() {
   if (!shared) {

@@ -166,6 +166,12 @@ defmodule XamtWeb.ServerLiveTest do
   } do
     {:ok, invite} = Servers.create_invite(scope, server.id)
     {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    refute has_element?(view, "#server-menu-drawer")
+
+    view |> element("#server-menu") |> render_click()
+    assert has_element?(view, "#server-menu-drawer")
+    assert has_element?(view, "#server-menu-new-channel")
+
     view |> element("#server-menu-settings") |> render_click()
     assert_patch(view, ~p"/servers/#{server.slug}/#{channel.slug}/settings")
 
@@ -189,6 +195,24 @@ defmodule XamtWeb.ServerLiveTest do
     assert has_element?(view, "#server-drawer")
     assert has_element?(view, "#create-channel-form")
     assert has_element?(view, "#channel_name")
+  end
+
+  test "admin can open the create-channel drawer from the server menu overlay", %{
+    conn: conn,
+    server: server,
+    channel: channel
+  } do
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    refute has_element?(view, "#server-menu-drawer")
+
+    view |> element("#server-menu") |> render_click()
+    assert has_element?(view, "#server-menu-drawer")
+
+    view |> element("#server-menu-new-channel") |> render_click()
+    assert_patch(view, ~p"/servers/#{server.slug}/#{channel.slug}/new")
+    refute has_element?(view, "#server-menu-drawer")
+    assert has_element?(view, "#server-drawer")
+    assert has_element?(view, "#create-channel-form")
   end
 
   test "create channel drawer submits and patches to the new channel", %{

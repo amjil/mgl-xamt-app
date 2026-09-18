@@ -17,8 +17,18 @@ defmodule XamtWeb.Layouts do
   """
   def ime_base_url do
     case Application.get_env(:xamt, :ime_base_url) do
-      url when is_binary(url) -> String.trim(url)
+      url when is_binary(url) -> normalize_ime_base_url(url)
       _ -> ""
+    end
+  end
+
+  defp normalize_ime_base_url(url) do
+    trimmed = url |> String.trim() |> String.trim_trailing("/")
+
+    cond do
+      trimmed in ["", "local"] -> ""
+      String.starts_with?(trimmed, ["http://", "https://"]) -> trimmed
+      true -> "http://" <> trimmed
     end
   end
 

@@ -456,6 +456,7 @@ defmodule XamtWeb.CoreComponents do
   attr :id, :string, required: true
   attr :show, :boolean, default: false
   attr :on_cancel, JS, default: %JS{}
+  attr :class, :any, default: nil
   slot :inner_block, required: true
 
   def drawer(assigns) do
@@ -465,7 +466,7 @@ defmodule XamtWeb.CoreComponents do
       phx-mounted={@show && show_drawer(@id)}
       phx-remove={hide_drawer(@id)}
       data-cancel={JS.concat(hide_drawer(@id), @on_cancel)}
-      class="xamt-sheet hidden"
+      class={["xamt-sheet hidden", @class]}
     >
       <button
         type="button"

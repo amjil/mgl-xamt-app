@@ -149,6 +149,10 @@ export const MessageComposer = {
 
     this.ime = new MglIME({
       adapter: buildEditorAdapter(this._root),
+      // Without a target, desktop IME handles every window keydown and the
+      // adapter's insertText() focuses this editor — stealing caret from
+      // search / other inputs that also have an IME instance.
+      target: this.host,
       profile: "auto",
       keyboard: "auto",
       provider: imeProvider(),

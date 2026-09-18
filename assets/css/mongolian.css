@@ -14,8 +14,9 @@
         flex `column` stacks children LEFT → RIGHT
       Size vertical fields with `--xamt-field-extent`, never a raw `16rem`,
       or they will run off the bottom of a phone.
-   4. Chrome that is not Mongolian script (toasts, theme toggle, Latin fields)
-      stays `horizontal-tb` via `.latin-text` / `.xamt-latin`.
+   4. Chrome that is not Mongolian script (toasts, theme toggle) stays
+      `horizontal-tb` via `.latin-text` / `.xamt-latin`. Form fields stay
+      vertical even when the value is Latin (email, password, username).
    5. Short Latin or digit runs embedded in a column (12:34, /slug, @name) use
       `.xamt-upright` so they read as one horizontal cluster. */
 
@@ -265,15 +266,10 @@ textarea.xamt-input {
   resize: block;
 }
 
-/* Explicit Latin fields (email, password) stay readable LTR; URL follows vertical form flow */
+/* Latin credentials still live in the vertical column; only the typeface changes. */
 .xamt-input--latin,
 input[type="email"],
 input[type="password"],
 input[type="tel"] {
-  writing-mode: horizontal-tb;
-  -webkit-writing-mode: horizontal-tb;
   font-family: var(--xamt-font-ui);
-  width: min(16rem, 70vw);
-  min-height: 2.75rem;
-  height: 2.75rem;
 }
