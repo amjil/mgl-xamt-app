@@ -494,6 +494,10 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
   background: var(--xamt-bg-3);
 }
 
+.xamt-channel-link.has-unread:not(.is-active) {
+  color: var(--xamt-text);
+}
+
 .xamt-channel-hash {
   color: var(--xamt-muted);
 }

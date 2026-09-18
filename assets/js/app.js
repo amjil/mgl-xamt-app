@@ -6,6 +6,7 @@ import topbar from "../vendor/topbar"
 import "../vendor/mgl-web-ime/mgl-web-ime.js"
 import {MongolianIME} from "./hooks/mongolian-ime"
 import {MessageComposer, MessageList} from "./hooks/message-composer"
+import {InfiniteScroll} from "./hooks/infinite-scroll"
 import {MongolianScroll} from "./hooks/mongolian-scroll"
 import {ToastHandler} from "./hooks/toast-handler"
 
@@ -14,6 +15,7 @@ const Hooks = {
   MongolianIME,
   MessageComposer,
   MessageList,
+  InfiniteScroll,
   MongolianScroll,
   ToastHandler,
 }

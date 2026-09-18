@@ -20,7 +20,7 @@ if System.get_env("PHX_SERVER") do
   config :xamt, XamtWeb.Endpoint, server: true
 end
 
-config :xamt, XamtWeb.Endpoint, http: [port: String.to_integer(System.get_env("PORT", "4000"))]
+config :xamt, XamtWeb.Endpoint, http: [port: String.to_integer(System.get_env("PORT", "4002"))]
 
 if config_env() == :prod do
   database_url =

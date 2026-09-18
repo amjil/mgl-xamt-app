@@ -11,7 +11,7 @@ mix setup
 mix phx.server
 ```
 
-Open [http://localhost:4000](http://localhost:4000).
+Open [http://localhost:4002](http://localhost:4002).
 
 Demo account (from seeds):
 

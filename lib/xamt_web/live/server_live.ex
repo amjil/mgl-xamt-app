@@ -5,6 +5,8 @@ defmodule XamtWeb.ServerLive do
   alias Xamt.Channels.Channel
   alias XamtWeb.Presence
 
+  @message_page_size 50
+
   @impl true
   def mount(%{"server_slug" => server_slug} = params, _session, socket) do
     scope = socket.assigns.current_scope
@@ -24,9 +26,11 @@ defmodule XamtWeb.ServerLive do
       end
 
     if connected?(socket) do
-      Presence.track_user(self(), channel_topic(channel), scope.user)
-      Phoenix.PubSub.subscribe(Xamt.PubSub, channel_topic(channel))
-      Phoenix.PubSub.subscribe(Xamt.PubSub, presence_topic(channel))
+      Enum.each(channels, &subscribe_channel/1)
+
+      if channel do
+        Presence.track_user(self(), channel_topic(channel), scope.user)
+      end
     end
 
     messages =
@@ -36,12 +40,7 @@ defmodule XamtWeb.ServerLive do
         []
       end
 
-    oldest_id =
-      case messages do
-        [first | _] -> first.id
-        _ -> nil
-      end
-
+    unread_ids = Channels.get_unread_channel_ids(scope.user.id, server.id)
     user_servers = Servers.list_servers_for_user(scope)
 
     socket =
@@ -58,8 +57,8 @@ defmodule XamtWeb.ServerLive do
       |> assign(:show_channel_form, false)
       |> assign(:channel_form, to_form(Channels.change_channel(%Channel{}), as: :channel))
       |> assign(:mobile_panel, :messages)
-      |> assign(:oldest_message_id, oldest_id)
-      |> stream(:messages, messages, reset: true)
+      |> assign(:unread_channels, MapSet.new(unread_ids))
+      |> assign_messages(messages)
 
     if channel && is_nil(Map.get(params, "channel_slug")) do
       {:ok, push_navigate(socket, to: ~p"/servers/#{server.slug}/#{channel.slug}")}
@@ -71,27 +70,29 @@ defmodule XamtWeb.ServerLive do
   @impl true
   def handle_params(%{"channel_slug" => channel_slug} = params, _uri, socket) do
     server = socket.assigns.server
+    scope = socket.assigns.current_scope
     old_channel = socket.assigns.active_channel
     channel = Channels.get_channel_by_slug!(server.id, channel_slug)
 
     socket =
       if (connected?(socket) and old_channel) && old_channel.id != channel.id do
-        Phoenix.PubSub.unsubscribe(Xamt.PubSub, channel_topic(old_channel))
-
-        Presence.untrack_user(
-          self(),
-          channel_topic(old_channel),
-          socket.assigns.current_scope.user
-        )
-
-        Presence.track_user(self(), channel_topic(channel), socket.assigns.current_scope.user)
-        Phoenix.PubSub.subscribe(Xamt.PubSub, channel_topic(channel))
+        Presence.untrack_user(self(), channel_topic(old_channel), scope.user)
+        Presence.track_user(self(), channel_topic(channel), scope.user)
         socket
       else
         socket
       end
 
     messages = Messages.list_messages(channel.id)
+    latest_msg = List.last(messages)
+
+    unread_channels =
+      if latest_msg do
+        Channels.mark_channel_as_read(scope.user.id, channel.id, latest_msg.id)
+        MapSet.delete(socket.assigns.unread_channels, channel.id)
+      else
+        MapSet.delete(socket.assigns.unread_channels, channel.id)
+      end
 
     {:noreply,
      socket
@@ -100,7 +101,8 @@ defmodule XamtWeb.ServerLive do
      |> assign(:typing_users, %{})
      |> assign(:editing_message_id, nil)
      |> assign(:mobile_panel, :messages)
-     |> stream(:messages, messages, reset: true)
+     |> assign(:unread_channels, unread_channels)
+     |> assign_messages(messages)
      |> maybe_push_composer_reset(params)}
   end
 
@@ -184,25 +186,28 @@ defmodule XamtWeb.ServerLive do
     channel = socket.assigns.active_channel
     oldest_id = socket.assigns[:oldest_message_id]
 
-    messages =
-      if oldest_id do
-        Messages.list_messages(channel.id, before_id: oldest_id)
-      else
-        []
-      end
+    if not socket.assigns.has_more_messages or is_nil(oldest_id) do
+      {:noreply, push_event(socket, "infinite_scroll:done", %{})}
+    else
+      messages = Messages.list_messages(channel.id, before_id: oldest_id)
 
-    socket =
-      case messages do
-        [first | _] = msgs ->
-          socket
-          |> assign(:oldest_message_id, first.id)
-          |> stream(:messages, msgs, at: 0)
+      socket =
+        case messages do
+          [first | _] = msgs ->
+            socket
+            |> assign(:oldest_message_id, first.id)
+            |> assign(:has_more_messages, length(msgs) >= @message_page_size)
+            |> stream(:messages, msgs, at: 0)
+            |> maybe_done_loading(length(msgs) >= @message_page_size)
 
-        [] ->
-          socket
-      end
+          [] ->
+            socket
+            |> assign(:has_more_messages, false)
+            |> push_event("infinite_scroll:done", %{})
+        end
 
-    {:noreply, socket}
+      {:noreply, socket}
+    end
   end
 
   def handle_event("toggle_channel_form", _params, socket) do
@@ -215,6 +220,8 @@ defmodule XamtWeb.ServerLive do
     case Channels.create_channel(server, params) do
       {:ok, channel} ->
         channels = Channels.list_channels(server.id)
+
+        if connected?(socket), do: subscribe_channel(channel)
 
         {:noreply,
          socket
@@ -235,7 +242,7 @@ defmodule XamtWeb.ServerLive do
     Phoenix.PubSub.broadcast(
       Xamt.PubSub,
       channel_topic(channel),
-      {:typing_started, user.id, display_name(user)}
+      {:typing_started, channel.id, user.id, display_name(user)}
     )
 
     {:noreply, socket}
@@ -248,7 +255,7 @@ defmodule XamtWeb.ServerLive do
     Phoenix.PubSub.broadcast(
       Xamt.PubSub,
       channel_topic(channel),
-      {:typing_stopped, user.id}
+      {:typing_stopped, channel.id, user.id}
     )
 
     {:noreply, socket}
@@ -261,36 +268,81 @@ defmodule XamtWeb.ServerLive do
 
   @impl true
   def handle_info({:new_message, message}, socket) do
-    {:noreply,
-     socket
-     |> stream_insert(:messages, message)
-     |> assign(:oldest_message_id, socket.assigns[:oldest_message_id] || message.id)
-     |> push_event("messages:scroll_bottom", %{})}
+    active_channel = socket.assigns.active_channel
+    user_id = socket.assigns.current_scope.user.id
+
+    socket =
+      cond do
+        active_channel && message.channel_id == active_channel.id ->
+          Channels.mark_channel_as_read(user_id, active_channel.id, message.id)
+
+          socket
+          |> stream_insert(:messages, message)
+          |> assign(:oldest_message_id, socket.assigns[:oldest_message_id] || message.id)
+          |> push_event("messages:scroll_bottom", %{})
+
+        message.user_id != user_id and server_channel?(socket, message.channel_id) ->
+          assign(
+            socket,
+            :unread_channels,
+            MapSet.put(socket.assigns.unread_channels, message.channel_id)
+          )
+
+        true ->
+          socket
+      end
+
+    {:noreply, socket}
   end
 
   def handle_info({:updated_message, message}, socket) do
-    {:noreply, stream_insert(socket, :messages, message)}
-  end
-
-  def handle_info({:deleted_message, message}, socket) do
-    {:noreply, stream_delete(socket, :messages, message)}
-  end
-
-  def handle_info({:typing_started, user_id, name}, socket) do
-    if user_id == socket.assigns.current_scope.user.id do
-      {:noreply, socket}
+    if active_channel_message?(socket, message) do
+      {:noreply, stream_insert(socket, :messages, message)}
     else
-      typing = Map.put(socket.assigns.typing_users, user_id, name)
-      {:noreply, assign(socket, :typing_users, typing)}
+      {:noreply, socket}
     end
   end
 
-  def handle_info({:typing_stopped, user_id}, socket) do
-    {:noreply, assign(socket, :typing_users, Map.delete(socket.assigns.typing_users, user_id))}
+  def handle_info({:deleted_message, message}, socket) do
+    if active_channel_message?(socket, message) do
+      {:noreply, stream_delete(socket, :messages, message)}
+    else
+      {:noreply, socket}
+    end
   end
 
-  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
-    {:noreply, assign(socket, :online_users, list_online(socket.assigns.active_channel))}
+  def handle_info({:typing_started, channel_id, user_id, name}, socket) do
+    active = socket.assigns.active_channel
+
+    cond do
+      is_nil(active) or active.id != channel_id ->
+        {:noreply, socket}
+
+      user_id == socket.assigns.current_scope.user.id ->
+        {:noreply, socket}
+
+      true ->
+        typing = Map.put(socket.assigns.typing_users, user_id, name)
+        {:noreply, assign(socket, :typing_users, typing)}
+    end
+  end
+
+  def handle_info({:typing_stopped, channel_id, user_id}, socket) do
+    active = socket.assigns.active_channel
+
+    if active && active.id == channel_id do
+      {:noreply, assign(socket, :typing_users, Map.delete(socket.assigns.typing_users, user_id))}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_info(%Phoenix.Socket.Broadcast{topic: topic, event: "presence_diff"}, socket) do
+    if topic == channel_topic(socket.assigns.active_channel) do
+      {:noreply, assign(socket, :online_users, list_online(socket.assigns.active_channel))}
+    else
+      {:noreply, socket}
+    end
   end
 
   @impl true
@@ -356,10 +408,32 @@ defmodule XamtWeb.ServerLive do
             <.link
               :for={ch <- @channels}
               navigate={~p"/servers/#{@server.slug}/#{ch.slug}"}
-              class={"xamt-channel-link #{if @active_channel && ch.id == @active_channel.id, do: "is-active"}"}
+              class={[
+                "xamt-channel-link",
+                @active_channel && ch.id == @active_channel.id && "is-active",
+                MapSet.member?(@unread_channels, ch.id) && "has-unread"
+              ]}
             >
-              <span class="xamt-channel-hash">#</span>
-              <span class="mongol-text">{ch.name}</span>
+              <div class="flex items-center justify-between w-full gap-2">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span class="xamt-channel-hash">#</span>
+                  <span class={[
+                    "mongol-text truncate",
+                    MapSet.member?(@unread_channels, ch.id) && "font-bold text-[var(--xamt-text)]"
+                  ]}>
+                    {ch.name}
+                  </span>
+                </div>
+                <span
+                  :if={
+                    MapSet.member?(@unread_channels, ch.id) &&
+                      !(@active_channel && ch.id == @active_channel.id)
+                  }
+                  class="w-2 h-2 shrink-0 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"
+                  aria-hidden="true"
+                >
+                </span>
+              </div>
             </.link>
           </nav>
         </div>
@@ -392,8 +466,12 @@ defmodule XamtWeb.ServerLive do
           phx-update="stream"
           phx-hook="MessageList"
         >
-          <div id="messages-load-more" class="xamt-messages__load" phx-click="load_older">
-            {gettext("Load older messages")}
+          <div
+            :if={@has_more_messages}
+            id="messages-infinite-scroll"
+            phx-hook="InfiniteScroll"
+            class="h-2 w-full shrink-0"
+          >
           </div>
           <article
             :for={{dom_id, message} <- @streams.messages}
@@ -486,13 +564,44 @@ defmodule XamtWeb.ServerLive do
     """
   end
 
+  defp assign_messages(socket, messages) do
+    oldest_id =
+      case messages do
+        [first | _] -> first.id
+        _ -> nil
+      end
+
+    socket
+    |> assign(:oldest_message_id, oldest_id)
+    |> assign(:has_more_messages, length(messages) >= @message_page_size)
+    |> stream(:messages, messages, reset: true)
+  end
+
+  defp maybe_done_loading(socket, true), do: socket
+
+  defp maybe_done_loading(socket, false) do
+    push_event(socket, "infinite_scroll:done", %{})
+  end
+
   defp maybe_push_composer_reset(socket, _params) do
     push_event(socket, "composer:clear", %{})
   end
 
+  defp subscribe_channel(%Channel{} = channel) do
+    Phoenix.PubSub.subscribe(Xamt.PubSub, channel_topic(channel))
+  end
+
+  defp server_channel?(socket, channel_id) do
+    Enum.any?(socket.assigns.channels, &(&1.id == channel_id))
+  end
+
+  defp active_channel_message?(socket, message) do
+    active = socket.assigns.active_channel
+    active && message.channel_id == active.id
+  end
+
   defp channel_topic(%Channel{id: id}), do: "xamt:channel:#{id}"
   defp channel_topic(nil), do: "xamt:channel:none"
-  defp presence_topic(channel), do: channel_topic(channel)
 
   defp list_online(nil), do: []
 
