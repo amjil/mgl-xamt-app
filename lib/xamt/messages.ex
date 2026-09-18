@@ -157,10 +157,10 @@ defmodule Xamt.Messages do
       "rich_text"
   end
 
-  # 剥离不需要的复杂嵌套数据。
-  # 前端 LiveView 渲染只依赖 `content_html` 和 `user`。
-  # 将 `content` (Map) 清空，避免 PubSub 广播时将复杂的 AST 树复制到所有订阅者的私有堆内存中。
-  # 大段的 `content_html` 作为 Refc Binary 会被虚拟机自动共享指针，无复制开销。
+  # Strip nested payload we do not need on the wire.
+  # LiveView rendering only depends on `content_html` and `user`.
+  # Clear `content` (Map) so PubSub does not copy a large AST into every subscriber heap.
+  # Large `content_html` binaries are refcounted and shared by the BEAM with no copy cost.
   defp strip_for_broadcast(%Message{} = message) do
     %{message | content: %{}}
   end

@@ -1,36 +1,145 @@
-.xamt-topnav {
-  border-bottom: 1px solid var(--xamt-line);
+/* --------------------------------------
+   Left sidebar nav (Mongolian vertical-lr)
+   -------------------------------------- */
+.xamt-leftnav {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4.5rem;
+  border-right: 1px solid var(--xamt-line);
   background: color-mix(in srgb, var(--xamt-bg-2) 90%, transparent);
   backdrop-filter: blur(8px);
+  z-index: 40;
+  padding: 1.5rem 0;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.xamt-topnav__inner {
-  max-width: 72rem;
-  margin: 0 auto;
-  padding: 0.65rem 1rem;
+.xamt-leftnav__inner {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
+  height: 100%;
 }
 
-.xamt-topnav__brand {
-  font-family: "Fraunces", serif;
-  color: var(--xamt-accent-2);
-  text-decoration: none;
-  font-size: 1.25rem;
-}
-
-.xamt-topnav__links {
+.xamt-leftnav__links {
   list-style: none;
   display: flex;
-  gap: 1rem;
+  flex-direction: column;
+  gap: 2rem;
   margin: 0;
   padding: 0;
+  align-items: center;
+  flex: 1;
 }
 
-.xamt-topnav__links a {
+.xamt-leftnav__links a {
   color: var(--xamt-muted);
   text-decoration: none;
+  /* Keep link text vertical */
+  writing-mode: vertical-lr;
+  text-orientation: mixed;
+  transition: color 160ms ease;
+}
+
+.xamt-leftnav__links a:hover {
+  color: var(--xamt-text);
+}
+
+.xamt-leftnav__close {
+  display: none; /* Hidden on desktop */
+  margin-top: auto;
+}
+
+/* --- Global scroll reset --- */
+html,
+body {
+  overflow-y: hidden; /* Disable native vertical page scroll */
+  height: 100dvh;
+}
+
+/* --- Main content horizontal scroll --- */
+.xamt-main-content {
+  height: 100dvh;
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* Clear the fixed left nav */
+  padding-left: 4.5rem;
+  padding-right: 3rem;
+  box-sizing: border-box;
+}
+
+/* Vertical writing + rightward flow for non-chat pages (home, auth, settings) */
+.xamt-main-content:not(:has(.xamt-app)) {
+  writing-mode: vertical-lr;
+  text-orientation: mixed;
+}
+
+/* Hide global left nav in fullscreen chat (preserve existing behavior) */
+body:has(.xamt-app) .xamt-leftnav,
+body:has(.xamt-app) .xamt-mobile-header {
+  display: none;
+}
+
+body:has(.xamt-app) .xamt-main-content {
+  padding-left: 0;
+  padding-right: 0;
+  height: 100dvh;
+}
+
+body:has(.xamt-app) {
+  overflow: hidden;
+}
+
+/* --------------------------------------
+   Mobile responsive (< 960px)
+   -------------------------------------- */
+.xamt-mobile-header {
+  display: none;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--xamt-line);
+  background: var(--xamt-bg-2);
+}
+
+.xamt-mobile-toggle {
+  background: transparent;
+  border: none;
+  color: var(--xamt-text);
+  cursor: pointer;
+  padding: 0.5rem;
+}
+
+@media (max-width: 960px) {
+  .xamt-mobile-header {
+    display: flex;
+  }
+
+  .xamt-main-content {
+    padding-left: 0; /* No left padding on mobile */
+    /* Subtract mobile-header height */
+    height: calc(100dvh - 3.5rem);
+  }
+
+  body:has(.xamt-app) .xamt-main-content {
+    height: 100dvh;
+  }
+
+  .xamt-leftnav {
+    transform: translateX(-100%); /* Hidden off-screen by default */
+    width: 6rem; /* Slightly wider for touch */
+    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Open drawer when .is-open is present */
+  .xamt-leftnav.is-open {
+    transform: translateX(0);
+  }
+
+  .xamt-leftnav__close {
+    display: flex;
+  }
 }
 
 .xamt-auth-shell {
@@ -38,16 +147,9 @@
 }
 
 .xamt-auth-shell__inner {
-  max-width: 28rem;
-  margin: 0 auto;
-}
-
-body:has(.xamt-app) .xamt-topnav {
-  display: none;
-}
-
-body:has(.xamt-app) {
-  overflow: hidden;
+  max-height: 32rem; /* was max-width: 28rem */
+  height: 100%;
+  margin: auto 0;
 }
 
 
@@ -72,13 +174,15 @@ body:has(.xamt-app) {
 }
 
 .xamt-home {
-  max-width: 52rem;
-  margin: 0 auto;
-  padding: 3rem 1.25rem 4rem;
+  max-height: 52rem;
+  height: 100%;
+  margin: auto 0; /* Center vertically in vertical-lr */
+  padding: 2rem 1.25rem 2rem 4rem;
 }
 
 .xamt-home__hero {
-  margin-bottom: 2.5rem;
+  margin-bottom: 0;
+  margin-right: 4rem; /* In vertical-lr, right gap replaces former bottom gap */
 }
 
 .xamt-home__title {

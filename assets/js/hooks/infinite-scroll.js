@@ -10,7 +10,7 @@ export const InfiniteScroll = {
             this.loading = true
             this.oldScrollHeight = this.el.parentNode.scrollHeight
 
-            // 动态读取事件名称，默认降级为 load_older 保持兼容
+            // Read event name dynamically; fall back to load_older for compatibility
             const eventName = this.el.dataset.event || "load_older"
             this.pushEvent(eventName, {})
           }

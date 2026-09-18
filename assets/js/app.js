@@ -7,7 +7,7 @@ import "../vendor/mgl-web-ime/mgl-web-ime.js"
 import {MongolianIME} from "./hooks/mongolian-ime"
 import {MessageComposer, MessageList} from "./hooks/message-composer"
 import {InfiniteScroll} from "./hooks/infinite-scroll"
-import {MongolianScroll} from "./hooks/mongolian-scroll"
+import {MongolianScroll, attachMongolianWheelScroll} from "./hooks/mongolian-scroll"
 import {ToastHandler} from "./hooks/toast-handler"
 
 const Hooks = {
@@ -30,6 +30,14 @@ const liveSocket = new LiveSocket("/live", Socket, {
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
+
+// Map vertical wheel to horizontal scroll on .xamt-main-content
+window.addEventListener("DOMContentLoaded", () => {
+  const mainContent = document.querySelector(".xamt-main-content")
+  if (mainContent) {
+    attachMongolianWheelScroll(mainContent)
+  }
+})
 
 liveSocket.connect()
 window.liveSocket = liveSocket

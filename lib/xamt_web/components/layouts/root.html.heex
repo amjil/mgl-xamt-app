@@ -23,10 +23,35 @@
     </script>
   </head>
   <body class="xamt-body">
-    <header class="xamt-topnav">
-      <nav class="xamt-topnav__inner">
-        <.link navigate={~p"/"} class="xamt-topnav__brand">Xamt</.link>
-        <ul class="xamt-topnav__links">
+    <%!-- Mobile top bar (small screens only) --%>
+    <div class="xamt-mobile-header">
+      <.link navigate={~p"/"} class="xamt-brand" style="font-size: 1.5rem; margin: 0;">
+        Xamt
+      </.link>
+      <button
+        type="button"
+        onclick="document.getElementById('leftnav').classList.toggle('is-open')"
+        class="xamt-mobile-toggle"
+        aria-label={gettext("Open menu")}
+      >
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M4 6h16M4 12h16M4 18h16"
+          >
+          </path>
+        </svg>
+      </button>
+    </div>
+
+    <%!-- Fixed left sidebar nav --%>
+    <aside id="leftnav" class="xamt-leftnav">
+      <nav class="xamt-leftnav__inner">
+        <.link navigate={~p"/"} class="xamt-brand-mark mb-8">X</.link>
+
+        <ul class="xamt-leftnav__links">
           <%= if @current_scope && @current_scope.user do %>
             <li>
               <.link navigate={~p"/settings"} class="mongol-text">{gettext("Settings")}</.link>
@@ -45,8 +70,21 @@
             </li>
           <% end %>
         </ul>
+
+        <%!-- Mobile close button --%>
+        <button
+          type="button"
+          onclick="document.getElementById('leftnav').classList.remove('is-open')"
+          class="xamt-leftnav__close xamt-btn xamt-btn--soft mongol-text"
+        >
+          {gettext("Close")}
+        </button>
       </nav>
-    </header>
-    {@inner_content}
+    </aside>
+
+    <%!-- Main content --%>
+    <div class="xamt-main-content">
+      {@inner_content}
+    </div>
   </body>
 </html>
