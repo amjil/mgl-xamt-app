@@ -1232,6 +1232,7 @@ defmodule XamtWeb.ServerLive do
 
           <div
             class="xamt-composer-wrap"
+            phx-drop-target={@uploads.media.ref}
             data-has-uploads={to_string(@uploads.media.entries != [])}
             data-submit-event={if @editing_message_id, do: "update_message", else: "send_message"}
           >

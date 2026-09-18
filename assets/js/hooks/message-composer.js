@@ -13,6 +13,26 @@ function editorRoot(editorEl) {
   return editorEl?.querySelector?.(".editor-content") || editorEl
 }
 
+/** Collect image File objects from a paste/drop DataTransfer. */
+function imageFilesFromDataTransfer(data) {
+  if (!data) return []
+
+  const fromFiles = Array.from(data.files || []).filter((f) =>
+    f.type?.startsWith("image/")
+  )
+  if (fromFiles.length > 0) return fromFiles
+
+  // Some browsers expose clipboard images only via items
+  const fromItems = []
+  for (const item of Array.from(data.items || [])) {
+    if (item.kind === "file" && item.type?.startsWith("image/")) {
+      const file = item.getAsFile()
+      if (file) fromItems.push(file)
+    }
+  }
+  return fromItems
+}
+
 function activeEditable(root) {
   const sel = window.getSelection()
   if (sel && sel.rangeCount > 0) {
@@ -142,6 +162,18 @@ export const MessageComposer = {
     this._onOnline = () => this.flushOfflineQueue()
     window.addEventListener("online", this._onOnline)
 
+    // Capture-phase paste: beat mongolian-editor's text-only paste handler.
+    // Image files go through LiveView allow_upload(:media) via this.upload.
+    this._onPaste = (e) => {
+      const imageFiles = imageFilesFromDataTransfer(e.clipboardData)
+      if (imageFiles.length === 0) return
+
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      this.upload("media", imageFiles)
+    }
+    this.host.addEventListener("paste", this._onPaste, true)
+
     // Throttle typing events: one typing_started until idle timeout
     this._typingTimer = null
     this._isTyping = false
@@ -195,6 +227,7 @@ export const MessageComposer = {
     clearTimeout(this._typingTimer)
     this.sendBtn?.removeEventListener("click", this._onSend)
     window.removeEventListener("online", this._onOnline)
+    this.host?.removeEventListener("paste", this._onPaste, true)
     this._detachWheel?.()
     if (this.ime && typeof this.ime.destroy === "function") this.ime.destroy()
   },
