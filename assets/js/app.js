@@ -6,12 +6,14 @@ import topbar from "../vendor/topbar"
 import "../vendor/mgl-web-ime/mgl-web-ime.js"
 import {MongolianIME} from "./hooks/mongolian-ime"
 import {MessageComposer, MessageList} from "./hooks/message-composer"
+import {MongolianScroll} from "./hooks/mongolian-scroll"
 
 const Hooks = {
   ...colocatedHooks,
   MongolianIME,
   MessageComposer,
   MessageList,
+  MongolianScroll,
 }
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")

@@ -408,7 +408,11 @@ defmodule XamtWeb.ServerLive do
                 <time>{format_time(message.inserted_at)}</time>
                 <span :if={edited?(message)} class="xamt-message__edited">{gettext("edited")}</span>
               </header>
-              <div class="xamt-message__content mongol-text">
+              <div
+                id={"msg-content-#{message.id}"}
+                class="xamt-message__content mongol-text"
+                phx-hook="MongolianScroll"
+              >
                 {raw(safe_html(message))}
               </div>
               <div
