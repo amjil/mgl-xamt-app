@@ -343,6 +343,7 @@ body:has(.xamt-app) {
   align-items: stretch;
   width: min(22.5rem, calc(100vw - var(--xamt-leftnav-w) - 2.5rem));
   max-height: calc(var(--xamt-vh) - 2.5rem);
+  overflow-x: hidden;
   overflow-y: auto;
   padding: 0.15rem 0.1rem 0.15rem 0;
 }

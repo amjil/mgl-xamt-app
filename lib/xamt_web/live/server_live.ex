@@ -1154,7 +1154,6 @@ defmodule XamtWeb.ServerLive do
                   <div
                     id={"msg-content-#{message.id}"}
                     class="xamt-message__content mongol-text"
-                    phx-hook="MongolianScroll"
                   >
                     {raw(safe_html(message))}
                   </div>

@@ -7,7 +7,8 @@ import "../vendor/mgl-web-ime/mgl-web-ime.js"
 import {MongolianIME} from "./hooks/mongolian-ime"
 import {MessageComposer, MessageList} from "./hooks/message-composer"
 import {InfiniteScroll} from "./hooks/infinite-scroll"
-import {MongolianScroll, attachMongolianWheelScroll} from "./hooks/mongolian-scroll"
+import {MongolianScroll, installGlobalMongolianWheelScroll} from "./hooks/mongolian-scroll"
+import {MessageScroll} from "./hooks/message-scroll"
 import {MobileDrawer} from "./hooks/mobile-drawer"
 import {ToastHandler} from "./hooks/toast-handler"
 import {adoptImeElements} from "./utils/ime"
@@ -20,6 +21,7 @@ const Hooks = {
   MongolianIME,
   MessageComposer,
   MessageList,
+  MessageScroll,
   InfiniteScroll,
   MongolianScroll,
   MobileDrawer,
@@ -41,13 +43,8 @@ topbar.config({
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 
-// Map vertical wheel to horizontal scroll on .xamt-main-content
-window.addEventListener("DOMContentLoaded", () => {
-  const mainContent = document.querySelector(".xamt-main-content")
-  if (mainContent) {
-    attachMongolianWheelScroll(mainContent)
-  }
-})
+// Map vertical wheel → horizontal scroll for Mongolian (vertical-lr) surfaces
+installGlobalMongolianWheelScroll()
 
 // Dispatched by JS.dispatch/2 from quote buttons — no per-message Hook needed.
 window.addEventListener("xamt:highlight", (event) => {

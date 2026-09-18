@@ -7,7 +7,7 @@ import { MglIME, createCustomAdapter } from "../../vendor/mgl-web-ime/mgl-web-im
 import { imeProvider } from "../utils/ime.js"
 import { OfflineStore, toast } from "../utils/offline-store.js"
 import { highlightMessage as flashHighlight } from "../utils/highlight-message.js"
-import { attachMongolianWheelScroll } from "./mongolian-scroll.js"
+import { attachMessageScrollLock } from "./message-scroll.js"
 
 function editorRoot(editorEl) {
   return editorEl?.querySelector?.(".editor-content") || editorEl
@@ -200,9 +200,6 @@ export const MessageComposer = {
       this.editor.focus()
     })
 
-    // vertical-lr: map wheel Y → scrollLeft, with edge + trackpad guards
-    this._detachWheel = attachMongolianWheelScroll(this.host)
-
     // Flush any messages left from a previous session once LiveView is up
     this.flushOfflineQueue()
   },
@@ -228,7 +225,6 @@ export const MessageComposer = {
     this.sendBtn?.removeEventListener("click", this._onSend)
     window.removeEventListener("online", this._onOnline)
     this.host?.removeEventListener("paste", this._onPaste, true)
-    this._detachWheel?.()
     if (this.ime && typeof this.ime.destroy === "function") this.ime.destroy()
   },
 
@@ -321,6 +317,9 @@ export const MessageList = {
     }
     this.el.addEventListener("scroll", this._onScroll, { passive: true })
 
+    // Lock scrollLeft when older messages prepend and scrollWidth grows
+    this._detachScrollLock = attachMessageScrollLock(this.el)
+
     this.scrollToLatest(false)
 
     this.handleEvent("messages:scroll_bottom", () => {
@@ -344,6 +343,7 @@ export const MessageList = {
   destroyed() {
     this.jumpBtn?.removeEventListener("click", this._onJump)
     this.el.removeEventListener("scroll", this._onScroll)
+    this._detachScrollLock?.()
   },
 
   nearLatest() {

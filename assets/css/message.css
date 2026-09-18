@@ -92,6 +92,8 @@
   max-block-size: calc(var(--xamt-vh) - 8rem);
   overflow-x: auto;
   overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Sits over the message list when new messages land off-screen */

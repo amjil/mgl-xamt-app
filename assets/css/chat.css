@@ -61,6 +61,8 @@
   box-shadow: var(--xamt-shadow);
   overflow-x: auto;
   overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
   animation: xamt-fade-in 160ms ease;
 }
 
@@ -217,6 +219,8 @@
   min-height: 0;
   overflow-x: auto;
   overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 0.85rem 0.75rem;
 }
 
@@ -233,6 +237,8 @@
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .xamt-rail__pane--members .xamt-rail__section {
@@ -248,6 +254,8 @@
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .xamt-rail__section-head {
@@ -563,6 +571,9 @@
   gap: 0.75rem;
   padding: 0.5rem;
   overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
   border-bottom: 1px solid var(--xamt-line);
 }
 
@@ -630,7 +641,10 @@
   block-size: 12rem;
   min-block-size: 8rem;
   max-block-size: 14rem;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--xamt-line);
   border-radius: 0.85rem;
   background: var(--xamt-paper);
