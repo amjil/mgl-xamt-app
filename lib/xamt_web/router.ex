@@ -34,6 +34,9 @@ defmodule XamtWeb.Router do
       on_mount: [{XamtWeb.UserAuth, :ensure_authenticated}] do
       live "/invite/:code", InviteLive, :show
       live "/servers/:server_slug", ServerLive, :show
+      live "/servers/:server_slug/:channel_slug/new", ServerLive, :new_channel
+      live "/servers/:server_slug/:channel_slug/edit/:edit_slug", ServerLive, :edit_channel
+      live "/servers/:server_slug/:channel_slug/settings", ServerLive, :edit_server
       live "/servers/:server_slug/:channel_slug", ServerLive, :show
       live "/settings", SettingsLive, :edit
     end

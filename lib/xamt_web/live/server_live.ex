@@ -79,13 +79,11 @@ defmodule XamtWeb.ServerLive do
       |> assign(:typing_users, %{})
       |> assign(:editing_message_id, nil)
       |> assign(:replying_to, nil)
-      |> assign(:show_channel_form, false)
       |> assign(:channel_form, to_form(Channels.change_channel(%Channel{}), as: :channel))
       |> assign(:admin?, Servers.admin?(server.id, scope.user.id))
-      |> assign(:show_server_settings, false)
       |> assign(:server_form, to_form(Servers.change_server(server), as: :server))
       |> assign(:invites, Servers.list_invites(server.id))
-      |> assign(:editing_channel_id, nil)
+      |> assign(:editing_channel, nil)
       |> assign(:mobile_panel, :messages)
       |> assign(:unread_channels, MapSet.new(unread_ids))
       |> assign(:search_q, "")
@@ -112,36 +110,10 @@ defmodule XamtWeb.ServerLive do
   end
 
   def handle_params(%{"channel_slug" => channel_slug} = params, _uri, socket) do
-    server = socket.assigns.server
-    scope = socket.assigns.current_scope
-    old_channel = socket.assigns.active_channel
-    channel = Channels.get_channel_by_slug!(server.id, channel_slug)
-
-    socket =
-      if (connected?(socket) and old_channel) && old_channel.id != channel.id do
-        Presence.untrack_user(self(), channel_topic(old_channel), scope.user)
-        Presence.track_user(self(), channel_topic(channel), scope.user)
-        socket
-      else
-        socket
-      end
-
-    messages = Messages.list_messages(channel.id)
-
     {:noreply,
      socket
-     |> assign(:active_channel, channel)
-     |> assign(:online_users, list_online(channel))
-     |> assign(:typing_users, %{})
-     |> assign(:editing_message_id, nil)
-     |> assign(:replying_to, nil)
-     |> assign(:mobile_panel, :messages)
-     |> assign(:search_q, "")
-     |> assign(:search_results, nil)
-     |> assign(:highlight_id, Map.get(params, "highlight"))
-     |> assign_messages(messages)
-     |> maybe_push_composer_reset(params)
-     |> maybe_scroll_to_highlight(params)}
+     |> maybe_switch_channel(channel_slug, params)
+     |> apply_action(socket.assigns.live_action, params)}
   end
 
   def handle_params(_params, _uri, socket), do: {:noreply, socket}
@@ -381,59 +353,8 @@ defmodule XamtWeb.ServerLive do
     end
   end
 
-  def handle_event("toggle_channel_form", _params, socket) do
-    {:noreply, assign(socket, :show_channel_form, !socket.assigns.show_channel_form)}
-  end
-
-  def handle_event("create_channel", %{"channel" => params}, socket) do
-    server = socket.assigns.server
-
-    case Channels.create_channel(socket.assigns.current_scope, server, params) do
-      {:ok, channel} ->
-        channels = Channels.list_channels(server.id)
-
-        if connected?(socket), do: subscribe_channel(channel)
-
-        {:noreply,
-         socket
-         |> assign(:channels, channels)
-         |> assign(:show_channel_form, false)
-         |> push_navigate(to: ~p"/servers/#{server.slug}/#{channel.slug}")}
-
-      {:error, :unauthorized} ->
-        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
-
-      {:error, changeset} ->
-        {:noreply,
-         assign(socket, channel_form: to_form(changeset, as: :channel), show_channel_form: true)}
-    end
-  end
-
-  def handle_event("edit_channel", %{"id" => id}, socket) do
-    {:noreply, assign(socket, :editing_channel_id, id)}
-  end
-
-  def handle_event("cancel_channel_edit", _params, socket) do
-    {:noreply, assign(socket, :editing_channel_id, nil)}
-  end
-
-  def handle_event("update_channel", %{"channel" => params}, socket) do
-    id = socket.assigns.editing_channel_id
-
-    case Channels.update_channel(socket.assigns.current_scope, id, params) do
-      {:ok, channel} ->
-        {:noreply,
-         socket
-         |> assign(:editing_channel_id, nil)
-         |> refresh_channels()
-         |> maybe_follow_renamed_channel(channel)}
-
-      {:error, :unauthorized} ->
-        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
-
-      {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, gettext("Could not rename the channel"))}
-    end
+  def handle_event("save_channel", %{"channel" => params}, socket) do
+    save_channel(socket, socket.assigns.live_action, params)
   end
 
   def handle_event("delete_channel", %{"id" => id}, socket) do
@@ -467,10 +388,6 @@ defmodule XamtWeb.ServerLive do
       {:ok, _} -> {:noreply, refresh_channels(socket)}
       {:error, _} -> {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
     end
-  end
-
-  def handle_event("toggle_server_settings", _params, socket) do
-    {:noreply, assign(socket, :show_server_settings, !socket.assigns.show_server_settings)}
   end
 
   def handle_event("save_server", %{"server" => params}, socket) do
@@ -779,103 +696,55 @@ defmodule XamtWeb.ServerLive do
         </aside>
 
         <aside class="xamt-rail xamt-rail--channels">
-          <.server_settings
-            :if={@admin? and @show_server_settings}
-            server={@server}
-            form={@server_form}
-            invites={@invites}
-          />
-
           <div class="xamt-rail__pane xamt-rail__pane--top">
             <header class="xamt-rail__header">
-              <h1 class="xamt-rail__title mongol-text">{@server.name}</h1>
+              <details :if={@admin?} id="server-menu" class="xamt-menu xamt-server-menu">
+                <summary class="xamt-server-menu__summary" aria-label={gettext("Server menu")}>
+                  <h1 class="xamt-rail__title mongol-text">{@server.name}</h1>
+                  <.icon name="hero-chevron-down" class="size-3" />
+                </summary>
+                <div class="xamt-server-menu__list">
+                  <.link
+                    :if={@active_channel}
+                    id="server-menu-new-channel"
+                    patch={~p"/servers/#{@server.slug}/#{@active_channel.slug}/new"}
+                    class="xamt-server-menu__item mongol-text"
+                    phx-click={JS.remove_attribute("open", to: "#server-menu")}
+                  >
+                    {gettext("Create channel")}
+                  </.link>
+                  <.link
+                    :if={@active_channel}
+                    id="server-menu-settings"
+                    patch={~p"/servers/#{@server.slug}/#{@active_channel.slug}/settings"}
+                    class="xamt-server-menu__item mongol-text"
+                    phx-click={JS.remove_attribute("open", to: "#server-menu")}
+                  >
+                    {gettext("Server settings")}
+                  </.link>
+                </div>
+              </details>
+              <h1 :if={not @admin?} class="xamt-rail__title mongol-text">{@server.name}</h1>
               <p class="xamt-rail__sub">/{@server.slug}</p>
-              <button
-                :if={@admin?}
-                type="button"
-                id="toggle-server-settings"
-                class="xamt-icon-btn"
-                phx-click="toggle_server_settings"
-                aria-label={gettext("Server settings")}
-              >
-                <.icon name="hero-cog-6-tooth" class="size-4" />
-              </button>
             </header>
 
             <div class="xamt-rail__section">
               <div class="xamt-rail__section-head">
                 <span class="mongol-text">{gettext("Channels")}</span>
-                <button
-                  :if={@admin?}
-                  type="button"
+                <.link
+                  :if={@admin? and @active_channel}
                   id="toggle-channel-form"
+                  patch={~p"/servers/#{@server.slug}/#{@active_channel.slug}/new"}
                   class="xamt-icon-btn"
-                  phx-click="toggle_channel_form"
+                  aria-label={gettext("Create channel")}
                 >
                   +
-                </button>
+                </.link>
               </div>
-
-              <form
-                :if={@show_channel_form}
-                id="create-channel-form"
-                phx-submit="create_channel"
-                class="xamt-form xamt-form--vertical xamt-form--compact"
-              >
-                <label class="xamt-label">
-                  <span class="xamt-field__label mongol-text">{gettext("Name")}</span>
-                  <input
-                    type="text"
-                    name="channel[name]"
-                    id="channel_name"
-                    required
-                    class="xamt-input mongol-input"
-                    phx-hook="MongolianIME"
-                    autocomplete="off"
-                  />
-                </label>
-                <button
-                  type="submit"
-                  id="add-channel-submit"
-                  class="xamt-btn xamt-btn--primary xamt-btn--sm mongol-text"
-                >
-                  {gettext("Add")}
-                </button>
-              </form>
 
               <nav class="xamt-channel-nav">
                 <div :for={ch <- @channels} class="xamt-channel-item">
-                  <.form
-                    :if={@editing_channel_id == ch.id}
-                    for={@channel_form}
-                    id={"rename-channel-#{ch.id}"}
-                    phx-submit="update_channel"
-                    class="xamt-form xamt-form--compact"
-                  >
-                    <input
-                      type="text"
-                      name="channel[name]"
-                      id={"rename-channel-name-#{ch.id}"}
-                      value={ch.name}
-                      required
-                      class="xamt-input mongol-input"
-                      phx-hook="MongolianIME"
-                    />
-                    <button type="submit" class="xamt-icon-btn" aria-label={gettext("Save")}>
-                      <.icon name="hero-check" class="size-4" />
-                    </button>
-                    <button
-                      type="button"
-                      class="xamt-icon-btn"
-                      phx-click="cancel_channel_edit"
-                      aria-label={gettext("Cancel")}
-                    >
-                      <.icon name="hero-x-mark" class="size-4" />
-                    </button>
-                  </.form>
-
                   <.link
-                    :if={@editing_channel_id != ch.id}
                     navigate={~p"/servers/#{@server.slug}/#{ch.slug}"}
                     class={[
                       "xamt-channel-link",
@@ -902,7 +771,7 @@ defmodule XamtWeb.ServerLive do
                   </.link>
 
                   <.action_menu
-                    :if={@admin? and @editing_channel_id != ch.id}
+                    :if={@admin?}
                     id={"channel-menu-#{ch.id}"}
                     label={gettext("Channel actions")}
                   >
@@ -926,15 +795,15 @@ defmodule XamtWeb.ServerLive do
                     >
                       <.icon name="hero-chevron-down" class="size-3" />
                     </button>
-                    <button
-                      type="button"
+                    <.link
+                      :if={@active_channel}
+                      patch={~p"/servers/#{@server.slug}/#{@active_channel.slug}/edit/#{ch.slug}"}
+                      id={"edit-channel-#{ch.id}"}
                       class="xamt-icon-btn"
-                      phx-click="edit_channel"
-                      phx-value-id={ch.id}
                       aria-label={gettext("Rename channel")}
                     >
                       <.icon name="hero-pencil" class="size-3" />
-                    </button>
+                    </.link>
                     <button
                       type="button"
                       class="xamt-icon-btn"
@@ -1328,6 +1197,17 @@ defmodule XamtWeb.ServerLive do
           </div>
         </section>
       </div>
+
+      <.server_overlay
+        :if={@admin? and @active_channel}
+        live_action={@live_action}
+        server={@server}
+        active_channel={@active_channel}
+        channel_form={@channel_form}
+        editing_channel={@editing_channel}
+        server_form={@server_form}
+        invites={@invites}
+      />
     </div>
     """
   end
@@ -1396,74 +1276,140 @@ defmodule XamtWeb.ServerLive do
     """
   end
 
-  # Overlays the whole channel rail so the rail keeps its width while open
+  attr :live_action, :atom, required: true
+  attr :server, :map, required: true
+  attr :active_channel, :map, required: true
+  attr :channel_form, :map, required: true
+  attr :editing_channel, :map
+  attr :server_form, :map, required: true
+  attr :invites, :list, required: true
+
+  defp server_overlay(assigns) do
+    ~H"""
+    <.drawer
+      :if={@live_action in [:new_channel, :edit_channel, :edit_server]}
+      id="server-drawer"
+      show
+      on_cancel={JS.patch(~p"/servers/#{@server.slug}/#{@active_channel.slug}")}
+    >
+      <.channel_sheet
+        :if={@live_action == :new_channel}
+        id="create-channel-form"
+        form={@channel_form}
+        title={gettext("Create channel")}
+        submit_label={gettext("Create")}
+        return_to={~p"/servers/#{@server.slug}/#{@active_channel.slug}"}
+      />
+      <.channel_sheet
+        :if={@live_action == :edit_channel and @editing_channel}
+        id="edit-channel-form"
+        form={@channel_form}
+        title={gettext("Rename channel")}
+        submit_label={gettext("Save")}
+        name_id="edit-channel-name"
+        return_to={~p"/servers/#{@server.slug}/#{@active_channel.slug}"}
+      />
+      <.server_settings
+        :if={@live_action == :edit_server}
+        server={@server}
+        form={@server_form}
+        invites={@invites}
+      />
+    </.drawer>
+    """
+  end
+
+  attr :id, :string, required: true
+  attr :form, :map, required: true
+  attr :title, :string, required: true
+  attr :submit_label, :string, required: true
+  attr :return_to, :string, required: true
+  attr :name_id, :string, default: "channel_name"
+
+  defp channel_sheet(assigns) do
+    ~H"""
+    <div class="xamt-sheet-form">
+      <h2 id={"#{@id}-title"} class="xamt-section-title mongol-text">{@title}</h2>
+      <.form for={@form} id={@id} phx-submit="save_channel" class="xamt-form xamt-form--vertical">
+        <.input
+          field={@form[:name]}
+          id={@name_id}
+          label={gettext("Channel name")}
+          phx-hook="MongolianIME"
+          class="xamt-input mongol-input"
+          autocomplete="off"
+          required
+        />
+        <div class="xamt-form__actions">
+          <button
+            type="submit"
+            id={"#{@id}-submit"}
+            class="xamt-btn xamt-btn--primary mongol-text"
+          >
+            {@submit_label}
+          </button>
+          <.link patch={@return_to} id={"#{@id}-cancel"} class="xamt-btn mongol-text">
+            {gettext("Cancel")}
+          </.link>
+        </div>
+      </.form>
+    </div>
+    """
+  end
+
   attr :server, :map, required: true
   attr :form, :map, required: true
   attr :invites, :list, required: true
 
   defp server_settings(assigns) do
     ~H"""
-    <div id="server-settings" class="xamt-settings-panel">
-      <div class="xamt-rail__section-head">
-        <span class="mongol-text">{gettext("Server settings")}</span>
-        <button
-          type="button"
-          id="close-server-settings"
-          class="xamt-icon-btn"
-          phx-click="toggle_server_settings"
-          aria-label={gettext("Close")}
-        >
-          <.icon name="hero-x-mark" class="size-4" />
-        </button>
-      </div>
+    <div id="server-settings" class="xamt-sheet-form">
+      <h2 class="xamt-section-title mongol-text">{gettext("Server settings")}</h2>
 
       <.form
         for={@form}
         id="server-settings-form"
         phx-submit="save_server"
-        class="xamt-form xamt-form--vertical xamt-form--compact"
+        class="xamt-form xamt-form--vertical"
       >
-        <label class="xamt-label">
-          <span class="xamt-field__label mongol-text">{gettext("Name")}</span>
-          <input
-            type="text"
-            name={@form[:name].name}
-            id="server-settings-name"
-            value={@form[:name].value}
-            class="xamt-input mongol-input"
-            phx-hook="MongolianIME"
-          />
-        </label>
-
-        <label class="xamt-label">
-          <span class="xamt-field__label mongol-text">{gettext("Description")}</span>
-          <textarea
-            name={@form[:description].name}
-            id="server-settings-description"
-            class="xamt-textarea mongol-input"
-            phx-hook="MongolianIME"
-          >{Phoenix.HTML.Form.normalize_value("textarea", @form[:description].value)}</textarea>
-        </label>
-
-        <label class="xamt-label">
-          <span class="xamt-field__label mongol-text">{gettext("Visibility")}</span>
-          <select name={@form[:visibility].name} id="server-settings-visibility" class="xamt-select">
-            <option value="private" selected={@server.visibility == "private"}>
-              {gettext("Private — invite only")}
-            </option>
-            <option value="public" selected={@server.visibility == "public"}>
-              {gettext("Public — anyone can find and join")}
-            </option>
-          </select>
-        </label>
-
-        <button
-          type="submit"
-          id="server-settings-save"
-          class="xamt-btn xamt-btn--primary xamt-btn--sm mongol-text"
-        >
-          {gettext("Save")}
-        </button>
+        <.input
+          field={@form[:name]}
+          id="server-settings-name"
+          label={gettext("Name")}
+          phx-hook="MongolianIME"
+          class="xamt-input mongol-input"
+          autocomplete="off"
+        />
+        <.input
+          field={@form[:description]}
+          id="server-settings-description"
+          type="textarea"
+          label={gettext("Description")}
+          phx-hook="MongolianIME"
+          class="xamt-textarea mongol-input"
+        />
+        <div class="xamt-field">
+          <label>
+            <span class="xamt-field__label mongol-text">{gettext("Visibility")}</span>
+            <select name={@form[:visibility].name} id="server-settings-visibility" class="xamt-select">
+              <option value="private" selected={@server.visibility == "private"}>
+                {gettext("Private — invite only")}
+              </option>
+              <option value="public" selected={@server.visibility == "public"}>
+                {gettext("Public — anyone can find and join")}
+              </option>
+            </select>
+          </label>
+        </div>
+        <div class="xamt-form__actions">
+          <button
+            type="submit"
+            id="server-settings-save"
+            class="xamt-btn xamt-btn--primary mongol-text"
+          >
+            {gettext("Save")}
+          </button>
+        </div>
       </.form>
 
       <div class="xamt-rail__section-head">
@@ -1514,16 +1460,168 @@ defmodule XamtWeb.ServerLive do
     assign(socket, :channels, Channels.list_channels(socket.assigns.server.id))
   end
 
+  defp overlay_return_path(socket) do
+    case socket.assigns.active_channel do
+      %{slug: slug} -> ~p"/servers/#{socket.assigns.server.slug}/#{slug}"
+      _ -> ~p"/servers/#{socket.assigns.server.slug}"
+    end
+  end
+
   defp channel_path(socket, channel) do
     ~p"/servers/#{socket.assigns.server.slug}/#{channel.slug}"
   end
 
-  # Renaming regenerates the slug, so the current URL would 404 on reconnect
-  defp maybe_follow_renamed_channel(socket, channel) do
+  defp maybe_switch_channel(socket, channel_slug, params) do
+    current = socket.assigns.active_channel
+
+    if current && current.slug == channel_slug do
+      socket
+      |> assign(:highlight_id, Map.get(params, "highlight"))
+      |> maybe_scroll_to_highlight(params)
+    else
+      switch_channel(socket, channel_slug, params)
+    end
+  end
+
+  defp switch_channel(socket, channel_slug, params) do
+    server = socket.assigns.server
+    scope = socket.assigns.current_scope
+    old_channel = socket.assigns.active_channel
+    channel = Channels.get_channel_by_slug!(server.id, channel_slug)
+
+    socket =
+      if (connected?(socket) and old_channel) && old_channel.id != channel.id do
+        Presence.untrack_user(self(), channel_topic(old_channel), scope.user)
+        Presence.track_user(self(), channel_topic(channel), scope.user)
+        socket
+      else
+        socket
+      end
+
+    messages = Messages.list_messages(channel.id)
+
+    socket
+    |> assign(:active_channel, channel)
+    |> assign(:online_users, list_online(channel))
+    |> assign(:typing_users, %{})
+    |> assign(:editing_message_id, nil)
+    |> assign(:replying_to, nil)
+    |> assign(:mobile_panel, :messages)
+    |> assign(:search_q, "")
+    |> assign(:search_results, nil)
+    |> assign(:highlight_id, Map.get(params, "highlight"))
+    |> assign_messages(messages)
+    |> maybe_push_composer_reset(params)
+    |> maybe_scroll_to_highlight(params)
+  end
+
+  defp apply_action(socket, :new_channel, _params) do
+    if socket.assigns.admin? do
+      assign(socket,
+        editing_channel: nil,
+        channel_form: to_form(Channels.change_channel(%Channel{}), as: :channel)
+      )
+    else
+      deny_overlay(socket)
+    end
+  end
+
+  defp apply_action(socket, :edit_channel, %{"edit_slug" => slug}) do
+    channel = Enum.find(socket.assigns.channels, &(&1.slug == slug))
+
+    cond do
+      not socket.assigns.admin? ->
+        deny_overlay(socket)
+
+      is_nil(channel) ->
+        socket
+        |> put_flash(:error, gettext("Channel not found"))
+        |> push_patch(to: overlay_return_path(socket))
+
+      true ->
+        assign(socket,
+          editing_channel: channel,
+          channel_form: to_form(Channels.change_channel(channel), as: :channel)
+        )
+    end
+  end
+
+  defp apply_action(socket, :edit_server, _params) do
+    if socket.assigns.admin? do
+      assign(
+        socket,
+        :server_form,
+        to_form(Servers.change_server(socket.assigns.server), as: :server)
+      )
+    else
+      deny_overlay(socket)
+    end
+  end
+
+  defp apply_action(socket, :show, _params) do
+    assign(socket, :editing_channel, nil)
+  end
+
+  defp apply_action(socket, _action, _params), do: socket
+
+  defp deny_overlay(socket) do
+    socket
+    |> put_flash(:error, gettext("Unauthorized"))
+    |> push_patch(to: overlay_return_path(socket))
+  end
+
+  defp save_channel(socket, :new_channel, params) do
+    server = socket.assigns.server
+
+    case Channels.create_channel(socket.assigns.current_scope, server, params) do
+      {:ok, channel} ->
+        if connected?(socket), do: subscribe_channel(channel)
+
+        {:noreply,
+         socket
+         |> assign(:channels, Channels.list_channels(server.id))
+         |> put_flash(:info, gettext("Channel created"))
+         |> push_patch(to: ~p"/servers/#{server.slug}/#{channel.slug}")}
+
+      {:error, :unauthorized} ->
+        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+
+      {:error, changeset} ->
+        {:noreply, assign(socket, :channel_form, to_form(changeset, as: :channel))}
+    end
+  end
+
+  defp save_channel(socket, :edit_channel, params) do
+    channel = socket.assigns.editing_channel
+
+    if is_nil(channel) do
+      {:noreply, socket}
+    else
+      case Channels.update_channel(socket.assigns.current_scope, channel.id, params) do
+        {:ok, updated} ->
+          socket =
+            socket
+            |> refresh_channels()
+            |> maybe_replace_active_channel(updated)
+
+          {:noreply, push_patch(socket, to: overlay_return_path(socket))}
+
+        {:error, :unauthorized} ->
+          {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+
+        {:error, changeset} ->
+          {:noreply, assign(socket, :channel_form, to_form(changeset, as: :channel))}
+      end
+    end
+  end
+
+  defp save_channel(socket, _action, _params), do: {:noreply, socket}
+
+  defp maybe_replace_active_channel(socket, channel) do
     active = socket.assigns.active_channel
 
-    if active && active.id == channel.id && active.slug != channel.slug do
-      push_navigate(socket, to: channel_path(socket, channel))
+    if active && active.id == channel.id do
+      assign(socket, :active_channel, channel)
     else
       socket
     end

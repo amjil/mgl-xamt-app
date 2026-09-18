@@ -14,6 +14,7 @@ const SCROLL_CONTAINERS = [
   ".xamt-upload-preview",
   ".xamt-message__content",
   ".xamt-settings-panel",
+  ".xamt-sheet__body",
 ].join(", ")
 
 /** Surfaces that intentionally scroll on the Y axis (Latin / horizontal-tb). */

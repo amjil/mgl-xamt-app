@@ -445,6 +445,87 @@ defmodule XamtWeb.CoreComponents do
     """
   end
 
+  @doc """
+  Renders a Mongolian-aware overlay for forms.
+
+  On small screens the panel is full-viewport so vertical-lr fields have the
+  whole width to sit left-to-right. From the 960px breakpoint it becomes a
+  large centered dialog. Candidate UI from `mgl-web-ime` mounts on `document.body`,
+  so this component does **not** use `phx-click-away`.
+  """
+  attr :id, :string, required: true
+  attr :show, :boolean, default: false
+  attr :on_cancel, JS, default: %JS{}
+  slot :inner_block, required: true
+
+  def drawer(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      phx-mounted={@show && show_drawer(@id)}
+      phx-remove={hide_drawer(@id)}
+      data-cancel={JS.concat(hide_drawer(@id), @on_cancel)}
+      class="xamt-sheet hidden"
+    >
+      <button
+        type="button"
+        id={"#{@id}-bg"}
+        class="xamt-sheet__bg"
+        aria-label={gettext("Close")}
+        phx-click={JS.exec("data-cancel", to: "##{@id}")}
+      >
+      </button>
+
+      <div class="xamt-sheet__frame">
+        <div
+          id={"#{@id}-panel"}
+          class="xamt-sheet__panel"
+          role="dialog"
+          aria-modal="true"
+          tabindex="-1"
+          phx-window-keydown={JS.exec("data-cancel", to: "##{@id}")}
+          phx-key="escape"
+        >
+          <div class="xamt-sheet__chrome">
+            <button
+              type="button"
+              id={"#{@id}-close"}
+              class="xamt-icon-btn"
+              phx-click={JS.exec("data-cancel", to: "##{@id}")}
+              aria-label={gettext("close")}
+            >
+              <.icon name="hero-x-mark" class="size-6" />
+            </button>
+          </div>
+
+          <div id={"#{@id}-body"} class="xamt-sheet__body">
+            {render_slot(@inner_block)}
+          </div>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  def show_drawer(js \\ %JS{}, id) when is_binary(id) do
+    js
+    |> JS.show(to: "##{id}")
+    |> JS.add_class("is-open", to: "##{id}")
+    |> JS.add_class("overflow-hidden", to: "body")
+    |> JS.focus_first(to: "##{id}-body")
+  end
+
+  def hide_drawer(js \\ %JS{}, id) when is_binary(id) do
+    js
+    |> JS.remove_class("is-open", to: "##{id}", time: 280)
+    |> JS.remove_class("overflow-hidden", to: "body")
+    |> JS.hide(
+      to: "##{id}",
+      time: 280,
+      transition: {"ease-in duration-200", "opacity-100", "opacity-0"}
+    )
+  end
+
   ## JS Commands
 
   def show(js \\ %JS{}, selector) do

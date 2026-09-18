@@ -166,12 +166,96 @@ defmodule XamtWeb.ServerLiveTest do
   } do
     {:ok, invite} = Servers.create_invite(scope, server.id)
     {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
-    view |> element("#toggle-server-settings") |> render_click()
+    view |> element("#server-menu-settings") |> render_click()
+    assert_patch(view, ~p"/servers/#{server.slug}/#{channel.slug}/settings")
 
+    assert has_element?(view, "#server-drawer")
     assert has_element?(view, "#copy-invite-#{invite.id}")
     html = render(view)
     assert html =~ "/invite/#{invite.code}"
     assert html =~ ~s(data-copy=")
+  end
+
+  test "admin can open the create-channel drawer from the plus control", %{
+    conn: conn,
+    server: server,
+    channel: channel
+  } do
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    refute has_element?(view, "#create-channel-form")
+
+    view |> element("#toggle-channel-form") |> render_click()
+    assert_patch(view, ~p"/servers/#{server.slug}/#{channel.slug}/new")
+    assert has_element?(view, "#server-drawer")
+    assert has_element?(view, "#create-channel-form")
+    assert has_element?(view, "#channel_name")
+  end
+
+  test "create channel drawer submits and patches to the new channel", %{
+    conn: conn,
+    server: server,
+    channel: channel
+  } do
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}/new")
+    assert has_element?(view, "#create-channel-form")
+
+    view
+    |> form("#create-channel-form", %{channel: %{name: "random"}})
+    |> render_submit()
+
+    assert_patch(view, ~p"/servers/#{server.slug}/random")
+    refute has_element?(view, "#create-channel-form")
+    html = render(view)
+    assert html =~ "random"
+  end
+
+  test "cancel closes the create-channel drawer", %{
+    conn: conn,
+    server: server,
+    channel: channel
+  } do
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}/new")
+    view |> element("#create-channel-form-cancel") |> render_click()
+    assert_patch(view, ~p"/servers/#{server.slug}/#{channel.slug}")
+    refute has_element?(view, "#create-channel-form")
+  end
+
+  test "edit channel drawer can rename a channel", %{
+    conn: conn,
+    server: server,
+    channel: channel
+  } do
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    view |> element("#edit-channel-#{channel.id}") |> render_click()
+    assert_patch(view, ~p"/servers/#{server.slug}/#{channel.slug}/edit/#{channel.slug}")
+    assert has_element?(view, "#edit-channel-form")
+
+    view
+    |> form("#edit-channel-form", %{channel: %{name: "renamed"}})
+    |> render_submit()
+
+    assert_patch(view, ~p"/servers/#{server.slug}/renamed")
+    html = render(view)
+    assert html =~ "renamed"
+  end
+
+  test "members cannot open the create-channel drawer", %{
+    conn: _conn,
+    server: server,
+    channel: channel
+  } do
+    member = user_fixture()
+    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(member), server.id)
+    member_conn = log_in_user(build_conn(), member)
+
+    {:ok, view, _html} = live(member_conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    refute has_element?(view, "#toggle-channel-form")
+    refute has_element?(view, "#server-menu")
+
+    assert {:error, {:live_redirect, %{to: to}}} =
+             live(member_conn, ~p"/servers/#{server.slug}/#{channel.slug}/new")
+
+    assert to == ~p"/servers/#{server.slug}/#{channel.slug}"
   end
 
   test "invite live redeems a code", %{scope: scope, server: server} do
