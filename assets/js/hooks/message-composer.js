@@ -159,9 +159,15 @@ export const MessageComposer = {
       provider: imeProvider(),
       mount: document.body,
     })
-    suppressSystemKeyboard(this.host)
-    this._onEditableFocus = (e) => suppressSystemKeyboard(e.target)
-    this.host.addEventListener("focusin", this._onEditableFocus)
+    if (this.ime.keyboardMode === "virtual") {
+      suppressSystemKeyboard(this.host)
+      this._onEditableFocus = (e) => suppressSystemKeyboard(e.target)
+      this.host.addEventListener("focusin", this._onEditableFocus)
+    }
+    this._onHostPointer = () => {
+      if (!this.host.contains(document.activeElement)) this.editor.focus()
+    }
+    this.host.addEventListener("pointerdown", this._onHostPointer)
     this._detachKeyboard = attachVirtualKeyboard(this.ime)
 
     // Send lives in the toolbar, outside this hook's phx-update="ignore"
@@ -239,6 +245,7 @@ export const MessageComposer = {
     window.removeEventListener("online", this._onOnline)
     this.host?.removeEventListener("paste", this._onPaste, true)
     this.host?.removeEventListener("focusin", this._onEditableFocus)
+    this.host?.removeEventListener("pointerdown", this._onHostPointer)
     this._detachKeyboard?.()
     if (this.ime && typeof this.ime.destroy === "function") this.ime.destroy()
   },

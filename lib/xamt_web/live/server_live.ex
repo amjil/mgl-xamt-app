@@ -493,7 +493,16 @@ defmodule XamtWeb.ServerLive do
 
   def handle_event("set_mobile_panel", %{"panel" => panel}, socket)
       when panel in @mobile_panels do
-    {:noreply, assign(socket, :mobile_panel, String.to_existing_atom(panel))}
+    requested = String.to_existing_atom(panel)
+
+    next =
+      if socket.assigns.mobile_panel == requested do
+        :messages
+      else
+        requested
+      end
+
+    {:noreply, assign(socket, :mobile_panel, next)}
   end
 
   def handle_event("set_mobile_panel", _params, socket), do: {:noreply, socket}

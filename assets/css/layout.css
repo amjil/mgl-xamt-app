@@ -645,7 +645,7 @@ img.xamt-message__avatar {
 }
 
 /* --------------------------------------
-   Responsive: 1200 (tighten) → 960 (rails become drawers) → 640 (phone)
+   Responsive: 1440 (channel/member drawers) → 960 (mobile drawers) → 640 (phone)
    -------------------------------------- */
 
 @media (max-width: 960px) {

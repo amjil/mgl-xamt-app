@@ -351,4 +351,19 @@ defmodule XamtWeb.ServerLiveTest do
     assert has_element?(view, ".xamt-app--panel-messages")
     refute has_element?(view, "#drawer-backdrop")
   end
+
+  test "clicking the open panel button again closes the drawer", %{
+    conn: conn,
+    server: server,
+    channel: channel
+  } do
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    view |> element("#mobile-nav-members") |> render_click()
+    assert has_element?(view, ".xamt-app--panel-members")
+
+    view |> element("#mobile-nav-members") |> render_click()
+    assert has_element?(view, ".xamt-app--panel-messages")
+    refute has_element?(view, "#drawer-backdrop")
+  end
 end
