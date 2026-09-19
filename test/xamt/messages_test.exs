@@ -30,6 +30,71 @@ defmodule Xamt.MessagesTest do
     loaded = Messages.get_message!(reply.id)
     assert loaded.reply_to_id == parent.id
     assert loaded.reply_to.id == parent.id
+    assert Ecto.assoc_loaded?(loaded.user)
+    assert Ecto.assoc_loaded?(loaded.reply_to.user)
+    assert loaded.reply_to.user.id == parent.user_id
+
+    # Broadcast payload must already include the nested author — LiveView
+    # renders "replied to @someone" from `message.reply_to.user`.
+    assert Ecto.assoc_loaded?(reply.user)
+    assert Ecto.assoc_loaded?(reply.reply_to)
+    assert Ecto.assoc_loaded?(reply.reply_to.user)
+    assert reply.reply_to.user.id == parent.user_id
+  end
+
+  test "list_messages join-preloads authors and quoted authors without N+1", %{
+    scope: scope,
+    channel: channel,
+    server: server,
+    owner: owner
+  } do
+    parent_author =
+      Xamt.AccountsFixtures.user_fixture(%{
+        username: "quoted#{System.unique_integer() |> abs()}"
+      })
+
+    {:ok, _} = Servers.join_server(Scope.for_user(parent_author), server.id)
+
+    {:ok, parent} =
+      Messages.create_message(Scope.for_user(parent_author), channel.id, %{
+        "content_html" => "<p>parent</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    for i <- 1..5 do
+      {:ok, _} =
+        Messages.create_message(scope, channel.id, %{
+          "content_html" => "<p>reply #{i}</p>",
+          "content" => %{"type" => "rich_text"},
+          "reply_to_id" => parent.id
+        })
+    end
+
+    {messages, query_count} = with_query_count(fn -> Messages.list_messages(channel.id) end)
+
+    assert length(messages) == 6
+
+    root = Enum.find(messages, &(&1.id == parent.id))
+    assert Ecto.assoc_loaded?(root.user)
+    assert root.user.id == parent_author.id
+    assert is_nil(root.reply_to)
+    assert Ecto.assoc_loaded?(root.mentions)
+
+    replies = Enum.filter(messages, &(&1.reply_to_id == parent.id))
+    assert length(replies) == 5
+
+    Enum.each(replies, fn reply ->
+      assert Ecto.assoc_loaded?(reply.user)
+      assert reply.user.id == owner.id
+      assert Ecto.assoc_loaded?(reply.reply_to)
+      assert Ecto.assoc_loaded?(reply.reply_to.user)
+      assert reply.reply_to.user.id == parent_author.id
+      assert Ecto.assoc_loaded?(reply.mentions)
+    end)
+
+    # One joined SELECT for message+user+reply_to+reply_to.user, one for mentions.
+    # Query count must not grow with the number of replies.
+    assert query_count == 2
   end
 
   test "toggles a reaction and summarises it", %{scope: scope, channel: channel, owner: owner} do
@@ -273,5 +338,36 @@ defmodule Xamt.MessagesTest do
 
     assert {:error, :deleted} =
              Messages.toggle_reaction(scope, message.id, hd(Reaction.emojis()))
+  end
+
+  defp with_query_count(fun) do
+    parent = self()
+    handler_id = "query-count-#{System.unique_integer([:positive])}"
+
+    :ok =
+      :telemetry.attach(
+        handler_id,
+        [:xamt, :repo, :query],
+        fn _event, _meas, _meta, _config -> send(parent, :repo_query) end,
+        nil
+      )
+
+    try do
+      result = fun.()
+      {result, drain_query_count(0)}
+    after
+      :telemetry.detach(handler_id)
+
+      # Drop any leftover counts so they cannot leak into later tests.
+      drain_query_count(0)
+    end
+  end
+
+  defp drain_query_count(n) do
+    receive do
+      :repo_query -> drain_query_count(n + 1)
+    after
+      0 -> n
+    end
   end
 end

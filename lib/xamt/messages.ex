@@ -14,7 +14,6 @@ defmodule Xamt.Messages do
   alias Xamt.Messages.{Mention, Message, RateLimiter, Reaction}
 
   @default_limit 50
-  @preloads [:user, :mentions, reply_to: :user]
   @mention_tag_re ~r/<(span|a)\b([^>]*\bdata-mention-id=["']([^"']+)["'][^>]*)>(.*?)<\/\1>/si
   @mention_id_re ~r/data-mention-id=["']([0-9a-fA-F-]{36})["']/
 
@@ -42,7 +41,7 @@ defmodule Xamt.Messages do
                {:ok, message}
              end
            end) do
-      message = message |> Repo.preload(@preloads, force: true) |> attach_mention_ids()
+      message = preload_message!(message)
       LastMessageCache.put(channel_id, message.id, message.inserted_at)
       broadcast(channel_id, :new_message, strip_for_broadcast(message))
       Xamt.Messages.LinkPreview.maybe_fetch_and_update(message)
@@ -79,7 +78,7 @@ defmodule Xamt.Messages do
                  {:ok, message}
                end
              end) do
-        message = message |> Repo.preload(@preloads, force: true) |> attach_mention_ids()
+        message = preload_message!(message)
         broadcast(message.channel_id, :updated_message, strip_for_broadcast(message))
         Xamt.Messages.LinkPreview.maybe_fetch_and_update(message)
         Xamt.Notifications.WebPush.notify_mentions(message, except: previous_mention_ids)
@@ -102,7 +101,7 @@ defmodule Xamt.Messages do
            message
            |> Message.delete_changeset()
            |> Repo.update() do
-      message = message |> Repo.preload(@preloads, force: true) |> attach_mention_ids()
+      message = preload_message!(message)
       LastMessageCache.refresh(message.channel_id)
       broadcast(message.channel_id, :deleted_message, strip_for_broadcast(message))
       {:ok, message}
@@ -116,23 +115,22 @@ defmodule Xamt.Messages do
     before_id = Keyword.get(opts, :before_id)
     before_time = Keyword.get(opts, :before_time)
 
-    query =
-      from m in Message,
-        where: m.channel_id == ^channel_id,
-        order_by: [desc: m.inserted_at, desc: m.id],
-        limit: ^limit,
-        preload: ^@preloads
-
-    query = apply_pagination(query, before_id, before_time)
-
-    query
+    from(m in Message, where: m.channel_id == ^channel_id)
+    |> apply_pagination(before_id, before_time)
+    |> with_assoc_joins()
+    |> order_by([m], desc: m.inserted_at, desc: m.id)
+    |> limit(^limit)
     |> Repo.all()
     |> Enum.map(&attach_mention_ids/1)
     |> Enum.reverse()
   end
 
-  def get_message!(id),
-    do: Repo.get!(Message, id) |> Repo.preload(@preloads) |> attach_mention_ids()
+  def get_message!(id) do
+    from(m in Message, where: m.id == ^id)
+    |> with_assoc_joins()
+    |> Repo.one!()
+    |> attach_mention_ids()
+  end
 
   @doc """
   Stores Open Graph data on a message without bumping `updated_at`.
@@ -327,26 +325,49 @@ defmodule Xamt.Messages do
     end)
   end
 
+  # Join-bind belongs_to associations so list/get is one round-trip for the
+  # message, author, quoted message, and quoted author. `mentions` stays a
+  # separate preload: joining has_many would cartesian-expand the page.
+  # Reactions are the same shape, but the UI needs `{emoji => [user_id]}`
+  # so `reaction_summary/1` issues one aggregated query instead of loading
+  # `reactions: :user` structs.
+  defp with_assoc_joins(query) do
+    from m in query,
+      join: u in assoc(m, :user),
+      left_join: r in assoc(m, :reply_to),
+      left_join: ru in assoc(r, :user),
+      preload: [:mentions, user: u, reply_to: {r, user: ru}]
+  end
+
+  # Reload after insert/update/delete so PubSub payloads include nested
+  # `reply_to.user` (the quote chip renders "replied to @someone").
+  defp preload_message!(%Message{id: id}), do: get_message!(id)
+
   defp apply_pagination(query, before_id, before_time) do
     cond do
       before_id && before_time ->
-        from m in query,
-          where:
-            m.inserted_at < ^before_time or
-              (m.inserted_at == ^before_time and m.id < ^before_id)
+        where(
+          query,
+          [m],
+          m.inserted_at < ^before_time or
+            (m.inserted_at == ^before_time and m.id < ^before_id)
+        )
 
       before_id ->
         case Repo.get(Message, before_id) do
           %Message{inserted_at: ts, id: id} ->
-            from m in query,
-              where: m.inserted_at < ^ts or (m.inserted_at == ^ts and m.id < ^id)
+            where(
+              query,
+              [m],
+              m.inserted_at < ^ts or (m.inserted_at == ^ts and m.id < ^id)
+            )
 
           nil ->
             query
         end
 
       before_time ->
-        from m in query, where: m.inserted_at < ^before_time
+        where(query, [m], m.inserted_at < ^before_time)
 
       true ->
         query
