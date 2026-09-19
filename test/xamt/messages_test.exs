@@ -135,4 +135,90 @@ defmodule Xamt.MessagesTest do
       Application.put_env(:xamt, RateLimiter, previous)
     end
   end
+
+  test "stores mentions of server members and rewrites the chip HTML", %{
+    scope: scope,
+    channel: channel,
+    server: server
+  } do
+    target =
+      Xamt.AccountsFixtures.user_fixture(%{
+        username: "bob#{System.unique_integer() |> abs()}",
+        display_name: "Bob"
+      })
+
+    {:ok, _} = Servers.join_server(Scope.for_user(target), server.id)
+
+    html =
+      ~s[<p>hey <span class="evil" onclick="alert(1)" data-mention-id="#{target.id}">@wrong</span></p>]
+
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => html,
+        "content" => %{"type" => "rich_text"}
+      })
+
+    assert message.mentioned_user_ids == [target.id]
+    assert message.content_html =~ ~s(class="xamt-mention mongol-text")
+    assert message.content_html =~ ~s(data-mention-id="#{target.id}")
+    assert message.content_html =~ ~s(data-mention-username="#{target.username}")
+    assert message.content_html =~ "@#{target.username}"
+    refute message.content_html =~ "onclick"
+    refute message.content_html =~ "@wrong"
+    assert message.content_html =~ ~s(href="/profile/#{target.username}")
+  end
+
+  test "drops mentions of users who are not members", %{
+    scope: scope,
+    channel: channel
+  } do
+    outsider =
+      Xamt.AccountsFixtures.user_fixture(%{username: "out#{System.unique_integer() |> abs()}"})
+
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" =>
+          ~s(<p>hey <span data-mention-id="#{outsider.id}">@#{outsider.username}</span></p>),
+        "content" => %{"type" => "rich_text"}
+      })
+
+    assert message.mentioned_user_ids == []
+    refute message.content_html =~ "data-mention-id"
+    assert message.content_html =~ "@#{outsider.username}"
+  end
+
+  test "replaces mention rows when a message is edited", %{
+    scope: scope,
+    channel: channel,
+    server: server
+  } do
+    first =
+      Xamt.AccountsFixtures.user_fixture(%{username: "one#{System.unique_integer() |> abs()}"})
+
+    second =
+      Xamt.AccountsFixtures.user_fixture(%{username: "two#{System.unique_integer() |> abs()}"})
+
+    {:ok, _} = Servers.join_server(Scope.for_user(first), server.id)
+    {:ok, _} = Servers.join_server(Scope.for_user(second), server.id)
+
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" =>
+          ~s(<p><span data-mention-id="#{first.id}">@#{first.username}</span></p>),
+        "content" => %{"type" => "rich_text"}
+      })
+
+    assert message.mentioned_user_ids == [first.id]
+
+    {:ok, updated} =
+      Messages.update_message(scope, message.id, %{
+        "content_html" =>
+          ~s(<p><span data-mention-id="#{second.id}">@#{second.username}</span></p>),
+        "content" => %{"type" => "rich_text"}
+      })
+
+    assert updated.mentioned_user_ids == [second.id]
+    assert updated.content_html =~ "@#{second.username}"
+    refute updated.content_html =~ first.username
+  end
 end

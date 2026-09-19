@@ -93,6 +93,7 @@
   --xamt-z-nav: 40;
   --xamt-z-sheet: 45;
   --xamt-z-toast: 50;
+  --xamt-z-mention: 10050;
 }
 
 :root.dark {

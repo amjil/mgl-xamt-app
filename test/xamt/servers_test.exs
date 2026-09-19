@@ -88,4 +88,28 @@ defmodule Xamt.ServersTest do
     [only] = Channels.list_channels(server.id)
     assert {:error, :last_channel} = Channels.delete_channel(scope, only.id)
   end
+
+  test "search_members matches username and display name", %{
+    owner_scope: owner_scope,
+    server: server
+  } do
+    username = "alice#{System.unique_integer() |> abs()}"
+
+    target =
+      Xamt.AccountsFixtures.user_fixture(%{username: username, display_name: "MentionTarget"})
+
+    {:ok, _} = Servers.join_server(Scope.for_user(target), server.id)
+
+    by_username = Servers.search_members(server.id, username)
+    assert Enum.any?(by_username, &(&1.user_id == target.id))
+
+    by_name = Servers.search_members(server.id, "MentionTarget")
+    assert Enum.any?(by_name, &(&1.user_id == target.id))
+
+    empty = Servers.search_members(server.id, "")
+    assert length(empty) >= 1
+    assert hd(empty).user_id == owner_scope.user.id
+
+    assert Servers.search_members(server.id, "no-such-member") == []
+  end
 end

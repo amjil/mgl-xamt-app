@@ -366,4 +366,51 @@ defmodule XamtWeb.ServerLiveTest do
     assert has_element?(view, ".xamt-app--panel-messages")
     refute has_element?(view, "#drawer-backdrop")
   end
+
+  test "mention_search replies with matching members", %{
+    conn: conn,
+    server: server,
+    channel: channel
+  } do
+    username = "pat#{System.unique_integer() |> abs()}"
+    target = user_fixture(%{username: username, display_name: "Pat"})
+    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(target), server.id)
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    html = render_hook(view, "mention_search", %{"q" => username})
+    assert html
+  end
+
+  test "a mention chip is highlighted for the mentioned user", %{
+    conn: conn,
+    server: server,
+    channel: channel
+  } do
+    username = "mia#{System.unique_integer() |> abs()}"
+    mentioned = user_fixture(%{username: username, display_name: "Mia"})
+    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(mentioned), server.id)
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    render_hook(view, "send_message", %{
+      "content_html" => ~s(<p>hi <span data-mention-id="#{mentioned.id}">@#{username}</span></p>),
+      "content_json" => ~s({"type":"rich_text","blocks":[]}),
+      "content_type" => "rich_text"
+    })
+
+    html = render(view)
+    assert html =~ "xamt-mention"
+    assert html =~ "@#{username}"
+    refute html =~ "xamt-message--mentioned"
+
+    mentioned_conn = log_in_user(build_conn(), mentioned)
+
+    {:ok, mentioned_view, mentioned_html} =
+      live(mentioned_conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    assert has_element?(mentioned_view, "article.xamt-message--mentioned")
+    assert has_element?(mentioned_view, "a.xamt-mention")
+    assert mentioned_html =~ ~s(data-you="true")
+    assert mentioned_html =~ ~s(href="/profile/#{username}")
+  end
 end

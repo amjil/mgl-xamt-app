@@ -6,31 +6,43 @@ defmodule Xamt.Messages do
   import Ecto.Query, warn: false
 
   alias Xamt.Accounts.Scope
+  alias Xamt.Accounts.User
+  alias Xamt.Channels.Channel
   alias Xamt.Channels.LastMessageCache
   alias Xamt.Repo
-  alias Xamt.Messages.{Message, RateLimiter, Reaction}
+  alias Xamt.Servers.ServerMember
+  alias Xamt.Messages.{Mention, Message, RateLimiter, Reaction}
 
   @default_limit 50
-  @preloads [:user, reply_to: :user]
+  @preloads [:user, :mentions, reply_to: :user]
+  @mention_tag_re ~r/<(span|a)\b([^>]*\bdata-mention-id=["']([^"']+)["'][^>]*)>(.*?)<\/\1>/si
+  @mention_id_re ~r/data-mention-id=["']([0-9a-fA-F-]{36})["']/
 
   def create_message(%Scope{user: user}, channel_id, attrs) when is_map(attrs) do
     content = build_content(attrs)
-    content_html = Map.get(attrs, "content_html") || Map.get(attrs, :content_html)
+    raw_html = Map.get(attrs, "content_html") || Map.get(attrs, :content_html)
+    {content_html, mention_ids} = prepare_mentions(raw_html, channel_id)
 
     with :ok <- RateLimiter.check_rate(user.id),
          {:ok, message} <-
-           %Message{}
-           |> Message.changeset(%{
-             channel_id: channel_id,
-             user_id: user.id,
-             content: content,
-             content_type: content_type(attrs, content),
-             content_html: content_html,
-             search_text: search_normalize(plain_text(content_html)),
-             reply_to_id: Map.get(attrs, "reply_to_id") || Map.get(attrs, :reply_to_id)
-           })
-           |> Repo.insert() do
-      message = Repo.preload(message, @preloads)
+           Repo.transact(fn ->
+             with {:ok, message} <-
+                    %Message{}
+                    |> Message.changeset(%{
+                      channel_id: channel_id,
+                      user_id: user.id,
+                      content: content,
+                      content_type: content_type(attrs, content),
+                      content_html: content_html,
+                      search_text: search_normalize(plain_text(content_html)),
+                      reply_to_id: Map.get(attrs, "reply_to_id") || Map.get(attrs, :reply_to_id)
+                    })
+                    |> Repo.insert(),
+                  :ok <- replace_mentions(message.id, mention_ids) do
+               {:ok, message}
+             end
+           end) do
+      message = message |> Repo.preload(@preloads, force: true) |> attach_mention_ids()
       LastMessageCache.put(channel_id, message.id, message.inserted_at)
       broadcast(channel_id, :new_message, strip_for_broadcast(message))
       {:ok, message}
@@ -45,20 +57,28 @@ defmodule Xamt.Messages do
     else
       content = build_content(attrs, message.content)
 
-      content_html =
+      raw_html =
         Map.get(attrs, "content_html") || Map.get(attrs, :content_html) ||
           message.content_html
 
+      {content_html, mention_ids} = prepare_mentions(raw_html, message.channel_id)
+
       with {:ok, message} <-
-             message
-             |> Message.changeset(%{
-               content: content,
-               content_type: content_type(attrs, content),
-               content_html: content_html,
-               search_text: search_normalize(plain_text(content_html))
-             })
-             |> Repo.update() do
-        message = Repo.preload(message, @preloads)
+             Repo.transact(fn ->
+               with {:ok, message} <-
+                      message
+                      |> Message.changeset(%{
+                        content: content,
+                        content_type: content_type(attrs, content),
+                        content_html: content_html,
+                        search_text: search_normalize(plain_text(content_html))
+                      })
+                      |> Repo.update(),
+                    :ok <- replace_mentions(message.id, mention_ids) do
+                 {:ok, message}
+               end
+             end) do
+        message = message |> Repo.preload(@preloads, force: true) |> attach_mention_ids()
         broadcast(message.channel_id, :updated_message, strip_for_broadcast(message))
         {:ok, message}
       end
@@ -99,10 +119,12 @@ defmodule Xamt.Messages do
 
     query
     |> Repo.all()
+    |> Enum.map(&attach_mention_ids/1)
     |> Enum.reverse()
   end
 
-  def get_message!(id), do: Repo.get!(Message, id) |> Repo.preload(@preloads)
+  def get_message!(id),
+    do: Repo.get!(Message, id) |> Repo.preload(@preloads) |> attach_mention_ids()
 
   @doc """
   Plain text of a message, used for reply previews and search indexing.
@@ -334,7 +356,115 @@ defmodule Xamt.Messages do
         other -> other
       end
 
+    message = attach_mention_ids(message)
+
     %{message | content: %{}, reply_to: reply_to}
+  end
+
+  defp attach_mention_ids(%Message{} = message) do
+    ids =
+      case message.mentions do
+        mentions when is_list(mentions) -> Enum.map(mentions, & &1.user_id)
+        _ -> message.mentioned_user_ids || []
+      end
+
+    %{message | mentioned_user_ids: ids}
+  end
+
+  defp attach_mention_ids(other), do: other
+
+  defp prepare_mentions(html, channel_id) when is_binary(html) and is_binary(channel_id) do
+    server_id = channel_server_id(channel_id)
+    ids = extract_mention_ids(html)
+    users = mentionable_users(server_id, ids)
+    {rewrite_mention_tags(html, users), Map.keys(users)}
+  end
+
+  defp prepare_mentions(_html, _channel_id), do: {"", []}
+
+  defp extract_mention_ids(html) do
+    @mention_id_re
+    |> Regex.scan(html)
+    |> Enum.map(fn [_, id] -> id end)
+    |> Enum.uniq()
+    |> Enum.filter(&valid_uuid?/1)
+  end
+
+  defp valid_uuid?(id) do
+    match?({:ok, _}, Ecto.UUID.cast(id))
+  end
+
+  defp mentionable_users(_server_id, []), do: %{}
+
+  defp mentionable_users(server_id, ids) when is_binary(server_id) do
+    from(u in User,
+      join: m in ServerMember,
+      on: m.user_id == u.id,
+      where: m.server_id == ^server_id and u.id in ^ids,
+      select: u
+    )
+    |> Repo.all()
+    |> Map.new(&{&1.id, &1})
+  end
+
+  defp mentionable_users(_server_id, _ids), do: %{}
+
+  defp rewrite_mention_tags(html, users_by_id) do
+    Regex.replace(@mention_tag_re, html, fn _full, _tag, _attrs, id, inner ->
+      case Map.get(users_by_id, id) do
+        %User{} = user -> mention_chip_html(user)
+        _ -> strip_tags(inner)
+      end
+    end)
+  end
+
+  defp mention_chip_html(%User{id: id, username: username}) do
+    safe = html_escape(username || "")
+
+    ~s(<a class="xamt-mention mongol-text" href="/profile/#{safe}" data-phx-link="redirect" data-phx-link-state="push" data-mention-id="#{id}" data-mention-username="#{safe}">@#{safe}</a>)
+  end
+
+  defp strip_tags(html) when is_binary(html) do
+    html
+    |> String.replace(~r/<[^>]+>/, "")
+    |> html_escape()
+  end
+
+  defp html_escape(text) when is_binary(text) do
+    text
+    |> String.replace("&", "&amp;")
+    |> String.replace("<", "&lt;")
+    |> String.replace(">", "&gt;")
+    |> String.replace("\"", "&quot;")
+  end
+
+  defp channel_server_id(channel_id) do
+    Repo.one(from c in Channel, where: c.id == ^channel_id, select: c.server_id)
+  end
+
+  defp replace_mentions(message_id, user_ids) do
+    from(m in Mention, where: m.message_id == ^message_id) |> Repo.delete_all()
+
+    now = DateTime.utc_now(:second)
+
+    entries =
+      user_ids
+      |> Enum.uniq()
+      |> Enum.map(fn user_id ->
+        %{
+          id: Ecto.UUID.generate(),
+          message_id: message_id,
+          user_id: user_id,
+          inserted_at: now,
+          updated_at: now
+        }
+      end)
+
+    if entries != [] do
+      Repo.insert_all(Mention, entries)
+    end
+
+    :ok
   end
 
   defp broadcast(channel_id, event, message) do

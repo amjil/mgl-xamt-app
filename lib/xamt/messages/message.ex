@@ -10,10 +10,12 @@ defmodule Xamt.Messages.Message do
     field :content_html, :string
     field :search_text, :string
     field :deleted_at, :utc_datetime
+    field :mentioned_user_ids, {:array, :binary_id}, virtual: true, default: []
 
     belongs_to :channel, Xamt.Channels.Channel
     belongs_to :user, Xamt.Accounts.User
     belongs_to :reply_to, Xamt.Messages.Message, foreign_key: :reply_to_id
+    has_many :mentions, Xamt.Messages.Mention
 
     timestamps(type: :utc_datetime)
   end

@@ -224,6 +224,39 @@ defmodule Xamt.Servers do
   end
 
   @doc """
+  Members whose username or display name contains `query`.
+
+  An empty query returns the earliest members of the server, used for the
+  mention picker right after `@`.
+  """
+  def search_members(server_id, query, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 8)
+    q = query |> to_string() |> String.trim()
+
+    base =
+      from(m in ServerMember,
+        join: u in assoc(m, :user),
+        where: m.server_id == ^server_id,
+        order_by: [asc: m.inserted_at],
+        limit: ^limit,
+        preload: [user: u]
+      )
+
+    query =
+      if q == "" do
+        base
+      else
+        from([m, u] in base,
+          where:
+            fragment("strpos(lower(?), lower(?)) > 0", u.username, ^q) or
+              fragment("strpos(lower(coalesce(?, '')), lower(?)) > 0", u.display_name, ^q)
+        )
+      end
+
+    Repo.all(query)
+  end
+
+  @doc """
   Removes a member. Owners cannot be kicked, and admins cannot kick each other.
   """
   def kick_member(%Scope{user: actor}, server_id, user_id) do

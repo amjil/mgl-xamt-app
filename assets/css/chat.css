@@ -682,6 +682,68 @@
   object-fit: contain;
 }
 
+.xamt-mention-picker {
+  position: fixed;
+  z-index: var(--xamt-z-mention);
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  min-inline-size: 8rem;
+  max-inline-size: min(18rem, calc(var(--xamt-vh) - 2rem));
+  max-block-size: min(10rem, 40vw);
+  overflow: auto;
+  padding: 0.55rem 0.45rem;
+  border: 1px solid var(--xamt-line-strong);
+  border-radius: var(--xamt-radius);
+  background: color-mix(in srgb, var(--xamt-bg-2) 96%, var(--xamt-shade));
+  box-shadow: var(--xamt-shadow);
+  animation: xamt-fade-in 140ms ease;
+  font-family: var(--xamt-font-mongol);
+}
+
+.xamt-mention-picker[hidden] {
+  display: none;
+}
+
+.xamt-mention-picker__row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.35rem;
+  border: 0;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: start;
+  font: inherit;
+}
+
+.xamt-mention-picker__row:hover,
+.xamt-mention-picker__row.is-selected {
+  background: var(--xamt-accent-soft);
+}
+
+.xamt-mention-picker__avatar {
+  flex: 0 0 auto;
+}
+
+.xamt-mention-picker__name {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.xamt-mention-picker__handle {
+  flex: 0 0 auto;
+  color: var(--xamt-muted);
+  font-size: 0.85rem;
+}
+
 .xamt-composer__editor {
   inline-size: 100%;
   block-size: 12rem;

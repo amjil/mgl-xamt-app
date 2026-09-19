@@ -10,6 +10,7 @@ import { OfflineStore, toast } from "../utils/offline-store.js"
 import { highlightMessage as flashHighlight } from "../utils/highlight-message.js"
 import { attachMessageScrollLock } from "./message-scroll.js"
 import { attachReadReceipt } from "./read-receipt.js"
+import { attachMentionAutocomplete, hydrateMentions } from "./mention-autocomplete.js"
 
 function editorRoot(editorEl) {
   return editorEl?.querySelector?.(".editor-content") || editorEl
@@ -148,8 +149,9 @@ export const MessageComposer = {
       )
     }
 
+    this.adapter = buildEditorAdapter(this._root)
     this.ime = new MglIME({
-      adapter: buildEditorAdapter(this._root),
+      adapter: this.adapter,
       // Without a target, desktop IME handles every window keydown and the
       // adapter's insertText() focuses this editor — stealing caret from
       // search / other inputs that also have an IME instance.
@@ -223,8 +225,11 @@ export const MessageComposer = {
     this.handleEvent("composer:focus", () => this.editor.focus())
     this.handleEvent("composer:load", ({ html }) => {
       if (html != null) this.editor.setHtml(html)
+      hydrateMentions(this._root())
       this.editor.focus()
     })
+
+    this._detachMentions = attachMentionAutocomplete(this)
 
     // Flush any messages left from a previous session once LiveView is up
     this.flushOfflineQueue()
@@ -246,6 +251,7 @@ export const MessageComposer = {
     this.host?.removeEventListener("paste", this._onPaste, true)
     this.host?.removeEventListener("focusin", this._onEditableFocus)
     this.host?.removeEventListener("pointerdown", this._onHostPointer)
+    this._detachMentions?.()
     this._detachKeyboard?.()
     if (this.ime && typeof this.ime.destroy === "function") this.ime.destroy()
   },

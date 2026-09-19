@@ -478,6 +478,32 @@ defmodule XamtWeb.ServerLive do
     {:noreply, socket}
   end
 
+  def handle_event("mention_search", params, socket) do
+    q = params["q"] || params[:q] || ""
+
+    members =
+      if socket.assigns[:member?] && socket.assigns[:server] do
+        Servers.search_members(socket.assigns.server.id, q, limit: 8)
+      else
+        []
+      end
+
+    online_names =
+      socket.assigns
+      |> Map.get(:online_users, [])
+      |> Enum.map(& &1.username)
+      |> MapSet.new()
+
+    rows =
+      members
+      |> Enum.sort_by(fn member ->
+        if MapSet.member?(online_names, member.user.username), do: 0, else: 1
+      end)
+      |> Enum.map(&mention_search_row/1)
+
+    {:reply, %{members: rows}, socket}
+  end
+
   def handle_event("typing_stopped", _params, socket) do
     channel = socket.assigns.active_channel
     user = socket.assigns.current_scope.user
@@ -1032,7 +1058,10 @@ defmodule XamtWeb.ServerLive do
                 <article
                   :for={{dom_id, message} <- @streams.messages}
                   id={dom_id}
-                  class="xamt-message"
+                  class={[
+                    "xamt-message",
+                    mentioned?(message, @current_scope.user) && "xamt-message--mentioned"
+                  ]}
                   data-message-id={message.id}
                   data-inserted-at={DateTime.to_iso8601(message.inserted_at)}
                 >
@@ -1068,7 +1097,7 @@ defmodule XamtWeb.ServerLive do
                       id={"msg-content-#{message.id}"}
                       class="xamt-message__content mongol-text"
                     >
-                      {raw(safe_html(message))}
+                      {raw(safe_html(message, @current_scope.user.id))}
                     </div>
                     <div class="xamt-reactions">
                       <button
@@ -1756,13 +1785,44 @@ defmodule XamtWeb.ServerLive do
 
   defp edited?(_), do: false
 
-  defp safe_html(%{content_html: html}) when is_binary(html) and html != "", do: html
-  defp safe_html(%{content: %{"html" => html}}) when is_binary(html), do: html
+  defp mentioned?(%{mentioned_user_ids: ids}, %{id: user_id})
+       when is_list(ids) and is_binary(user_id),
+       do: user_id in ids
 
-  defp safe_html(%{content: content}) when is_map(content),
+  defp mentioned?(_, _), do: false
+
+  defp mention_search_row(%{user: user}) do
+    %{
+      id: user.id,
+      username: user.username,
+      display_name: display_name(user),
+      avatar: user.avatar
+    }
+  end
+
+  defp safe_html(message, current_user_id)
+
+  defp safe_html(%{content_html: html}, current_user_id)
+       when is_binary(html) and html != "",
+       do: decorate_own_mentions(html, current_user_id)
+
+  defp safe_html(%{content: %{"html" => html}}, current_user_id) when is_binary(html),
+    do: decorate_own_mentions(html, current_user_id)
+
+  defp safe_html(%{content: content}, _current_user_id) when is_map(content),
     do: Phoenix.HTML.html_escape(inspect(content))
 
-  defp safe_html(_), do: ""
+  defp safe_html(_, _), do: ""
+
+  defp decorate_own_mentions(html, user_id) when is_binary(html) and is_binary(user_id) do
+    String.replace(
+      html,
+      ~s(data-mention-id="#{user_id}"),
+      ~s(data-mention-id="#{user_id}" data-you="true")
+    )
+  end
+
+  defp decorate_own_mentions(html, _), do: html
 
   defp typing_label(typing_users) do
     names = Map.values(typing_users) |> Enum.join(", ")
