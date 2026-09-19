@@ -1088,10 +1088,10 @@ defmodule XamtWeb.ServerLive do
                     </button>
                     <header class="xamt-message__meta">
                       <strong class="mongol-text">{display_name(message.user)}</strong>
-                      <time class="xamt-upright">{format_time(message.inserted_at)}</time>
                       <span :if={edited?(message)} class="xamt-message__edited">
                         {gettext("edited")}
                       </span>
+                      <time class="xamt-message__time">{format_time(message.inserted_at)}</time>
                     </header>
                     <div
                       id={"msg-content-#{message.id}"}

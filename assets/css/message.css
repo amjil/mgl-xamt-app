@@ -129,6 +129,7 @@
 }
 
 .xamt-message {
+  position: relative;
   display: flex;
   flex-direction: row;
   gap: 0.75rem;
@@ -179,13 +180,35 @@
   display: flex;
   flex-direction: row;
   gap: 0.5rem;
-  align-items: center;
+  align-items: flex-start;
+  align-self: stretch;
   font-size: 0.85rem;
   color: var(--xamt-muted);
 }
 
 .xamt-message__meta strong {
   color: var(--xamt-text);
+  flex: 0 0 auto;
+}
+
+.xamt-message__edited {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+}
+
+/* Rotate the whole timestamp as one run and pin it to the card foot. */
+.xamt-message__time {
+  position: absolute;
+  bottom: 0.45rem;
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: sideways;
+  -webkit-text-orientation: sideways;
+  font-family: var(--xamt-font-ui);
+  font-variant-numeric: lining-nums tabular-nums;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 /* Quoted parent, both inside a message and above the composer */
