@@ -681,7 +681,12 @@ var ImeCore = class {
     if (key && /^[1-5]$/.test(key) && hasComp) return true;
     if (hasComp && (key === "ArrowDown" || key === "PageDown")) return true;
     if (hasComp && (key === "ArrowUp" || key === "PageUp")) return true;
-    if (key === "Enter") return true;
+    if (key === "Enter") {
+      if (hasComp) return true;
+      const el = this.adapter.getElement?.();
+      if (el instanceof HTMLInputElement) return false;
+      return true;
+    }
     return false;
   }
   // ─── Composition / preview ─────────────────────────────────
@@ -967,6 +972,8 @@ var ImeCore = class {
       await this.commitCurrent({ addSpaceAfter: false });
       return true;
     }
+    const el = this.adapter.getElement?.();
+    if (el instanceof HTMLInputElement) return false;
     this.adapter.insertText("\n");
     return true;
   }

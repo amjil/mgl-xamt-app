@@ -466,7 +466,7 @@ defmodule XamtWeb.CoreComponents do
       phx-mounted={@show && show_drawer(@id)}
       phx-remove={hide_drawer(@id)}
       data-cancel={JS.concat(hide_drawer(@id), @on_cancel)}
-      class={["xamt-sheet hidden", @class]}
+      class={["xamt-sheet", @show && "is-open", not @show && "hidden", @class]}
     >
       <button
         type="button"

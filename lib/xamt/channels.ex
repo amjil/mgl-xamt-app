@@ -33,15 +33,17 @@ defmodule Xamt.Channels do
 
     if Servers.admin?(channel.server_id, user.id) do
       name = Map.get(attrs, "name") || Map.get(attrs, :name)
+      base_slug = Map.get(attrs, "slug") || Map.get(attrs, :slug) || Slug.slugify(name)
 
       channel
       |> Channel.changeset(%{
         server_id: channel.server_id,
         name: name,
-        slug: Map.get(attrs, "slug") || Map.get(attrs, :slug) || Slug.slugify(name),
+        slug: unique_channel_slug(channel.server_id, base_slug, 0, channel.id),
         type: Map.get(attrs, "type") || Map.get(attrs, :type) || channel.type
       })
       |> Repo.update()
+      |> with_visible_slug_error()
     else
       {:error, :unauthorized}
     end
@@ -116,17 +118,79 @@ defmodule Xamt.Channels do
 
   def create_channel(%Server{} = server, attrs) when is_map(attrs) do
     name = Map.get(attrs, "name") || Map.get(attrs, :name)
-    slug = Map.get(attrs, "slug") || Map.get(attrs, :slug) || Slug.slugify(name)
+    base_slug = Map.get(attrs, "slug") || Map.get(attrs, :slug) || Slug.slugify(name)
 
     %Channel{}
     |> Channel.changeset(%{
       server_id: server.id,
       name: name,
-      slug: slug,
+      slug: unique_channel_slug(server.id, base_slug),
       type: Map.get(attrs, "type") || Map.get(attrs, :type) || "text",
-      position: Map.get(attrs, "position") || Map.get(attrs, :position) || 0
+      position:
+        Map.get(attrs, "position") || Map.get(attrs, :position) ||
+          next_channel_position(server.id)
     })
     |> Repo.insert()
+    |> with_visible_slug_error()
+  end
+
+  defp unique_channel_slug(server_id, slug, attempt \\ 0, exclude_id \\ nil)
+
+  defp unique_channel_slug(_server_id, slug, attempt, _exclude_id) when attempt > 100 do
+    "#{slug}-#{System.unique_integer([:positive])}"
+  end
+
+  defp unique_channel_slug(server_id, slug, attempt, exclude_id) do
+    candidate = if attempt == 0, do: slug, else: "#{slug}-#{attempt}"
+
+    exists? =
+      Channel
+      |> where([c], c.server_id == ^server_id and c.slug == ^candidate)
+      |> maybe_exclude_channel(exclude_id)
+      |> Repo.exists?()
+
+    if exists? do
+      unique_channel_slug(server_id, slug, attempt + 1, exclude_id)
+    else
+      candidate
+    end
+  end
+
+  defp maybe_exclude_channel(query, nil), do: query
+
+  defp maybe_exclude_channel(query, id) do
+    from(c in query, where: c.id != ^id)
+  end
+
+  defp next_channel_position(server_id) do
+    case Repo.one(from(c in Channel, where: c.server_id == ^server_id, select: max(c.position))) do
+      nil -> 0
+      max -> max + 1
+    end
+  end
+
+  # unique_constraint errors land on :slug, which the create/rename form does not
+  # render — copy them onto :name so the user actually sees why save failed.
+  defp with_visible_slug_error({:ok, channel}), do: {:ok, channel}
+
+  defp with_visible_slug_error({:error, %Ecto.Changeset{} = changeset}) do
+    {:error, expose_slug_error(changeset)}
+  end
+
+  defp with_visible_slug_error(other), do: other
+
+  defp expose_slug_error(changeset) do
+    case Keyword.get(changeset.errors, :slug) do
+      {msg, opts} ->
+        if Keyword.has_key?(changeset.errors, :name) do
+          changeset
+        else
+          Ecto.Changeset.add_error(changeset, :name, msg, opts)
+        end
+
+      _ ->
+        changeset
+    end
   end
 
   def list_channels(server_id) do

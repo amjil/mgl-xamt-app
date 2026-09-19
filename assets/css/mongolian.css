@@ -62,9 +62,8 @@
   --xamt-glow-1: #bfdac9;
   --xamt-glow-2: #ead9b8;
   --xamt-glow-3: #cfe0d4;
-  /* The composer stays "paper" in both themes — writing surface, not chrome */
-  --xamt-paper: #fffdf8;
-  --xamt-paper-ink: #171c19;
+  --xamt-paper: var(--xamt-bg);
+  --xamt-paper-ink: var(--xamt-text);
   --xamt-radius: 0.95rem;
   --mgl-ime-font: var(--xamt-font-mongol);
   color-scheme: light;

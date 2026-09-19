@@ -371,6 +371,10 @@ defmodule XamtWeb.ServerLive do
     save_channel(socket, socket.assigns.live_action, params)
   end
 
+  def handle_event("save_channel", params, socket) when is_map(params) do
+    save_channel(socket, socket.assigns.live_action, params)
+  end
+
   def handle_event("delete_channel", %{"id" => id}, socket) do
     active = socket.assigns.active_channel
 
@@ -1432,7 +1436,13 @@ defmodule XamtWeb.ServerLive do
     ~H"""
     <div class="xamt-sheet-form">
       <h2 id={"#{@id}-title"} class="xamt-section-title mongol-text">{@title}</h2>
-      <.form for={@form} id={@id} phx-submit="save_channel" class="xamt-form xamt-form--vertical">
+      <.form
+        for={@form}
+        id={@id}
+        phx-submit="save_channel"
+        novalidate
+        class="xamt-form xamt-form--vertical"
+      >
         <.input
           field={@form[:name]}
           id={@name_id}
@@ -1440,7 +1450,6 @@ defmodule XamtWeb.ServerLive do
           phx-hook="MongolianIME"
           class="xamt-input mongol-input"
           autocomplete="off"
-          required
         />
         <div class="xamt-form__actions">
           <button

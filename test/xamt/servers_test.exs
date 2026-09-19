@@ -84,6 +84,23 @@ defmodule Xamt.ServersTest do
     assert {:ok, _} = Channels.delete_channel(scope, renamed.id)
   end
 
+  test "Mongolian channel names get unique untitled slugs", %{owner_scope: scope, server: server} do
+    assert {:ok, first} = Channels.create_channel(scope, server, %{"name" => "ᠮᠣᠩᠭᠣᠯ"})
+    assert {:ok, second} = Channels.create_channel(scope, server, %{"name" => "ᠪᠢᠴᠢᠭ"})
+    assert first.slug == "untitled"
+    assert second.slug == "untitled-1"
+    assert first.name == "ᠮᠣᠩᠭᠣᠯ"
+    assert second.name == "ᠪᠢᠴᠢᠭ"
+  end
+
+  test "creating a channel named general does not collide with the default", %{
+    owner_scope: scope,
+    server: server
+  } do
+    assert {:ok, extra} = Channels.create_channel(scope, server, %{"name" => "general"})
+    assert extra.slug == "general-1"
+  end
+
   test "cannot delete the last channel", %{owner_scope: scope, server: server} do
     [only] = Channels.list_channels(server.id)
     assert {:error, :last_channel} = Channels.delete_channel(scope, only.id)

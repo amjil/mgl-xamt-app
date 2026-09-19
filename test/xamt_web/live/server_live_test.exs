@@ -243,6 +243,41 @@ defmodule XamtWeb.ServerLiveTest do
     assert html =~ "random"
   end
 
+  test "create channel drawer accepts a Mongolian name", %{
+    conn: conn,
+    server: server,
+    channel: channel
+  } do
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}/new")
+
+    view
+    |> form("#create-channel-form", %{channel: %{name: "ᠮᠣᠩᠭᠣᠯ"}})
+    |> render_submit()
+
+    assert_patch(view, ~p"/servers/#{server.slug}/untitled")
+    refute has_element?(view, "#create-channel-form")
+    html = render(view)
+    assert html =~ "ᠮᠣᠩᠭᠣᠯ"
+  end
+
+  test "second Mongolian channel gets a unique slug", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    {:ok, _first} = Channels.create_channel(scope, server, %{"name" => "ᠮᠣᠩᠭᠣᠯ"})
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}/new")
+
+    view
+    |> form("#create-channel-form", %{channel: %{name: "ᠪᠢᠴᠢᠭ"}})
+    |> render_submit()
+
+    assert_patch(view, ~p"/servers/#{server.slug}/untitled-1")
+    html = render(view)
+    assert html =~ "ᠪᠢᠴᠢᠭ"
+  end
+
   test "cancel closes the create-channel drawer", %{
     conn: conn,
     server: server,

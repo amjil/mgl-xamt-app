@@ -14,6 +14,7 @@
   justify-content: center;
   gap: 0.35rem;
   align-self: start;
+  position: relative;
   writing-mode: vertical-lr;
   -webkit-writing-mode: vertical-lr;
   text-orientation: mixed;
@@ -408,7 +409,9 @@ input[type="tel"] {
   writing-mode: vertical-lr;
   -webkit-writing-mode: vertical-lr;
   text-orientation: mixed;
+  display: inline-block;
   padding: 0.95rem 0.6rem;
+  text-align: center;
 }
 
 .xamt-form--vertical .xamt-input,

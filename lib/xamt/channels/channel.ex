@@ -25,6 +25,6 @@ defmodule Xamt.Channels.Channel do
     |> cast(attrs, [:server_id, :name, :slug, :type, :position])
     |> validate_required([:server_id, :name, :slug])
     |> validate_inclusion(:type, @types)
-    |> unique_constraint([:server_id, :slug])
+    |> unique_constraint(:slug, name: :channels_server_id_slug_index)
   end
 end

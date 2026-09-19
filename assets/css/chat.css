@@ -594,7 +594,7 @@
   height: 100%;
   border-left: 1px solid var(--xamt-line);
   padding: 0.95rem;
-  background: color-mix(in srgb, var(--xamt-bg-2) 92%, var(--xamt-shade));
+  background: color-mix(in srgb, var(--xamt-bg-2) 72%, transparent);
   box-sizing: border-box;
 }
 
@@ -745,6 +745,11 @@
 }
 
 .xamt-composer__editor {
+  --border-color: var(--xamt-line);
+  --bg-color: var(--xamt-bg);
+  --accent: var(--xamt-accent);
+  --callout-bg: var(--xamt-gold-soft);
+  --callout-border: var(--xamt-line-strong);
   inline-size: 100%;
   block-size: 12rem;
   min-block-size: 8rem;
@@ -755,13 +760,24 @@
   -webkit-overflow-scrolling: touch;
   border: 1px solid var(--xamt-line);
   border-radius: 0.85rem;
-  background: var(--xamt-paper);
-  color: var(--xamt-paper-ink);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  background: var(--xamt-bg);
+  color: var(--xamt-text);
+  caret-color: var(--xamt-accent);
+  box-shadow: none;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
+.xamt-composer__editor:focus-within {
+  border-color: var(--xamt-accent-2);
+  box-shadow: 0 0 0 3px var(--xamt-gold-soft);
+}
+
+/* Vendor editor injects `#fff` / `#f9f9f9` later; beat those so the field
+   tracks light and dark chrome instead of a standalone paper sheet. */
 .xamt-composer__editor .mgl-editor-scope,
-.xamt-composer__editor .editor-container {
+.xamt-composer__editor .mgl-editor-scope .editor-container {
   height: 100%;
   width: 100%;
   max-width: none;
@@ -769,7 +785,8 @@
   border: 0;
   box-shadow: none;
   border-radius: 0.75rem;
-  background: transparent;
+  background: transparent !important;
+  color: inherit;
   overflow: hidden;
 }
 
@@ -786,7 +803,17 @@
   padding: 0.85rem 0.55rem;
   font-family: var(--xamt-font-mongol);
   font-size: 1.05rem;
-  background: transparent;
+  background: transparent !important;
+  color: var(--xamt-text);
+  caret-color: var(--xamt-accent);
+}
+
+.xamt-composer__editor .mgl-editor-scope .block-content {
+  color: inherit;
+}
+
+.xamt-composer__editor .mgl-editor-scope .block-children {
+  border-top-color: var(--xamt-line);
 }
 
 .xamt-composer__toolbar {
@@ -852,6 +879,8 @@
 
 .xamt-sheet__panel {
   pointer-events: auto;
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   width: 100%;
