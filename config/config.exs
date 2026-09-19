@@ -31,6 +31,14 @@ config :xamt, :ime_base_url, nil
 # Message send rate limit (ETS sliding window). Tests override limit.
 config :xamt, Xamt.Messages.RateLimiter, limit: 5, window_seconds: 3
 
+# Local VAPID pair for development. Production reads env vars in runtime.exs.
+# Generate a new pair with: mix web_push_ex.vapid
+config :web_push_ex, :vapid,
+  subject: "mailto:admin@xamt.app",
+  public_key:
+    "BLN44unPgkRn4KHf5szEzGg8oHEKcJXrkgWU3G6zLzmLFTcOkQMkf3yM-M0lx5MZssNCYdaodHTB051uQ0EPbQQ",
+  private_key: "5j5nvktvZE_EziNxh_KdIk7T4pvehV5rGZIPmGtNcFg"
+
 # Configure the endpoint
 config :xamt, XamtWeb.Endpoint,
   url: [host: "localhost"],

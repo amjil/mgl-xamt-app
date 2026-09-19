@@ -64,7 +64,7 @@ defmodule XamtWeb.Layouts do
       </div>
     </main>
 
-    <.flash_group flash={@flash} />
+    <.flash_group flash={@flash} current_scope={@current_scope} />
     """
   end
 
@@ -77,6 +77,10 @@ defmodule XamtWeb.Layouts do
   """
   attr :flash, :map, required: true, doc: "the map of flash messages"
   attr :id, :string, default: "flash-group", doc: "the optional id of flash container"
+
+  attr :current_scope, :map,
+    default: nil,
+    doc: "the current [scope](https://hexdocs.pm/phoenix/scopes.html)"
 
   def flash_group(assigns) do
     ~H"""
@@ -118,8 +122,44 @@ defmodule XamtWeb.Layouts do
       >
       </div>
     </div>
+
+    <.web_push_manager current_scope={@current_scope} />
     """
   end
+
+  @doc """
+  Invisible LiveView hook that asks for notification permission and saves
+  the Web Push subscription after login.
+  """
+  attr :current_scope, :map, default: nil
+
+  def web_push_manager(assigns) do
+    ~H"""
+    <div
+      :if={web_push_enabled?(@current_scope)}
+      id="web-push-manager"
+      phx-hook="WebPush"
+      phx-update="ignore"
+      data-vapid-public-key={vapid_public_key()}
+      class="hidden"
+    >
+    </div>
+    """
+  end
+
+  def vapid_public_key do
+    case Application.get_env(:web_push_ex, :vapid) do
+      details when is_list(details) -> details[:public_key]
+      _ -> nil
+    end
+  end
+
+  defp web_push_enabled?(%{user: %{id: _id}}) do
+    key = vapid_public_key()
+    is_binary(key) and key != ""
+  end
+
+  defp web_push_enabled?(_), do: false
 
   @doc """
   Provides dark vs light theme toggle based on the `.dark` class variant.

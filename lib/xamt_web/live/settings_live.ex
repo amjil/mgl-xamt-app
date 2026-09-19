@@ -60,7 +60,7 @@ defmodule XamtWeb.SettingsLive do
   def render(assigns) do
     ~H"""
     <div class="xamt-page-inner">
-      <Layouts.flash_group flash={@flash} />
+      <Layouts.flash_group flash={@flash} current_scope={@current_scope} />
 
       <section class="xamt-stack" id="settings-panel">
         <div class="xamt-auth-intro">

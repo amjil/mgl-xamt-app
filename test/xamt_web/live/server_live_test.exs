@@ -480,4 +480,27 @@ defmodule XamtWeb.ServerLiveTest do
     assert html =~ "A short summary"
     assert html =~ ~s(src="https://example.com/og.png")
   end
+
+  test "saves a web push subscription from the LiveView hook", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    user: user
+  } do
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    assert has_element?(view, "#web-push-manager")
+
+    endpoint = "https://push.example/live-#{System.unique_integer([:positive])}"
+
+    render_hook(view, "save_push_subscription", %{
+      "endpoint" => endpoint,
+      "p256dh" => "live-p256dh",
+      "auth" => "live-auth"
+    })
+
+    assert [sub] = Xamt.Notifications.list_user_subscriptions(user.id)
+    assert sub.endpoint == endpoint
+    assert sub.p256dh == "live-p256dh"
+    assert sub.auth == "live-auth"
+  end
 end

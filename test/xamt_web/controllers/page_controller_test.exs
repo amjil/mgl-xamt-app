@@ -13,5 +13,7 @@ defmodule XamtWeb.PageControllerTest do
     assert get_resp_header(conn, "service-worker-allowed") == ["/"]
     assert "no-cache" in get_resp_header(conn, "cache-control")
     assert conn.resp_body =~ "sync-messages"
+    assert conn.resp_body =~ ~s(addEventListener("push")
+    assert conn.resp_body =~ ~s(addEventListener("notificationclick")
   end
 end

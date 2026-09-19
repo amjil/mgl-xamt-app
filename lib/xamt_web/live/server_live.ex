@@ -724,7 +724,7 @@ defmodule XamtWeb.ServerLive do
   def render(assigns) do
     ~H"""
     <div class="xamt-chat" id="xamt-app" phx-hook="MobileDrawer">
-      <Layouts.flash_group flash={@flash} />
+      <Layouts.flash_group flash={@flash} current_scope={@current_scope} />
 
       <div class={"xamt-app xamt-app--panel-#{@mobile_panel}"}>
         <button
@@ -1119,10 +1119,16 @@ defmodule XamtWeb.ServerLive do
                             referrerpolicy="no-referrer"
                           />
                           <div class="xamt-link-preview__body">
-                            <strong :if={preview["title"]} class="xamt-link-preview__title mongol-text">
+                            <strong
+                              :if={preview["title"]}
+                              class="xamt-link-preview__title mongol-text"
+                            >
                               {preview["title"]}
                             </strong>
-                            <p :if={preview["description"]} class="xamt-link-preview__desc mongol-text">
+                            <p
+                              :if={preview["description"]}
+                              class="xamt-link-preview__desc mongol-text"
+                            >
                               {preview["description"]}
                             </p>
                           </div>

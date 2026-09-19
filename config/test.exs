@@ -32,6 +32,9 @@ config :xamt, Xamt.Messages.RateLimiter, limit: :infinity
 # Link unfurling hits the network; tests that need it opt in and stub Req.
 config :xamt, Xamt.Messages.LinkPreview, enabled: false
 
+# Web Push hits push services; tests that need it opt in and stub the sender.
+config :xamt, Xamt.Notifications.WebPush, enabled: false, async: false
+
 # Disable swoosh api client as it is only required for production adapters
 config :swoosh, :api_client, false
 

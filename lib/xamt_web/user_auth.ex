@@ -267,17 +267,43 @@ defmodule XamtWeb.UserAuth do
   end
 
   defp mount_current_scope(socket, session) do
-    Phoenix.Component.assign_new(socket, :current_scope, fn ->
-      case session do
-        %{"user_token" => user_token} ->
-          case Accounts.get_user_by_session_token(user_token) do
-            {user, _token_inserted_at} -> Scope.for_user(user)
-            _ -> Scope.for_user(nil)
-          end
+    socket =
+      Phoenix.Component.assign_new(socket, :current_scope, fn ->
+        case session do
+          %{"user_token" => user_token} ->
+            case Accounts.get_user_by_session_token(user_token) do
+              {user, _token_inserted_at} -> Scope.for_user(user)
+              _ -> Scope.for_user(nil)
+            end
 
-        _ ->
-          Scope.for_user(nil)
-      end
-    end)
+          _ ->
+            Scope.for_user(nil)
+        end
+      end)
+
+    maybe_attach_web_push_hook(socket)
   end
+
+  defp maybe_attach_web_push_hook(socket) do
+    scope = socket.assigns[:current_scope]
+
+    if scope && scope.user do
+      Phoenix.LiveView.attach_hook(
+        socket,
+        :save_push_subscription,
+        :handle_event,
+        &handle_save_push_subscription/3
+      )
+    else
+      socket
+    end
+  end
+
+  defp handle_save_push_subscription("save_push_subscription", params, socket) do
+    user_id = socket.assigns.current_scope.user.id
+    _ = Xamt.Notifications.save_subscription(user_id, params)
+    {:halt, socket}
+  end
+
+  defp handle_save_push_subscription(_event, _params, socket), do: {:cont, socket}
 end

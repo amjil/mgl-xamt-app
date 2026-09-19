@@ -202,3 +202,48 @@ async function putPendingMessage(msg) {
     tx.onerror = () => reject(tx.error);
   });
 }
+
+// 5. Web Push: show a system notification and open the target URL on click.
+self.addEventListener("push", (event) => {
+  event.waitUntil(showPushNotification(event));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || "/";
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      for (let i = 0; i < windowClients.length; i++) {
+        const client = windowClients[i];
+        if (client.url.includes(targetUrl) && "focus" in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+
+async function showPushNotification(event) {
+  if (!event.data) return;
+
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch (_error) {
+    payload = { title: "Xamt", body: event.data.text(), url: "/" };
+  }
+
+  const options = {
+    body: payload.body,
+    icon: "/images/logo.svg",
+    badge: "/images/logo.svg",
+    data: { url: payload.url || "/" },
+    vibrate: [200, 100, 200]
+  };
+
+  await self.registration.showNotification(payload.title || "Xamt", options);
+}

@@ -48,7 +48,7 @@ defmodule XamtWeb.HomeLive do
   def render(assigns) do
     ~H"""
     <div class="xamt-page-inner">
-      <Layouts.flash_group flash={@flash} />
+      <Layouts.flash_group flash={@flash} current_scope={@current_scope} />
       <div class="xamt-home">
         <header class="xamt-home__hero">
           <span class="xamt-ornament" aria-hidden="true"></span>

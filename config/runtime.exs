@@ -26,6 +26,26 @@ if base_url = System.get_env("XAMT_IME_BASE_URL") do
   config :xamt, :ime_base_url, base_url
 end
 
+vapid_public_key = System.get_env("VAPID_PUBLIC_KEY")
+vapid_private_key = System.get_env("VAPID_PRIVATE_KEY")
+
+cond do
+  vapid_public_key && vapid_private_key ->
+    config :web_push_ex, :vapid,
+      subject: System.get_env("VAPID_SUBJECT") || "mailto:admin@xamt.app",
+      public_key: vapid_public_key,
+      private_key: vapid_private_key
+
+  config_env() == :prod ->
+    raise """
+    environment variables VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY are missing.
+    Generate a pair with: mix web_push_ex.vapid
+    """
+
+  true ->
+    :ok
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

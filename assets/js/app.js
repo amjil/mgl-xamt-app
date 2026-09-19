@@ -12,6 +12,7 @@ import {MessageScroll} from "./hooks/message-scroll"
 import {MobileDrawer} from "./hooks/mobile-drawer"
 import {ToastHandler} from "./hooks/toast-handler"
 import {ReadReceipt} from "./hooks/read-receipt"
+import {WebPush} from "./hooks/web-push"
 import {adoptImeElements} from "./utils/ime"
 import {initVisualViewport, trackImeKeyboard} from "./utils/viewport"
 import {toast} from "./utils/offline-store"
@@ -32,6 +33,7 @@ const Hooks = {
   MobileDrawer,
   ToastHandler,
   ReadReceipt,
+  WebPush,
 }
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")

@@ -46,6 +46,7 @@ defmodule Xamt.Messages do
       LastMessageCache.put(channel_id, message.id, message.inserted_at)
       broadcast(channel_id, :new_message, strip_for_broadcast(message))
       Xamt.Messages.LinkPreview.maybe_fetch_and_update(message)
+      Xamt.Notifications.WebPush.notify_mentions(message)
       {:ok, message}
     end
   end
@@ -63,6 +64,7 @@ defmodule Xamt.Messages do
           message.content_html
 
       {content_html, mention_ids} = prepare_mentions(raw_html, message.channel_id)
+      previous_mention_ids = message.mentioned_user_ids || []
 
       with {:ok, message} <-
              Repo.transact(fn ->
@@ -82,6 +84,7 @@ defmodule Xamt.Messages do
         message = message |> Repo.preload(@preloads, force: true) |> attach_mention_ids()
         broadcast(message.channel_id, :updated_message, strip_for_broadcast(message))
         Xamt.Messages.LinkPreview.maybe_fetch_and_update(message)
+        Xamt.Notifications.WebPush.notify_mentions(message, except: previous_mention_ids)
         {:ok, message}
       end
     end
