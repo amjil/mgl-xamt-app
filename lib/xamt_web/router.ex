@@ -17,6 +17,23 @@ defmodule XamtWeb.Router do
     plug :accepts, ["json"]
   end
 
+  # Session-cookie JSON API for the Service Worker. Background Sync cannot use
+  # the LiveView WebSocket, so queued messages are POSTed here with the same
+  # browser session + CSRF token that LiveView already uses.
+  pipeline :session_api do
+    plug :accepts, ["json"]
+    plug :fetch_session
+    plug :protect_from_forgery
+    plug :put_secure_browser_headers
+    plug :fetch_current_scope_for_user
+  end
+
+  scope "/api", XamtWeb do
+    pipe_through [:session_api, :require_authenticated_user_api]
+
+    post "/messages/sync", MessageApiController, :sync
+  end
+
   scope "/", XamtWeb do
     pipe_through [:browser]
 

@@ -39,6 +39,9 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
 
+  // Do not cache the Background Sync HTTP endpoint (or any JSON API).
+  if (url.pathname.startsWith("/api/")) return;
+
   // 策略 A: 字体文件 -> Cache-First (缓存优先)
   // 命中缓存立即返回，避免字体闪烁。未命中才走网络。
   if (url.pathname.startsWith("/fonts/")) {
@@ -86,3 +89,116 @@ self.addEventListener("fetch", (event) => {
       })
   );
 });
+
+// 4. Background Sync: replay IndexedDB-queued messages over HTTP.
+// The worker cannot reuse the LiveView WebSocket; keep DB constants in sync
+// with assets/js/utils/offline-store.js.
+const OFFLINE_DB = "XamtOfflineDB";
+const OFFLINE_STORE = "pending_messages";
+const OFFLINE_DB_VERSION = 2;
+const SYNC_TAG = "sync-messages";
+
+self.addEventListener("sync", (event) => {
+  if (event.tag === SYNC_TAG) {
+    event.waitUntil(flushOfflineMessages());
+  }
+});
+
+async function flushOfflineMessages() {
+  let sent = 0;
+
+  for (;;) {
+    const msg = await takeNextPendingMessage();
+    if (!msg) return sent;
+
+    try {
+      const response = await fetch("/api/messages/sync", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "x-csrf-token": msg.csrf_token || ""
+        },
+        body: JSON.stringify({
+          channel_id: msg.channel_id,
+          content_html: (msg.payload && msg.payload.content_html) || msg.content_html,
+          content_json: (msg.payload && msg.payload.content_json) || msg.content_json,
+          content_type:
+            (msg.payload && msg.payload.content_type) || msg.content_type || "rich_text",
+          reply_to_id: (msg.payload && msg.payload.reply_to_id) || msg.reply_to_id || null
+        })
+      });
+
+      if (response.ok) {
+        sent += 1;
+        continue;
+      }
+
+      if (shouldRetrySyncStatus(response.status)) {
+        await putPendingMessage(msg);
+        throw new Error("Sync failed, will retry later: " + response.status);
+      }
+      // 4xx (other than 401/403/429): drop — retrying will not help
+    } catch (err) {
+      if (String(err.message || "").includes("will retry later")) throw err;
+      await putPendingMessage(msg);
+      console.error("Sync failed, will retry later:", err);
+      throw err;
+    }
+  }
+}
+
+function shouldRetrySyncStatus(status) {
+  return status === 401 || status === 403 || status === 408 || status === 429 || status >= 500;
+}
+
+function openOfflineDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(OFFLINE_DB, OFFLINE_DB_VERSION);
+
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (db.objectStoreNames.contains(OFFLINE_STORE)) {
+        db.deleteObjectStore(OFFLINE_STORE);
+      }
+      db.createObjectStore(OFFLINE_STORE, { keyPath: "id" });
+    };
+
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function takeNextPendingMessage() {
+  const db = await openOfflineDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(OFFLINE_STORE, "readwrite");
+    const store = tx.objectStore(OFFLINE_STORE);
+    const req = store.openCursor();
+
+    req.onsuccess = (e) => {
+      const cursor = e.target.result;
+      if (!cursor) {
+        resolve(null);
+        return;
+      }
+      const value = cursor.value;
+      cursor.delete();
+      resolve(value);
+    };
+
+    req.onerror = () => reject(req.error);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function putPendingMessage(msg) {
+  const db = await openOfflineDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(OFFLINE_STORE, "readwrite");
+    tx.objectStore(OFFLINE_STORE).put(msg);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}

@@ -116,7 +116,9 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () 
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/pwa/service-worker.js").catch(() => {})
+    // Root scope is required so chat pages can register Background Sync.
+    // The SW file is under /pwa/, so the Endpoint sends Service-Worker-Allowed: /.
+    navigator.serviceWorker.register("/pwa/service-worker.js", {scope: "/"}).catch(() => {})
   })
 }
 

@@ -201,6 +201,8 @@ defmodule Xamt.Channels do
     |> Repo.all()
   end
 
+  def get_channel(id), do: Repo.get(Channel, id)
+
   def get_channel!(id), do: Repo.get!(Channel, id)
 
   def get_channel_by_slug!(server_id, slug) when is_binary(slug) do

@@ -1181,6 +1181,8 @@ defmodule XamtWeb.ServerLive do
               phx-drop-target={@uploads.media.ref}
               data-has-uploads={to_string(@uploads.media.entries != [])}
               data-submit-event={if @editing_message_id, do: "update_message", else: "send_message"}
+              data-channel-id={@active_channel && @active_channel.id}
+              data-reply-to-id={@replying_to && @replying_to.id}
             >
               <div :if={@replying_to} id="reply-preview" class="xamt-reply-bar">
                 <span class="xamt-quote__mark" aria-hidden="true">↳</span>

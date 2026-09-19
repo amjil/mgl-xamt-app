@@ -31,6 +31,7 @@ defmodule XamtWeb.ServerLiveTest do
     {:ok, view, html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
     assert html =~ server.name
     assert html =~ channel.name
+    assert has_element?(view, "#message-composer-wrap[data-channel-id='#{channel.id}']")
 
     {:ok, message} =
       Messages.create_message(scope, channel.id, %{

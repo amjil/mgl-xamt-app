@@ -212,6 +212,23 @@ defmodule XamtWeb.UserAuth do
     end
   end
 
+  @doc """
+  JSON variant of `require_authenticated_user/2` for the Service Worker sync API.
+
+  A redirect to `/login` is useless to a background `fetch`; the worker needs
+  a 401 it can retry later.
+  """
+  def require_authenticated_user_api(conn, _opts) do
+    if conn.assigns.current_scope && conn.assigns.current_scope.user do
+      conn
+    else
+      conn
+      |> put_status(:unauthorized)
+      |> json(%{status: "error", detail: "unauthorized"})
+      |> halt()
+    end
+  end
+
   defp maybe_store_return_to(%{method: "GET"} = conn) do
     put_session(conn, :user_return_to, current_path(conn))
   end

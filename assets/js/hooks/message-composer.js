@@ -6,7 +6,12 @@ import { createMongolianEditor } from "../../vendor/mongolian-editor.js"
 import { MglIME, createCustomAdapter } from "../../vendor/mgl-web-ime/mgl-web-ime.js"
 import { imeProvider } from "../utils/ime.js"
 import { attachVirtualKeyboard, suppressSystemKeyboard } from "../utils/ime-keyboard.js"
-import { OfflineStore, toast } from "../utils/offline-store.js"
+import {
+  OfflineStore,
+  flushPendingMessages,
+  registerBackgroundSync,
+  toast,
+} from "../utils/offline-store.js"
 import { highlightMessage as flashHighlight } from "../utils/highlight-message.js"
 import { attachMessageScrollLock } from "./message-scroll.js"
 import { attachReadReceipt } from "./read-receipt.js"
@@ -190,6 +195,11 @@ export const MessageComposer = {
     this._onOnline = () => this.flushOfflineQueue()
     window.addEventListener("online", this._onOnline)
 
+    this._onSwMessage = (event) => {
+      if (event.data?.type === "xamt:flush-offline") this.flushOfflineQueue()
+    }
+    navigator.serviceWorker?.addEventListener("message", this._onSwMessage)
+
     // Capture-phase paste: beat mongolian-editor's text-only paste handler.
     // Image files go through LiveView allow_upload(:media) via this.upload.
     this._onPaste = (e) => {
@@ -231,8 +241,10 @@ export const MessageComposer = {
 
     this._detachMentions = attachMentionAutocomplete(this)
 
-    // Flush any messages left from a previous session once LiveView is up
+    // Flush leftovers from a previous session; register Background Sync as well
+    // so the Service Worker can HTTP-replay if this tab is gone when we reconnect.
     this.flushOfflineQueue()
+    registerBackgroundSync()
   },
 
   updated() {
@@ -248,6 +260,7 @@ export const MessageComposer = {
     clearTimeout(this._typingTimer)
     document.removeEventListener("click", this._onSend)
     window.removeEventListener("online", this._onOnline)
+    navigator.serviceWorker?.removeEventListener("message", this._onSwMessage)
     this.host?.removeEventListener("paste", this._onPaste, true)
     this.host?.removeEventListener("focusin", this._onEditableFocus)
     this.host?.removeEventListener("pointerdown", this._onHostPointer)
@@ -278,20 +291,20 @@ export const MessageComposer = {
   },
 
   async flushOfflineQueue() {
-    if (this._flushing || !this._canPush()) return
+    // HTTP flush does not need the LiveView socket — only a network path.
+    if (this._flushing || navigator.onLine === false) return
 
     this._flushing = true
     try {
-      const pending = await OfflineStore.popAll()
-      if (pending.length === 0) return
-
-      for (const msg of pending) {
-        this.pushEvent(msg.event, msg.payload)
+      const sent = await flushPendingMessages()
+      if (sent > 0) {
+        toast(
+          "success",
+          sent === 1 ? "Synced 1 offline message" : `Synced ${sent} offline messages`
+        )
       }
-
-      toast("success", `Synced ${pending.length} offline message${pending.length === 1 ? "" : "s"}`)
     } catch (_err) {
-      // IndexedDB unavailable — ignore; next reconnect will retry
+      registerBackgroundSync()
     } finally {
       this._flushing = false
     }
@@ -312,13 +325,32 @@ export const MessageComposer = {
       content_html: html,
       content_json: JSON.stringify({ type: "rich_text", blocks: json }),
       content_type: "rich_text",
+      reply_to_id: this.wrap?.dataset?.replyToId || null,
     }
 
-    // Intercept when browser is offline or LiveView socket is down
+    // Intercept when the browser is offline or the LiveView socket is down.
+    // The Service Worker cannot reuse this socket, so we queue for HTTP replay.
     if (!this._canPush()) {
-      OfflineStore.save({ event, payload })
+      if (hasUploads) {
+        toast("error", "Can't send uploads while offline")
+        return
+      }
+
+      if (event !== "send_message") {
+        toast("error", "Reconnect to save this edit")
+        return
+      }
+
+      const channelId = this.wrap?.dataset?.channelId
+      if (!channelId) {
+        toast("error", "Can't queue this message — missing channel")
+        return
+      }
+
+      OfflineStore.save({channel_id: channelId, event, payload})
+        .then(() => registerBackgroundSync())
         .then(() => {
-          toast("warning", "You're offline — message saved to local drafts")
+          toast("warning", "You're offline — message will send when you're back online")
           this.clear()
         })
         .catch(() => {
