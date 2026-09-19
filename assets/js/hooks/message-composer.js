@@ -159,9 +159,19 @@ export const MessageComposer = {
       mount: document.body,
     })
 
-    this.sendBtn = this.wrap.querySelector("[data-composer-send]")
-    this._onSend = () => this.submit()
-    this.sendBtn?.addEventListener("click", this._onSend)
+    // Send lives in the toolbar, outside this hook's phx-update="ignore"
+    // node. Reply/edit patches replace that button, and updated() does not
+    // run (ignored subtree, no attr change) — so bind by delegation on
+    // document, not on a specific node.
+    this._onSend = (e) => {
+      const btn = e.target.closest?.("[data-composer-send]")
+      if (!btn) return
+      const wrap = this.el.closest(".xamt-composer-wrap")
+      if (!wrap?.contains(btn)) return
+      this.wrap = wrap
+      this.submit()
+    }
+    document.addEventListener("click", this._onSend)
 
     this._flushing = false
     this._onOnline = () => this.flushOfflineQueue()
@@ -210,14 +220,7 @@ export const MessageComposer = {
   },
 
   updated() {
-    // Toolbar lives outside phx-update="ignore" and may be re-patched;
-    // re-bind send if LiveView replaced the button node.
-    const sendBtn = this.wrap.querySelector("[data-composer-send]")
-    if (sendBtn !== this.sendBtn) {
-      this.sendBtn?.removeEventListener("click", this._onSend)
-      this.sendBtn = sendBtn
-      this.sendBtn?.addEventListener("click", this._onSend)
-    }
+    this.wrap = this.el.closest(".xamt-composer-wrap") || this.wrap
   },
 
   // LiveView WebSocket restored — retry queued pushEvents
@@ -227,7 +230,7 @@ export const MessageComposer = {
 
   destroyed() {
     clearTimeout(this._typingTimer)
-    this.sendBtn?.removeEventListener("click", this._onSend)
+    document.removeEventListener("click", this._onSend)
     window.removeEventListener("online", this._onOnline)
     this.host?.removeEventListener("paste", this._onPaste, true)
     if (this.ime && typeof this.ime.destroy === "function") this.ime.destroy()
@@ -275,6 +278,7 @@ export const MessageComposer = {
   },
 
   submit() {
+    this.wrap = this.el.closest(".xamt-composer-wrap") || this.wrap
     const html = this.editor.getHtml()
     const json = this.editor.getJson()
 

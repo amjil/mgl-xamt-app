@@ -80,6 +80,16 @@ defmodule XamtWeb.ServerLiveTest do
     |> render_click()
 
     assert has_element?(view, "#reply-preview")
+    assert has_element?(view, "#composer-send")
+
+    render_hook(view, "send_message", %{
+      "content_html" => "<p>a reply</p>",
+      "content_json" => ~s({"type":"rich_text","blocks":[]}),
+      "content_type" => "rich_text"
+    })
+
+    refute has_element?(view, "#reply-preview")
+    assert render(view) =~ "a reply"
   end
 
   test "toggling a reaction updates the chip", %{

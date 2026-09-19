@@ -1118,6 +1118,7 @@ defmodule XamtWeb.ServerLive do
           </div>
 
           <div
+            id="message-composer-wrap"
             class="xamt-composer-wrap"
             phx-drop-target={@uploads.media.ref}
             data-has-uploads={to_string(@uploads.media.entries != [])}
@@ -1174,7 +1175,7 @@ defmodule XamtWeb.ServerLive do
               <div class="xamt-composer__editor" id="composer-editor-host"></div>
             </div>
 
-            <div class="xamt-composer__toolbar">
+            <div id="composer-toolbar" class="xamt-composer__toolbar">
               <label
                 for={@uploads.media.ref}
                 class="xamt-btn xamt-btn--soft"
@@ -1185,12 +1186,18 @@ defmodule XamtWeb.ServerLive do
               <button
                 :if={@editing_message_id}
                 type="button"
+                id="composer-cancel-edit"
                 class="xamt-btn xamt-btn--sm"
                 phx-click="cancel_edit"
               >
                 {gettext("Cancel")}
               </button>
-              <button type="button" class="xamt-btn xamt-btn--primary mongol-text" data-composer-send>
+              <button
+                type="button"
+                id="composer-send"
+                class="xamt-btn xamt-btn--primary mongol-text"
+                data-composer-send
+              >
                 {if @editing_message_id, do: gettext("Save"), else: gettext("Send")}
               </button>
             </div>
