@@ -15,6 +15,7 @@ defmodule Xamt.Application do
       XamtWeb.Presence,
       Xamt.Channels.LastMessageCache,
       Xamt.Messages.RateLimiter,
+      {Task.Supervisor, name: Xamt.TaskSupervisor},
       XamtWeb.Endpoint
     ]
 

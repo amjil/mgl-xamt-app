@@ -45,6 +45,7 @@ defmodule Xamt.Messages do
       message = message |> Repo.preload(@preloads, force: true) |> attach_mention_ids()
       LastMessageCache.put(channel_id, message.id, message.inserted_at)
       broadcast(channel_id, :new_message, strip_for_broadcast(message))
+      Xamt.Messages.LinkPreview.maybe_fetch_and_update(message)
       {:ok, message}
     end
   end
@@ -80,6 +81,7 @@ defmodule Xamt.Messages do
              end) do
         message = message |> Repo.preload(@preloads, force: true) |> attach_mention_ids()
         broadcast(message.channel_id, :updated_message, strip_for_broadcast(message))
+        Xamt.Messages.LinkPreview.maybe_fetch_and_update(message)
         {:ok, message}
       end
     end
@@ -125,6 +127,27 @@ defmodule Xamt.Messages do
 
   def get_message!(id),
     do: Repo.get!(Message, id) |> Repo.preload(@preloads) |> attach_mention_ids()
+
+  @doc """
+  Stores Open Graph data on a message without bumping `updated_at`.
+
+  Used by link unfurling so a completed fetch does not mark the message as
+  edited. Broadcasts `:updated_message` so LiveViews can `stream_insert/3`.
+  """
+  def put_link_preview(%Message{} = message, preview)
+      when is_map(preview) or is_nil(preview) do
+    {count, _} =
+      from(m in Message, where: m.id == ^message.id and is_nil(m.deleted_at))
+      |> Repo.update_all(set: [link_preview: preview])
+
+    if count == 1 do
+      message = get_message!(message.id)
+      broadcast(message.channel_id, :updated_message, strip_for_broadcast(message))
+      {:ok, message}
+    else
+      {:error, :not_found}
+    end
+  end
 
   @doc """
   Plain text of a message, used for reply previews and search indexing.

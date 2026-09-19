@@ -449,4 +449,35 @@ defmodule XamtWeb.ServerLiveTest do
     assert mentioned_html =~ ~s(data-you="true")
     assert mentioned_html =~ ~s(href="/profile/#{username}")
   end
+
+  test "renders a link preview card and replaces it over PubSub", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>https://example.com/story</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    {:ok, view, html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    refute html =~ "xamt-link-preview"
+
+    {:ok, _} =
+      Messages.put_link_preview(message, %{
+        "url" => "https://example.com/story",
+        "title" => "Example Story",
+        "description" => "A short summary",
+        "image" => "https://example.com/og.png"
+      })
+
+    assert has_element?(view, "#msg-preview-#{message.id}")
+    assert has_element?(view, "#msg-preview-#{message.id}[href='https://example.com/story']")
+    html = render(view)
+    assert html =~ "Example Story"
+    assert html =~ "A short summary"
+    assert html =~ ~s(src="https://example.com/og.png")
+  end
 end

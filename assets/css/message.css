@@ -419,6 +419,72 @@ a.xamt-mention:hover {
   color: var(--xamt-accent-2);
 }
 
+.xamt-link-preview {
+  display: flex;
+  flex-direction: column;
+  margin-block-start: 0.5rem;
+  border: 1px solid var(--xamt-line);
+  border-radius: 0.6rem;
+  background: var(--xamt-bg-2);
+  text-decoration: none;
+  overflow: hidden;
+  max-width: min(9.5rem, 100%);
+  flex-shrink: 0;
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+
+.xamt-link-preview:hover {
+  background: var(--xamt-bg-3);
+  border-color: var(--xamt-line-strong);
+}
+
+.xamt-link-preview__img {
+  width: 100%;
+  height: 5rem;
+  object-fit: cover;
+  border-bottom: 1px solid var(--xamt-line);
+}
+
+.xamt-link-preview__body {
+  padding: 0.45rem 0.5rem 0.55rem;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+
+.xamt-link-preview__title,
+.xamt-link-preview__desc {
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  font-family: var(--xamt-font-mongol);
+  line-height: 1.75;
+  letter-spacing: 0.06em;
+  height: 7.25rem;
+  overflow: hidden;
+}
+
+.xamt-link-preview__title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--xamt-accent-2);
+  max-width: 2.2em;
+}
+
+.xamt-link-preview__desc {
+  font-size: 0.75rem;
+  color: var(--xamt-muted);
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  max-width: 3.4em;
+}
+
 .xamt-typing {
   padding: 0 1rem 0.35rem;
   color: var(--xamt-muted);

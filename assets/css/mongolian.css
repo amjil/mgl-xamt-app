@@ -219,7 +219,8 @@ body {
 .latin-text,
 .xamt-latin,
 .xamt-toast,
-.xamt-theme-toggle {
+.xamt-theme-toggle,
+.xamt-link-preview {
   writing-mode: horizontal-tb;
   -webkit-writing-mode: horizontal-tb;
   font-family: var(--xamt-font-ui);

@@ -1102,6 +1102,32 @@ defmodule XamtWeb.ServerLive do
                       class="xamt-message__content mongol-text"
                     >
                       {raw(safe_html(message, @current_scope.user.id))}
+                      <%= if preview = link_preview(message) do %>
+                        <a
+                          id={"msg-preview-#{message.id}"}
+                          href={preview["url"]}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="xamt-link-preview"
+                        >
+                          <img
+                            :if={preview["image"]}
+                            src={preview["image"]}
+                            alt={preview["title"] || ""}
+                            class="xamt-link-preview__img"
+                            loading="lazy"
+                            referrerpolicy="no-referrer"
+                          />
+                          <div class="xamt-link-preview__body">
+                            <strong :if={preview["title"]} class="xamt-link-preview__title mongol-text">
+                              {preview["title"]}
+                            </strong>
+                            <p :if={preview["description"]} class="xamt-link-preview__desc mongol-text">
+                              {preview["description"]}
+                            </p>
+                          </div>
+                        </a>
+                      <% end %>
                     </div>
                     <div class="xamt-reactions">
                       <button
@@ -1801,6 +1827,12 @@ defmodule XamtWeb.ServerLive do
        do: user_id in ids
 
   defp mentioned?(_, _), do: false
+
+  defp link_preview(%{link_preview: preview})
+       when is_map(preview) and map_size(preview) > 0,
+       do: preview
+
+  defp link_preview(_), do: nil
 
   defp mention_search_row(%{user: user}) do
     %{

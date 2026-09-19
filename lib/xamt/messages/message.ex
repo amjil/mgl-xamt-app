@@ -9,6 +9,7 @@ defmodule Xamt.Messages.Message do
     field :content_type, :string, default: "rich_text"
     field :content_html, :string
     field :search_text, :string
+    field :link_preview, :map
     field :deleted_at, :utc_datetime
     field :mentioned_user_ids, {:array, :binary_id}, virtual: true, default: []
 

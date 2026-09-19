@@ -29,6 +29,9 @@ config :xamt, Xamt.Mailer, adapter: Swoosh.Adapters.Test
 # Avoid flaky failures when fixtures create many messages in one window
 config :xamt, Xamt.Messages.RateLimiter, limit: :infinity
 
+# Link unfurling hits the network; tests that need it opt in and stub Req.
+config :xamt, Xamt.Messages.LinkPreview, enabled: false
+
 # Disable swoosh api client as it is only required for production adapters
 config :swoosh, :api_client, false
 
