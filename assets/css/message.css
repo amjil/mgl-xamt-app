@@ -336,6 +336,29 @@
   transition: color 140ms ease;
 }
 
+@media (max-width: 960px) {
+  .xamt-message__content {
+    max-width: min(14rem, 100%);
+  }
+
+  .xamt-message__actions button {
+    min-height: 2.75rem;
+    padding: 0.45rem 0.35rem;
+  }
+
+  .xamt-reaction {
+    min-height: 2.25rem;
+    padding: 0.2rem 0.5rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .xamt-messages {
+    padding: 0.6rem;
+    gap: 0.75rem;
+  }
+}
+
 .xamt-message__actions button:hover {
   color: var(--xamt-accent-2);
 }

@@ -11,6 +11,7 @@
  */
 import { MglIME } from "../../vendor/mgl-web-ime/mgl-web-ime.js"
 import { imeProvider } from "../utils/ime.js"
+import { attachVirtualKeyboard } from "../utils/ime-keyboard.js"
 
 const instances = new WeakMap()
 
@@ -25,6 +26,7 @@ export const MongolianIME = {
       provider: imeProvider(),
       mount: document.body,
     })
+    this._detachKeyboard = attachVirtualKeyboard(ime)
     instances.set(this.el, ime)
   },
 
@@ -33,6 +35,7 @@ export const MongolianIME = {
   },
 
   destroyed() {
+    this._detachKeyboard?.()
     const ime = instances.get(this.el)
     if (ime && typeof ime.destroy === "function") ime.destroy()
     instances.delete(this.el)

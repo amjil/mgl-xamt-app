@@ -71,8 +71,9 @@
 
   /* Usable viewport height. `dvh` tracks the dynamic toolbar; `svh` is the
      fallback. The ViewportKeyboard hook narrows it further while a keyboard
-     is open. */
+     is open. `--xamt-ime-kb` is the custom Mongolian keyboard inset. */
   --xamt-vh: 100svh;
+  --xamt-ime-kb: 0px;
   --xamt-safe-top: env(safe-area-inset-top, 0px);
   --xamt-safe-right: env(safe-area-inset-right, 0px);
   --xamt-safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -80,10 +81,11 @@
 
   /* A vertical field's `inline-size` is its *physical height*, so it has to be
      capped against the viewport or it runs off the bottom of a phone. */
-  --xamt-field-extent: clamp(7rem, calc(var(--xamt-vh) - 11rem), 16rem);
-  --xamt-field-extent-lg: clamp(8rem, calc(var(--xamt-vh) - 10rem), 18rem);
+  --xamt-field-extent: clamp(7rem, calc(var(--xamt-vh) - var(--xamt-ime-kb) - 11rem), 16rem);
+  --xamt-field-extent-lg: clamp(8rem, calc(var(--xamt-vh) - var(--xamt-ime-kb) - 10rem), 18rem);
 
   --xamt-leftnav-w: 4.75rem;
+  --xamt-toolbar-w: 3.15rem;
   --xamt-z-jump: 15;
   --xamt-z-settings: 20;
   --xamt-z-drawer-backdrop: 25;

@@ -3,7 +3,7 @@
 .xamt-chat {
   position: relative;
   height: 100%;
-  max-height: var(--xamt-vh);
+  max-height: calc(var(--xamt-vh) - var(--xamt-ime-kb));
   overflow: hidden;
 }
 
@@ -14,7 +14,7 @@
   grid-template-columns: 4.75rem 20rem minmax(0, 1fr);
   grid-template-rows: minmax(0, 100%);
   height: 100%;
-  max-height: var(--xamt-vh);
+  max-height: calc(var(--xamt-vh) - var(--xamt-ime-kb));
   overflow: hidden;
   font-family: var(--xamt-font-mongol);
   background: var(--xamt-bg);
@@ -512,6 +512,16 @@
   background: color-mix(in srgb, var(--xamt-bg-2) 55%, transparent);
 }
 
+.xamt-chat-window {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .xamt-main__title {
   margin: 0;
   display: flex;
@@ -520,9 +530,9 @@
   gap: 0.35rem;
 }
 
-.xamt-mobile-nav {
+.xamt-mobile-nav__btn,
+.xamt-search__toggle {
   display: none;
-  gap: 0.35rem;
 }
 
 /* Only rendered while a drawer is open; hidden above the drawer breakpoint */
@@ -549,20 +559,29 @@
   }
 }
 
-.xamt-mobile-nav button {
+.xamt-mobile-nav__btn {
   border: 1px solid var(--xamt-line);
   background: var(--xamt-bg-2);
   color: inherit;
   border-radius: 0.55rem;
   padding: 0.4rem 0.5rem;
-  display: grid;
   place-items: center;
-  transition: background-color 150ms ease, border-color 150ms ease;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
 }
 
-.xamt-mobile-nav button:hover {
+.xamt-mobile-nav__btn:hover,
+.xamt-mobile-nav__btn[aria-expanded="true"] {
   background: var(--xamt-bg-3);
   border-color: var(--xamt-line-strong);
+  color: var(--xamt-accent-2);
+}
+
+.xamt-app--panel-channels .xamt-mobile-nav__menu,
+.xamt-app--panel-servers .xamt-mobile-nav__menu,
+.xamt-app--panel-members .xamt-mobile-nav__members {
+  background: var(--xamt-accent-soft);
+  border-color: color-mix(in srgb, var(--xamt-accent) 48%, var(--xamt-line));
 }
 
 .xamt-composer-wrap {
@@ -872,5 +891,188 @@
 .xamt-sheet--menu.is-open .xamt-sheet__panel {
   transform: translateY(0) scale(1);
   opacity: 1;
+}
+
+@media (max-width: 1200px) {
+  .xamt-app {
+    grid-template-columns: 4.5rem 16rem minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 960px) {
+  .xamt-app {
+    grid-template-columns: minmax(0, 1fr);
+    position: relative;
+  }
+
+  /* Physical two columns: toolbar | chat. Chat stays vertical-lr inside. */
+  .xamt-main {
+    writing-mode: horizontal-tb;
+    -webkit-writing-mode: horizontal-tb;
+    display: grid;
+    grid-template-columns: var(--xamt-toolbar-w) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .xamt-mobile-toolbar {
+    writing-mode: vertical-lr;
+    -webkit-writing-mode: vertical-lr;
+    text-orientation: mixed;
+    width: var(--xamt-toolbar-w);
+    height: 100%;
+    min-width: 0;
+    padding: 0.55rem 0.3rem;
+    gap: 0.45rem;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  .xamt-mobile-nav__btn,
+  .xamt-search__toggle {
+    display: grid;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    flex: 0 0 auto;
+  }
+
+  .xamt-mobile-nav__members {
+    margin-inline-start: auto;
+  }
+
+  .xamt-chat-window {
+    writing-mode: vertical-lr;
+    -webkit-writing-mode: vertical-lr;
+    text-orientation: mixed;
+    min-width: 0;
+  }
+
+  .xamt-search__toggle {
+    border: 1px solid var(--xamt-line);
+    background: var(--xamt-bg-2);
+  }
+
+  .xamt-search:not(.is-open) .xamt-search__field {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+  }
+
+  .xamt-search.is-open .xamt-search__field {
+    position: fixed;
+    top: calc(var(--xamt-safe-top) + 0.55rem);
+    left: calc(var(--xamt-safe-left) + var(--xamt-toolbar-w) + 0.4rem);
+    z-index: calc(var(--xamt-z-drawer) + 1);
+    display: block;
+  }
+
+  .xamt-search.is-open #clear-search {
+    position: fixed;
+    top: calc(var(--xamt-safe-top) + 0.55rem);
+    left: calc(var(--xamt-safe-left) + var(--xamt-toolbar-w) + 3.1rem);
+    z-index: calc(var(--xamt-z-drawer) + 1);
+  }
+
+  .xamt-rail--servers,
+  .xamt-rail--channels {
+    display: none;
+  }
+
+  .xamt-app--panel-servers .xamt-rail--servers,
+  .xamt-app--panel-channels .xamt-rail--servers {
+    display: flex;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: var(--xamt-z-drawer);
+    width: 4.75rem;
+    animation: xamt-drawer-in 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .xamt-app--panel-servers .xamt-rail--channels,
+  .xamt-app--panel-channels .xamt-rail--channels {
+    display: grid;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 4.75rem;
+    z-index: var(--xamt-z-drawer);
+    width: min(calc(85vw - 4.75rem), 20rem);
+    height: 100%;
+    grid-template-rows: minmax(0, 1fr);
+    box-shadow: var(--xamt-shadow);
+    animation: xamt-drawer-in 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .xamt-app--panel-channels .xamt-rail__pane--members,
+  .xamt-app--panel-servers .xamt-rail__pane--members {
+    display: none;
+  }
+
+  .xamt-app--panel-members .xamt-rail--channels {
+    display: grid;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    left: auto;
+    z-index: var(--xamt-z-drawer);
+    width: min(85vw, 22rem);
+    height: 100%;
+    grid-template-rows: minmax(0, 1fr);
+    box-shadow: var(--xamt-shadow);
+    animation: xamt-drawer-in-right 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .xamt-app--panel-members .xamt-rail__pane--top {
+    display: none;
+  }
+
+  .xamt-drawer-backdrop {
+    display: block;
+  }
+
+  .xamt-icon-btn {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+
+  .xamt-channel-link,
+  .xamt-member {
+    padding-block: 0.75rem;
+  }
+
+  .xamt-composer-wrap {
+    padding: 0.5rem 0.4rem;
+    gap: 0.4rem;
+  }
+
+  .xamt-composer__editor {
+    block-size: 5.75rem;
+    min-block-size: 5.25rem;
+    max-block-size: 6.5rem;
+  }
+
+  .xamt-btn,
+  .xamt-icon-btn,
+  .xamt-mobile-nav__btn,
+  .xamt-channel-link,
+  .xamt-member,
+  .xamt-server-dot {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: color-mix(in srgb, var(--xamt-accent) 18%, transparent);
+  }
+}
+
+@media (max-width: 640px) {
+  .xamt-search__field .xamt-input {
+    inline-size: 6.5rem;
+  }
+
+  .xamt-mobile-toolbar {
+    padding: 0.45rem 0.22rem;
+  }
 }
 

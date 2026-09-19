@@ -5,6 +5,7 @@
 import { createMongolianEditor } from "../../vendor/mongolian-editor.js"
 import { MglIME, createCustomAdapter } from "../../vendor/mgl-web-ime/mgl-web-ime.js"
 import { imeProvider } from "../utils/ime.js"
+import { attachVirtualKeyboard, suppressSystemKeyboard } from "../utils/ime-keyboard.js"
 import { OfflineStore, toast } from "../utils/offline-store.js"
 import { highlightMessage as flashHighlight } from "../utils/highlight-message.js"
 import { attachMessageScrollLock } from "./message-scroll.js"
@@ -158,6 +159,10 @@ export const MessageComposer = {
       provider: imeProvider(),
       mount: document.body,
     })
+    suppressSystemKeyboard(this.host)
+    this._onEditableFocus = (e) => suppressSystemKeyboard(e.target)
+    this.host.addEventListener("focusin", this._onEditableFocus)
+    this._detachKeyboard = attachVirtualKeyboard(this.ime)
 
     // Send lives in the toolbar, outside this hook's phx-update="ignore"
     // node. Reply/edit patches replace that button, and updated() does not
@@ -233,6 +238,8 @@ export const MessageComposer = {
     document.removeEventListener("click", this._onSend)
     window.removeEventListener("online", this._onOnline)
     this.host?.removeEventListener("paste", this._onPaste, true)
+    this.host?.removeEventListener("focusin", this._onEditableFocus)
+    this._detachKeyboard?.()
     if (this.ime && typeof this.ime.destroy === "function") this.ime.destroy()
   },
 

@@ -304,4 +304,51 @@ defmodule XamtWeb.ServerLiveTest do
 
     assert to =~ "/servers/#{server.slug}"
   end
+
+  test "mobile menu opens the channel drawer and backdrop closes it", %{
+    conn: conn,
+    server: server,
+    channel: channel
+  } do
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    assert has_element?(view, "#mobile-nav-menu")
+    assert has_element?(view, "#mobile-nav-members")
+    assert has_element?(view, ".xamt-app--panel-messages")
+    refute has_element?(view, "#drawer-backdrop")
+
+    view |> element("#mobile-nav-menu") |> render_click()
+    assert has_element?(view, ".xamt-app--panel-channels")
+    assert has_element?(view, "#drawer-backdrop")
+
+    view |> element("#drawer-backdrop") |> render_click()
+    assert has_element?(view, ".xamt-app--panel-messages")
+    refute has_element?(view, "#drawer-backdrop")
+  end
+
+  test "mobile members button opens the members drawer", %{
+    conn: conn,
+    server: server,
+    channel: channel
+  } do
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    view |> element("#mobile-nav-members") |> render_click()
+    assert has_element?(view, ".xamt-app--panel-members")
+    assert has_element?(view, "#drawer-backdrop")
+  end
+
+  test "selecting the current channel closes the mobile drawer", %{
+    conn: conn,
+    server: server,
+    channel: channel
+  } do
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    view |> element("#mobile-nav-menu") |> render_click()
+    assert has_element?(view, ".xamt-app--panel-channels")
+
+    view |> element("#channel-link-#{channel.slug}") |> render_click()
+    assert has_element?(view, ".xamt-app--panel-messages")
+    refute has_element?(view, "#drawer-backdrop")
+  end
 end

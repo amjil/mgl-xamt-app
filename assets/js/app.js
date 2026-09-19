@@ -13,7 +13,7 @@ import {MobileDrawer} from "./hooks/mobile-drawer"
 import {ToastHandler} from "./hooks/toast-handler"
 import {ReadReceipt} from "./hooks/read-receipt"
 import {adoptImeElements} from "./utils/ime"
-import {trackViewportHeight} from "./utils/viewport"
+import {trackViewportHeight, trackImeKeyboard} from "./utils/viewport"
 import {toast} from "./utils/offline-store"
 import {highlightMessageById} from "./utils/highlight-message"
 
@@ -75,6 +75,7 @@ window.addEventListener("xamt:copy", async (event) => {
 })
 
 trackViewportHeight()
+trackImeKeyboard()
 adoptImeElements()
 window.addEventListener("DOMContentLoaded", () => adoptImeElements())
 

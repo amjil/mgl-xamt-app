@@ -28,3 +28,8 @@
 @import "./chat.css";
 @import "./message.css";
 @import "../vendor/mgl-web-ime/mgl-web-ime.css";
+
+/* Host owns the keyboard inset via --xamt-ime-kb; don't also pad the body. */
+body.mgl-ime-mobile-open {
+  padding-bottom: 0;
+}

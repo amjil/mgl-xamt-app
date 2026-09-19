@@ -1,10 +1,12 @@
 /**
- * Closes the mobile server/channel/member drawers with Escape or a left swipe.
+ * Mobile drawers: edge-swipe to open, opposite swipe or Escape to close.
  * The drawers themselves are pure CSS driven by the `xamt-app--panel-*` class.
  */
 const CLOSED_PANEL = "messages"
 const SWIPE_DISTANCE = 60
 const SWIPE_DRIFT = 50
+const EDGE = 28
+const DRAWER_BREAKPOINT = 960
 
 export const MobileDrawer = {
   mounted() {
@@ -13,7 +15,7 @@ export const MobileDrawer = {
     }
 
     this._onTouchStart = (e) => {
-      if (!this.openPanel() || e.touches.length !== 1) {
+      if (!this.isMobile() || e.touches.length !== 1) {
         this._start = null
         return
       }
@@ -23,13 +25,28 @@ export const MobileDrawer = {
     this._onTouchEnd = (e) => {
       const start = this._start
       this._start = null
-      if (!start) return
+      if (!start || !this.isMobile()) return
 
       const touch = e.changedTouches[0]
       const dx = touch.clientX - start.x
       const dy = Math.abs(touch.clientY - start.y)
-      // Drawers slide in from the left, so a leftward swipe dismisses them
-      if (dx < -SWIPE_DISTANCE && dy < SWIPE_DRIFT) this.close()
+      if (dy >= SWIPE_DRIFT) return
+
+      const panel = this.openPanel()
+      if (panel === "members") {
+        if (dx > SWIPE_DISTANCE) this.close()
+        return
+      }
+      if (panel) {
+        if (dx < -SWIPE_DISTANCE) this.close()
+        return
+      }
+
+      if (start.x < EDGE && dx > SWIPE_DISTANCE) {
+        this.pushEvent("set_mobile_panel", {panel: "channels"})
+      } else if (start.x > window.innerWidth - EDGE && dx < -SWIPE_DISTANCE) {
+        this.pushEvent("set_mobile_panel", {panel: "members"})
+      }
     }
 
     document.addEventListener("keydown", this._onKey)
@@ -41,6 +58,10 @@ export const MobileDrawer = {
     document.removeEventListener("keydown", this._onKey)
     this.el.removeEventListener("touchstart", this._onTouchStart)
     this.el.removeEventListener("touchend", this._onTouchEnd)
+  },
+
+  isMobile() {
+    return window.innerWidth <= DRAWER_BREAKPOINT
   },
 
   openPanel() {
