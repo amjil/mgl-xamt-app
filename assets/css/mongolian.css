@@ -69,8 +69,9 @@
   color-scheme: light;
 
   /* Usable viewport height. `dvh` tracks the dynamic toolbar; `svh` is the
-     fallback. The ViewportKeyboard hook narrows it further while a keyboard
-     is open. `--xamt-ime-kb` is the custom Mongolian keyboard inset. */
+     fallback. `initVisualViewport()` overwrites this with visualViewport.height
+     while a system keyboard is open. `--xamt-ime-kb` is the in-page Mongolian
+     keyboard inset and is subtracted by the chat shell separately. */
   --xamt-vh: 100svh;
   --xamt-ime-kb: 0px;
   --xamt-safe-top: env(safe-area-inset-top, 0px);

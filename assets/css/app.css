@@ -33,3 +33,14 @@
 body.mgl-ime-mobile-open {
   padding-bottom: 0;
 }
+
+/* Keyboard-safe shell: --xamt-vh is kept in sync by initVisualViewport().
+   overflow:hidden is set on html/body in mongolian.css so iOS cannot rubber-band
+   the page behind the keys. Inner surfaces contain overscroll so the chain
+   never reaches the locked root. */
+.xamt-messages,
+.xamt-composer__editor {
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}

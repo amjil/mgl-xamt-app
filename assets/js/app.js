@@ -13,9 +13,13 @@ import {MobileDrawer} from "./hooks/mobile-drawer"
 import {ToastHandler} from "./hooks/toast-handler"
 import {ReadReceipt} from "./hooks/read-receipt"
 import {adoptImeElements} from "./utils/ime"
-import {trackViewportHeight, trackImeKeyboard} from "./utils/viewport"
+import {initVisualViewport, trackImeKeyboard} from "./utils/viewport"
 import {toast} from "./utils/offline-store"
 import {highlightMessageById} from "./utils/highlight-message"
+
+// Bind --xamt-vh before LiveSocket so the shell is already keyboard-aware
+initVisualViewport()
+trackImeKeyboard()
 
 const Hooks = {
   ...colocatedHooks,
@@ -74,8 +78,6 @@ window.addEventListener("xamt:copy", async (event) => {
   }
 })
 
-trackViewportHeight()
-trackImeKeyboard()
 adoptImeElements()
 window.addEventListener("DOMContentLoaded", () => adoptImeElements())
 
