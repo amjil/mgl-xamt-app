@@ -144,6 +144,7 @@ function buildEditorAdapter(getRoot) {
 export const MessageComposer = {
   mounted() {
     this.wrap = this.el.closest(".xamt-composer-wrap") || this.el
+    this._channelId = this.wrap?.dataset?.channelId
     this.host = this.el.querySelector(".xamt-composer__editor") || this.el
     this.editor = createMongolianEditor(this.host)
     this._root = () => editorRoot(this.host)
@@ -245,7 +246,16 @@ export const MessageComposer = {
   },
 
   updated() {
-    this.wrap = this.el.closest(".xamt-composer-wrap") || this.wrap
+    const wrap = this.el.closest(".xamt-composer-wrap") || this.wrap
+    const channelId = wrap?.dataset?.channelId
+    if (this._channelId && channelId && this._channelId !== channelId) {
+      // Server already untracked the previous channel; reset so the next
+      // keystroke in the new channel emits typing_started.
+      this._isTyping = false
+      clearTimeout(this._typingTimer)
+    }
+    this._channelId = channelId
+    this.wrap = wrap
   },
 
   // LiveView WebSocket restored — retry queued pushEvents

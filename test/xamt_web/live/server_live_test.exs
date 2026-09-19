@@ -6,6 +6,7 @@ defmodule XamtWeb.ServerLiveTest do
 
   alias Xamt.{Accounts, Servers, Channels, Messages}
   alias Xamt.Messages.Reaction
+  alias XamtWeb.TypingTracker
 
   setup %{conn: conn} do
     user = user_fixture()
@@ -592,5 +593,119 @@ defmodule XamtWeb.ServerLiveTest do
     refute has_element?(view, "#edit-message-#{message.id}")
     refute has_element?(view, "#delete-message-#{message.id}")
     assert has_element?(view, "#reply-message-#{message.id}")
+  end
+
+  test "typing_started tracks the user without a per-keystroke broadcast", %{
+    conn: conn,
+    user: user,
+    server: server,
+    channel: channel
+  } do
+    {:ok, view, html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    assert has_element?(view, "#channel-typing")
+    refute html =~ "is typing..."
+
+    topic = TypingTracker.topic(channel)
+    Phoenix.PubSub.subscribe(Xamt.PubSub, topic)
+
+    render_hook(view, "typing_started", %{})
+    tracked = List.keyfind(TypingTracker.list(channel), user.id, 0)
+    assert tracked
+    assert elem(tracked, 0) == user.id
+
+    assert_receive {:typing_diff, ^topic, _joins, _leaves}, 500
+    refute render(view) =~ "is typing..."
+  end
+
+  test "batched typing diffs show other members and hide them on stop", %{
+    conn: conn,
+    user: user,
+    server: server,
+    channel: channel
+  } do
+    member = user_fixture(%{username: unique_user_username(), display_name: "Typer One"})
+
+    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(member), server.id)
+    member_conn = log_in_user(build_conn(), member)
+
+    {:ok, owner_view, _} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    {:ok, member_view, _} = live(member_conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    topic = TypingTracker.topic(channel)
+    Phoenix.PubSub.subscribe(Xamt.PubSub, topic)
+
+    render_hook(member_view, "typing_started", %{})
+    assert_receive {:typing_diff, ^topic, _joins, _leaves}, 500
+    assert render(owner_view) =~ "Typer One is typing..."
+
+    render_hook(owner_view, "typing_started", %{})
+    assert_receive {:typing_diff, ^topic, _joins, _leaves}, 500
+    html = render(owner_view)
+    assert html =~ "Typer One is typing..."
+    refute html =~ "#{user.username} is typing"
+
+    render_hook(member_view, "typing_stopped", %{})
+    assert_receive {:typing_diff, ^topic, _joins, _leaves}, 500
+    refute render(owner_view) =~ "Typer One is typing..."
+  end
+
+  test "typing label aggregates two and several typists", %{
+    conn: conn,
+    user: user,
+    server: server,
+    channel: channel
+  } do
+    {:ok, view, _} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    topic = TypingTracker.topic(channel)
+
+    send(
+      view.pid,
+      {:typing_diff, topic, [{Ecto.UUID.generate(), %{display_name: "Ada"}}], []}
+    )
+
+    assert render(view) =~ "Ada is typing..."
+
+    send(
+      view.pid,
+      {:typing_diff, topic,
+       [
+         {Ecto.UUID.generate(), %{display_name: "Bob"}}
+       ], []}
+    )
+
+    html = render(view)
+    assert html =~ "Ada and Bob are typing..." or html =~ "Bob and Ada are typing..."
+
+    send(
+      view.pid,
+      {:typing_diff, topic, [{Ecto.UUID.generate(), %{display_name: "Cyd"}}], []}
+    )
+
+    assert render(view) =~ "Several people are typing..."
+
+    send(
+      view.pid,
+      {:typing_diff, TypingTracker.topic("other"), [{user.id, %{username: "nope"}}], []}
+    )
+
+    refute render(view) =~ "nope"
+  end
+
+  test "switching channels untracks typing on the previous channel", %{
+    conn: conn,
+    user: user,
+    scope: scope,
+    server: server,
+    channel: channel
+  } do
+    {:ok, other} = Channels.create_channel(scope, server, %{"name" => "second"})
+    {:ok, view, _} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    render_hook(view, "typing_started", %{})
+    assert List.keyfind(TypingTracker.list(channel), user.id, 0)
+
+    view |> element("#channel-link-#{other.slug}") |> render_click()
+    assert_patch(view, ~p"/servers/#{server.slug}/#{other.slug}")
+    refute List.keyfind(TypingTracker.list(channel), user.id, 0)
   end
 end

@@ -13,9 +13,10 @@ defmodule Xamt.Application do
       {DNSCluster, query: Application.get_env(:xamt, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Xamt.PubSub},
       XamtWeb.Presence,
+      {Task.Supervisor, name: Xamt.TaskSupervisor},
+      {XamtWeb.TypingTracker, Application.get_env(:xamt, XamtWeb.TypingTracker, [])},
       Xamt.Channels.LastMessageCache,
       Xamt.Messages.RateLimiter,
-      {Task.Supervisor, name: Xamt.TaskSupervisor},
       XamtWeb.Endpoint
     ]
 

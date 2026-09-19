@@ -516,5 +516,9 @@ a.xamt-mention:hover {
   padding: 0 1rem 0.35rem;
   color: var(--xamt-muted);
   font-size: 0.85rem;
+  /* Reserved slot: block axis is width under vertical-lr, so the composer
+     does not jump when a batched typing diff arrives. */
+  min-width: 1.5rem;
+  min-height: 1.5rem;
 }
 

@@ -6,6 +6,7 @@ defmodule XamtWeb.ServerLive do
   alias Xamt.Messages.Reaction
   alias Xamt.Servers.Server
   alias XamtWeb.Presence
+  alias XamtWeb.TypingTracker
 
   @message_page_size 50
   @member_page_size 50
@@ -51,6 +52,7 @@ defmodule XamtWeb.ServerLive do
 
       if channel do
         Presence.track_user(self(), channel_topic(channel), scope.user)
+        subscribe_typing(channel)
       end
     end
 
@@ -76,7 +78,7 @@ defmodule XamtWeb.ServerLive do
       |> stream(:members, members)
       |> assign(:active_channel, channel)
       |> assign(:online_users, list_online(channel))
-      |> assign(:typing_users, %{})
+      |> assign(:typing_users, list_typists(channel, scope.user.id))
       |> assign(:editing_message_id, nil)
       |> assign(:replying_to, nil)
       |> assign(:channel_form, to_form(Channels.change_channel(%Channel{}), as: :channel))
@@ -481,16 +483,14 @@ defmodule XamtWeb.ServerLive do
   end
 
   def handle_event("typing_started", _params, socket) do
-    channel = socket.assigns.active_channel
-    user = socket.assigns.current_scope.user
+    case socket.assigns.active_channel do
+      nil ->
+        {:noreply, socket}
 
-    Phoenix.PubSub.broadcast(
-      Xamt.PubSub,
-      channel_topic(channel),
-      {:typing_started, channel.id, user.id, display_name(user)}
-    )
-
-    {:noreply, socket}
+      channel ->
+        TypingTracker.track_user(self(), channel, socket.assigns.current_scope.user)
+        {:noreply, socket}
+    end
   end
 
   def handle_event("mention_search", params, socket) do
@@ -520,16 +520,14 @@ defmodule XamtWeb.ServerLive do
   end
 
   def handle_event("typing_stopped", _params, socket) do
-    channel = socket.assigns.active_channel
-    user = socket.assigns.current_scope.user
+    case socket.assigns.active_channel do
+      nil ->
+        {:noreply, socket}
 
-    Phoenix.PubSub.broadcast(
-      Xamt.PubSub,
-      channel_topic(channel),
-      {:typing_stopped, channel.id, user.id}
-    )
-
-    {:noreply, socket}
+      channel ->
+        TypingTracker.untrack_user(self(), channel, socket.assigns.current_scope.user)
+        {:noreply, socket}
+    end
   end
 
   def handle_event("set_mobile_panel", %{"panel" => panel}, socket)
@@ -663,29 +661,20 @@ defmodule XamtWeb.ServerLive do
     end
   end
 
-  def handle_info({:typing_started, channel_id, user_id, name}, socket) do
+  def handle_info({:typing_diff, topic, joins, leaves}, socket) do
     active = socket.assigns.active_channel
 
-    cond do
-      is_nil(active) or active.id != channel_id ->
-        {:noreply, socket}
-
-      user_id == socket.assigns.current_scope.user.id ->
-        {:noreply, socket}
-
-      true ->
-        typing = Map.put(socket.assigns.typing_users, user_id, name)
-        {:noreply, assign(socket, :typing_users, typing)}
-    end
-  end
-
-  def handle_info({:typing_stopped, channel_id, user_id}, socket) do
-    active = socket.assigns.active_channel
-
-    if active && active.id == channel_id do
-      {:noreply, assign(socket, :typing_users, Map.delete(socket.assigns.typing_users, user_id))}
-    else
+    if is_nil(active) or TypingTracker.topic(active) != topic do
       {:noreply, socket}
+    else
+      current_user_id = socket.assigns.current_scope.user.id
+
+      typing_users =
+        socket.assigns.typing_users
+        |> drop_typists(leaves, active)
+        |> put_typists(joins, current_user_id)
+
+      {:noreply, assign(socket, :typing_users, typing_users)}
     end
   end
 
@@ -1248,7 +1237,7 @@ defmodule XamtWeb.ServerLive do
               </button>
             </div>
 
-            <div :if={map_size(@typing_users) > 0} class="xamt-typing">
+            <div id="channel-typing" class="xamt-typing mongol-text">
               {typing_label(@typing_users)}
             </div>
 
@@ -1687,6 +1676,9 @@ defmodule XamtWeb.ServerLive do
       if (connected?(socket) and old_channel) && old_channel.id != channel.id do
         Presence.untrack_user(self(), channel_topic(old_channel), scope.user)
         Presence.track_user(self(), channel_topic(channel), scope.user)
+        TypingTracker.untrack_user(self(), old_channel, scope.user)
+        unsubscribe_typing(old_channel)
+        subscribe_typing(channel)
         socket
       else
         socket
@@ -1697,7 +1689,7 @@ defmodule XamtWeb.ServerLive do
     socket
     |> assign(:active_channel, channel)
     |> assign(:online_users, list_online(channel))
-    |> assign(:typing_users, %{})
+    |> assign(:typing_users, list_typists(channel, scope.user.id))
     |> assign(:editing_message_id, nil)
     |> assign(:replying_to, nil)
     |> assign(:mobile_panel, :messages)
@@ -1825,6 +1817,18 @@ defmodule XamtWeb.ServerLive do
     Phoenix.PubSub.subscribe(Xamt.PubSub, channel_topic(channel))
   end
 
+  defp subscribe_typing(nil), do: :ok
+
+  defp subscribe_typing(%Channel{} = channel) do
+    Phoenix.PubSub.subscribe(Xamt.PubSub, TypingTracker.topic(channel))
+  end
+
+  defp unsubscribe_typing(nil), do: :ok
+
+  defp unsubscribe_typing(%Channel{} = channel) do
+    Phoenix.PubSub.unsubscribe(Xamt.PubSub, TypingTracker.topic(channel))
+  end
+
   defp server_channel?(socket, channel_id) do
     Enum.any?(socket.assigns.channels, &(&1.id == channel_id))
   end
@@ -1876,6 +1880,36 @@ defmodule XamtWeb.ServerLive do
         avatar: presence_meta(meta, :avatar)
       }
     end)
+  end
+
+  defp list_typists(nil, _), do: %{}
+
+  defp list_typists(channel, current_user_id) do
+    Enum.reduce(TypingTracker.list(channel), %{}, fn {user_id, meta}, acc ->
+      put_typist(acc, user_id, meta, current_user_id)
+    end)
+  end
+
+  defp drop_typists(typing_users, leaves, channel) do
+    Enum.reduce(leaves, typing_users, fn {user_id, _meta}, acc ->
+      if TypingTracker.still_typing?(channel, user_id) do
+        acc
+      else
+        Map.delete(acc, user_id)
+      end
+    end)
+  end
+
+  defp put_typists(typing_users, joins, current_user_id) do
+    Enum.reduce(joins, typing_users, fn {user_id, meta}, acc ->
+      put_typist(acc, user_id, meta, current_user_id)
+    end)
+  end
+
+  defp put_typist(typing_users, user_id, _meta, user_id), do: typing_users
+
+  defp put_typist(typing_users, user_id, meta, _current_user_id) do
+    Map.put(typing_users, user_id, TypingTracker.display_name(meta))
   end
 
   defp presence_meta(meta, key) when is_atom(key) do
@@ -1946,8 +1980,21 @@ defmodule XamtWeb.ServerLive do
   defp decorate_own_mentions(html, _), do: html
 
   defp typing_label(typing_users) do
-    names = Map.values(typing_users) |> Enum.join(", ")
-    gettext("%{names} typing…", names: names)
+    names = Map.values(typing_users)
+
+    case names do
+      [] ->
+        ""
+
+      [name] ->
+        gettext("%{name} is typing...", name: name)
+
+      [name1, name2] ->
+        gettext("%{name1} and %{name2} are typing...", name1: name1, name2: name2)
+
+      _ ->
+        gettext("Several people are typing...")
+    end
   end
 
   defp decode_json(nil), do: %{}

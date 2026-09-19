@@ -31,6 +31,10 @@ config :xamt, :ime_base_url, nil
 # Message send rate limit (ETS sliding window). Tests override limit.
 config :xamt, Xamt.Messages.RateLimiter, limit: 5, window_seconds: 3
 
+# Dedicated typing tracker. Batches join/leave diffs to at most one
+# broadcast per window so large channels do not storm PubSub.
+config :xamt, XamtWeb.TypingTracker, broadcast_period: 2_000
+
 # Local VAPID pair for development. Production reads env vars in runtime.exs.
 # Generate a new pair with: mix web_push_ex.vapid
 config :web_push_ex, :vapid,
