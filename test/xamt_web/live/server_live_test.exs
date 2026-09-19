@@ -109,14 +109,18 @@ defmodule XamtWeb.ServerLiveTest do
     {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
     emoji = hd(Reaction.emojis())
 
-    view
-    |> element(
+    picker =
       ".xamt-reaction-picker button[phx-value-emoji='#{emoji}'][phx-value-id='#{message.id}']"
-    )
+
+    chip =
+      ".xamt-reaction:not(.xamt-reaction--add)[phx-value-emoji='#{emoji}'][phx-value-id='#{message.id}']"
+
+    view
+    |> element(picker)
     |> render_click()
 
-    html = render(view)
-    assert html =~ emoji
+    assert has_element?(view, chip)
+    refute has_element?(view, picker)
   end
 
   test "search finds a message in the channel", %{

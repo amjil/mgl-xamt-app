@@ -1175,9 +1175,12 @@ defmodule XamtWeb.ServerLive do
                           <span class="xamt-reaction__count">{length(user_ids)}</span>
                         </button>
 
-                        <div class="xamt-reaction-picker">
+                        <div
+                          :if={picker_emojis(@reactions, message.id) != []}
+                          class="xamt-reaction-picker"
+                        >
                           <button
-                            :for={emoji <- Reaction.emojis()}
+                            :for={emoji <- picker_emojis(@reactions, message.id)}
                             type="button"
                             class="xamt-reaction xamt-reaction--add"
                             phx-click="toggle_reaction"
@@ -1185,7 +1188,7 @@ defmodule XamtWeb.ServerLive do
                             phx-value-emoji={emoji}
                             aria-label={emoji}
                           >
-                            {emoji}
+                            <span class="xamt-reaction__emoji">{emoji}</span>
                           </button>
                         </div>
                       </div>
@@ -1377,6 +1380,10 @@ defmodule XamtWeb.ServerLive do
     reactions
     |> Map.get(message_id, %{})
     |> Enum.sort_by(fn {emoji, _users} -> Enum.find_index(Reaction.emojis(), &(&1 == emoji)) end)
+  end
+
+  defp picker_emojis(reactions, message_id) do
+    Reaction.emojis() -- Map.keys(Map.get(reactions, message_id, %{}))
   end
 
   defp maybe_done_loading(socket, _event, true), do: socket

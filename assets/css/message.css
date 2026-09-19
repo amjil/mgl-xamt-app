@@ -338,34 +338,38 @@ a.xamt-mention:hover {
   color: var(--xamt-accent-2);
 }
 
-/* Reaction chips run down the column; the picker appears on hover/focus */
+/* Reaction chips stay in the column. The count is a sideways run — same
+   treatment as .xamt-message__time — so five digits grow down the column
+   instead of widening it via an orthogonal horizontal-tb chip. */
 .xamt-reactions {
   display: flex;
   flex-direction: row;
   align-items: flex-start;
   gap: 0.3rem;
-  margin-top: 0.35rem;
+  margin-block-start: 0.35rem;
 }
 
 .xamt-reaction {
-  writing-mode: horizontal-tb;
-  -webkit-writing-mode: horizontal-tb;
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
   display: inline-flex;
+  flex-direction: row;
   align-items: center;
-  gap: 0.2rem;
-  padding: 0.1rem 0.4rem;
+  gap: 0.15rem;
+  padding: 0.2rem 0.25rem;
   border: 1px solid var(--xamt-line);
-  border-radius: 999px;
+  border-radius: 0.75rem;
   background: var(--xamt-bg-2);
   color: var(--xamt-muted);
   font-size: 0.8rem;
-  line-height: 1.6;
+  line-height: 1.2;
   cursor: pointer;
   transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
 }
 
 .xamt-reaction:hover {
-  transform: translateY(-1px);
+  transform: translateX(-1px);
   border-color: var(--xamt-line-strong);
 }
 
@@ -375,9 +379,34 @@ a.xamt-mention:hover {
   color: var(--xamt-text);
 }
 
+.xamt-reaction__emoji {
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  -webkit-text-orientation: mixed;
+  display: block;
+  flex: 0 0 auto;
+  line-height: 1;
+  font-style: normal;
+}
+
 .xamt-reaction__count {
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: sideways;
+  -webkit-text-orientation: sideways;
   font-family: var(--xamt-font-ui);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
+  font-size: 0.75rem;
+  line-height: 1;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.xamt-reaction--add {
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  padding: 0.2rem;
 }
 
 .xamt-reaction-picker {
@@ -430,8 +459,9 @@ a.xamt-mention:hover {
   }
 
   .xamt-reaction {
-    min-height: 2.25rem;
-    padding: 0.2rem 0.5rem;
+    min-inline-size: 2.25rem;
+    min-block-size: 2.25rem;
+    padding: 0.25rem;
   }
 }
 
