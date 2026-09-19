@@ -35,6 +35,29 @@ defmodule Xamt.Messages.Message do
     ])
     |> validate_required([:channel_id, :user_id, :content])
     |> validate_inclusion(:content_type, ~w(plain_text rich_text))
+    |> touch_edited_at()
+  end
+
+  # `updated_at` is second-precision. A same-second edit would otherwise
+  # compare equal to `inserted_at` and skip the "edited" marker.
+  defp touch_edited_at(changeset) do
+    case {changeset.data.id, get_change(changeset, :content_html)} do
+      {id, html} when is_binary(id) and is_binary(html) ->
+        inserted_at = changeset.data.inserted_at
+        now = DateTime.utc_now(:second)
+
+        updated_at =
+          cond do
+            is_nil(inserted_at) -> now
+            DateTime.compare(now, inserted_at) == :gt -> now
+            true -> DateTime.add(inserted_at, 1, :second)
+          end
+
+        put_change(changeset, :updated_at, updated_at)
+
+      _ ->
+        changeset
+    end
   end
 
   @doc false

@@ -210,15 +210,18 @@ defmodule XamtWeb.ServerLive do
 
   def handle_event("edit_message", %{"id" => id}, socket) do
     message = Messages.get_message!(id)
+    previous_id = socket.assigns.editing_message_id
 
-    if message.user_id == socket.assigns.current_scope.user.id do
+    if own_active_message?(socket, message) and is_nil(message.deleted_at) do
       html = message.content_html || ""
 
       {:noreply,
        socket
        |> assign(:editing_message_id, id)
        |> assign(:replying_to, nil)
-       |> push_event("composer:load", %{"html" => html})}
+       |> restream_message(previous_id)
+       |> stream_insert(:messages, message)
+       |> push_event("populate_composer", %{html: html})}
     else
       {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
     end
@@ -254,40 +257,48 @@ defmodule XamtWeb.ServerLive do
     scope = socket.assigns.current_scope
     id = socket.assigns.editing_message_id
 
-    if Enum.any?(socket.assigns.uploads.media.entries, &(not &1.done?)) do
-      {:noreply, put_flash(socket, :error, gettext("Please wait for uploads to finish"))}
-    else
-      media_html = consume_media_html(socket)
+    cond do
+      is_nil(id) ->
+        {:noreply, put_flash(socket, :error, gettext("Could not update message"))}
 
-      attrs = %{
-        "content" => decode_json(params["content_json"]),
-        "content_html" => (params["content_html"] || "") <> media_html,
-        "content_type" => params["content_type"] || "rich_text"
-      }
+      Enum.any?(socket.assigns.uploads.media.entries, &(not &1.done?)) ->
+        {:noreply, put_flash(socket, :error, gettext("Please wait for uploads to finish"))}
 
-      case Messages.update_message(scope, id, attrs) do
-        {:ok, _message} ->
-          {:noreply,
-           socket
-           |> assign(:editing_message_id, nil)
-           |> push_event("composer:clear", %{})}
+      true ->
+        media_html = consume_media_html(socket)
 
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, gettext("Could not update message"))}
-      end
+        attrs = %{
+          "content" => decode_json(params["content_json"]),
+          "content_html" => (params["content_html"] || "") <> media_html,
+          "content_type" => params["content_type"] || "rich_text"
+        }
+
+        case Messages.update_message(scope, id, attrs) do
+          {:ok, _message} ->
+            {:noreply,
+             socket
+             |> assign(:editing_message_id, nil)
+             |> push_event("composer:clear", %{})}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, gettext("Could not update message"))}
+        end
     end
   end
 
   def handle_event("cancel_edit", _params, socket) do
+    previous_id = socket.assigns.editing_message_id
+
     {:noreply,
      socket
      |> assign(:editing_message_id, nil)
      |> assign(:replying_to, nil)
+     |> restream_message(previous_id)
      |> push_event("composer:clear", %{})}
   end
 
   def handle_event("delete_message", %{"id" => id}, socket) do
-    case Messages.soft_delete_message(socket.assigns.current_scope, id) do
+    case Messages.delete_message(socket.assigns.current_scope, id) do
       {:ok, _} -> {:noreply, socket}
       {:error, _} -> {:noreply, put_flash(socket, :error, gettext("Could not delete message"))}
     end
@@ -643,7 +654,10 @@ defmodule XamtWeb.ServerLive do
 
   def handle_info({:deleted_message, message}, socket) do
     if active_channel_message?(socket, message) do
-      {:noreply, stream_delete(socket, :messages, message)}
+      {:noreply,
+       socket
+       |> maybe_cancel_edit(message.id)
+       |> stream_insert(:messages, message)}
     else
       {:noreply, socket}
     end
@@ -1063,132 +1077,163 @@ defmodule XamtWeb.ServerLive do
                   :for={{dom_id, message} <- @streams.messages}
                   id={dom_id}
                   class={[
-                    "xamt-message",
-                    mentioned?(message, @current_scope.user) && "xamt-message--mentioned"
+                    "xamt-message group",
+                    mentioned?(message, @current_scope.user) && "xamt-message--mentioned",
+                    @editing_message_id == message.id && "xamt-message--editing",
+                    deleted?(message) && "xamt-message--deleted"
                   ]}
                   data-message-id={message.id}
                   data-inserted-at={DateTime.to_iso8601(message.inserted_at)}
                 >
                   <.avatar user={message.user} class="xamt-message__avatar" />
-                  <div class="xamt-message__body">
-                    <button
-                      :if={message.reply_to}
-                      type="button"
-                      class="xamt-quote"
-                      phx-click={
-                        JS.dispatch("xamt:highlight",
-                          detail: %{target_id: "messages-#{message.reply_to_id}"}
-                        )
-                      }
-                      title={gettext("Jump to the quoted message")}
-                    >
-                      <span class="xamt-quote__mark" aria-hidden="true">↳</span>
-                      <span class="xamt-quote__author mongol-text">
-                        {display_name(message.reply_to.user)}
-                      </span>
-                      <span class="xamt-quote__text mongol-text">
-                        {Messages.excerpt(message.reply_to)}
-                      </span>
-                    </button>
-                    <header class="xamt-message__meta">
-                      <strong class="mongol-text">{display_name(message.user)}</strong>
-                      <span :if={edited?(message)} class="xamt-message__edited">
-                        {gettext("edited")}
-                      </span>
-                      <time class="xamt-message__time">{format_time(message.inserted_at)}</time>
-                    </header>
-                    <div
-                      id={"msg-content-#{message.id}"}
-                      class="xamt-message__content mongol-text"
-                    >
-                      {raw(safe_html(message, @current_scope.user.id))}
-                      <%= if preview = link_preview(message) do %>
-                        <a
-                          id={"msg-preview-#{message.id}"}
-                          href={preview["url"]}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="xamt-link-preview"
-                        >
-                          <img
-                            :if={preview["image"]}
-                            src={preview["image"]}
-                            alt={preview["title"] || ""}
-                            class="xamt-link-preview__img"
-                            loading="lazy"
-                            referrerpolicy="no-referrer"
-                          />
-                          <div class="xamt-link-preview__body">
-                            <strong
-                              :if={preview["title"]}
-                              class="xamt-link-preview__title mongol-text"
-                            >
-                              {preview["title"]}
-                            </strong>
-                            <p
-                              :if={preview["description"]}
-                              class="xamt-link-preview__desc mongol-text"
-                            >
-                              {preview["description"]}
-                            </p>
-                          </div>
-                        </a>
-                      <% end %>
-                    </div>
-                    <div class="xamt-reactions">
-                      <button
-                        :for={{emoji, user_ids} <- reactions_for(@reactions, message.id)}
-                        type="button"
-                        class={[
-                          "xamt-reaction",
-                          @current_scope.user.id in user_ids && "is-mine"
-                        ]}
-                        phx-click="toggle_reaction"
-                        phx-value-id={message.id}
-                        phx-value-emoji={emoji}
+                  <%= if deleted?(message) do %>
+                    <div class="xamt-message__body">
+                      <header class="xamt-message__meta">
+                        <strong class="mongol-text">{display_name(message.user)}</strong>
+                        <time class="xamt-message__time">{format_time(message.inserted_at)}</time>
+                      </header>
+                      <div
+                        id={"msg-tombstone-#{message.id}"}
+                        class="xamt-message__tombstone mongol-text"
                       >
-                        <span class="xamt-reaction__emoji">{emoji}</span>
-                        <span class="xamt-reaction__count">{length(user_ids)}</span>
+                        <.icon name="hero-trash" class="size-4" />
+                        {gettext("This message was deleted")}
+                      </div>
+                    </div>
+                  <% else %>
+                    <div class="xamt-message__body">
+                      <button
+                        :if={message.reply_to}
+                        type="button"
+                        class="xamt-quote"
+                        phx-click={
+                          JS.dispatch("xamt:highlight",
+                            detail: %{target_id: "messages-#{message.reply_to_id}"}
+                          )
+                        }
+                        title={gettext("Jump to the quoted message")}
+                      >
+                        <span class="xamt-quote__mark" aria-hidden="true">↳</span>
+                        <span class="xamt-quote__author mongol-text">
+                          {display_name(message.reply_to.user)}
+                        </span>
+                        <span class="xamt-quote__text mongol-text">
+                          <%= if deleted?(message.reply_to) do %>
+                            {gettext("This message was deleted")}
+                          <% else %>
+                            {Messages.excerpt(message.reply_to)}
+                          <% end %>
+                        </span>
                       </button>
-
-                      <div class="xamt-reaction-picker">
+                      <header class="xamt-message__meta">
+                        <strong class="mongol-text">{display_name(message.user)}</strong>
+                        <span :if={edited?(message)} class="xamt-message__edited">
+                          {gettext("edited")}
+                        </span>
+                        <time class="xamt-message__time">{format_time(message.inserted_at)}</time>
+                      </header>
+                      <div
+                        id={"msg-content-#{message.id}"}
+                        class="xamt-message__content mongol-text"
+                      >
+                        {raw(safe_html(message, @current_scope.user.id))}
+                        <%= if preview = link_preview(message) do %>
+                          <a
+                            id={"msg-preview-#{message.id}"}
+                            href={preview["url"]}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="xamt-link-preview"
+                          >
+                            <img
+                              :if={preview["image"]}
+                              src={preview["image"]}
+                              alt={preview["title"] || ""}
+                              class="xamt-link-preview__img"
+                              loading="lazy"
+                              referrerpolicy="no-referrer"
+                            />
+                            <div class="xamt-link-preview__body">
+                              <strong
+                                :if={preview["title"]}
+                                class="xamt-link-preview__title mongol-text"
+                              >
+                                {preview["title"]}
+                              </strong>
+                              <p
+                                :if={preview["description"]}
+                                class="xamt-link-preview__desc mongol-text"
+                              >
+                                {preview["description"]}
+                              </p>
+                            </div>
+                          </a>
+                        <% end %>
+                      </div>
+                      <div class="xamt-reactions">
                         <button
-                          :for={emoji <- Reaction.emojis()}
+                          :for={{emoji, user_ids} <- reactions_for(@reactions, message.id)}
                           type="button"
-                          class="xamt-reaction xamt-reaction--add"
+                          class={[
+                            "xamt-reaction",
+                            @current_scope.user.id in user_ids && "is-mine"
+                          ]}
                           phx-click="toggle_reaction"
                           phx-value-id={message.id}
                           phx-value-emoji={emoji}
-                          aria-label={emoji}
                         >
-                          {emoji}
+                          <span class="xamt-reaction__emoji">{emoji}</span>
+                          <span class="xamt-reaction__count">{length(user_ids)}</span>
+                        </button>
+
+                        <div class="xamt-reaction-picker">
+                          <button
+                            :for={emoji <- Reaction.emojis()}
+                            type="button"
+                            class="xamt-reaction xamt-reaction--add"
+                            phx-click="toggle_reaction"
+                            phx-value-id={message.id}
+                            phx-value-emoji={emoji}
+                            aria-label={emoji}
+                          >
+                            {emoji}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div class="xamt-message__actions">
+                        <button
+                          type="button"
+                          id={"reply-message-#{message.id}"}
+                          phx-click="reply_message"
+                          phx-value-id={message.id}
+                        >
+                          {gettext("Reply")}
+                        </button>
+                        <button
+                          :if={message.user_id == @current_scope.user.id}
+                          type="button"
+                          id={"edit-message-#{message.id}"}
+                          phx-click="edit_message"
+                          phx-value-id={message.id}
+                        >
+                          <.icon name="hero-pencil" class="size-4" />
+                          {gettext("Edit")}
+                        </button>
+                        <button
+                          :if={message.user_id == @current_scope.user.id}
+                          type="button"
+                          id={"delete-message-#{message.id}"}
+                          phx-click="delete_message"
+                          phx-value-id={message.id}
+                          data-confirm={gettext("Delete this message?")}
+                        >
+                          <.icon name="hero-trash" class="size-4" />
+                          {gettext("Delete")}
                         </button>
                       </div>
                     </div>
-
-                    <div class="xamt-message__actions">
-                      <button type="button" phx-click="reply_message" phx-value-id={message.id}>
-                        {gettext("Reply")}
-                      </button>
-                      <button
-                        :if={message.user_id == @current_scope.user.id}
-                        type="button"
-                        phx-click="edit_message"
-                        phx-value-id={message.id}
-                      >
-                        {gettext("Edit")}
-                      </button>
-                      <button
-                        :if={message.user_id == @current_scope.user.id}
-                        type="button"
-                        phx-click="delete_message"
-                        phx-value-id={message.id}
-                        data-confirm={gettext("Delete this message?")}
-                      >
-                        {gettext("Delete")}
-                      </button>
-                    </div>
-                  </div>
+                  <% end %>
                 </article>
               </div>
 
@@ -1213,6 +1258,7 @@ defmodule XamtWeb.ServerLive do
               phx-drop-target={@uploads.media.ref}
               data-has-uploads={to_string(@uploads.media.entries != [])}
               data-submit-event={if @editing_message_id, do: "update_message", else: "send_message"}
+              data-editing-id={@editing_message_id}
               data-channel-id={@active_channel && @active_channel.id}
               data-reply-to-id={@replying_to && @replying_to.id}
             >
@@ -1788,6 +1834,32 @@ defmodule XamtWeb.ServerLive do
     active && message.channel_id == active.id
   end
 
+  defp own_active_message?(socket, message) do
+    message.user_id == socket.assigns.current_scope.user.id and
+      active_channel_message?(socket, message)
+  end
+
+  defp restream_message(socket, id) when is_binary(id) do
+    stream_insert(socket, :messages, Messages.get_message!(id))
+  rescue
+    Ecto.NoResultsError -> socket
+  end
+
+  defp restream_message(socket, _), do: socket
+
+  defp maybe_cancel_edit(socket, message_id) do
+    if socket.assigns.editing_message_id == message_id do
+      socket
+      |> assign(:editing_message_id, nil)
+      |> push_event("composer:clear", %{})
+    else
+      socket
+    end
+  end
+
+  defp deleted?(%{deleted_at: %DateTime{}}), do: true
+  defp deleted?(_), do: false
+
   defp channel_topic(%Channel{id: id}), do: "xamt:channel:#{id}"
   defp channel_topic(nil), do: "xamt:channel:none"
 
@@ -1823,7 +1895,7 @@ defmodule XamtWeb.ServerLive do
   defp format_time(%DateTime{} = dt), do: Calendar.strftime(dt, "%H:%M")
 
   defp edited?(%{inserted_at: a, updated_at: b}) when not is_nil(a) and not is_nil(b) do
-    DateTime.diff(b, a, :second) > 1
+    DateTime.compare(b, a) == :gt
   end
 
   defp edited?(_), do: false

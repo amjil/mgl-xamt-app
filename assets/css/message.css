@@ -284,6 +284,33 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--xamt-accent) 28%, transparent);
 }
 
+.xamt-message--editing {
+  background: var(--xamt-gold-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--xamt-accent-2) 35%, transparent);
+}
+
+.xamt-message--deleted {
+  opacity: 0.88;
+}
+
+.xamt-message__tombstone {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.5rem;
+  border: 1px dashed var(--xamt-line);
+  border-radius: 0.5rem;
+  color: var(--xamt-muted);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.xamt-message__tombstone .hero-trash,
+.xamt-message__tombstone [class*="hero-trash"] {
+  flex: 0 0 auto;
+}
+
 .xamt-mention {
   writing-mode: vertical-lr;
   -webkit-writing-mode: vertical-lr;

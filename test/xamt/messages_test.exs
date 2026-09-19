@@ -221,4 +221,57 @@ defmodule Xamt.MessagesTest do
     assert updated.content_html =~ "@#{second.username}"
     refute updated.content_html =~ first.username
   end
+
+  test "update and delete broadcast the latest message and keep tombstones", %{
+    scope: scope,
+    channel: channel
+  } do
+    Phoenix.PubSub.subscribe(Xamt.PubSub, Messages.channel_topic(channel.id))
+
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>orig-body</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    assert_receive {:new_message, %{id: id}} when id == message.id
+
+    {:ok, updated} =
+      Messages.update_message(scope, message.id, %{
+        "content_html" => "<p>edited-body</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    assert updated.content_html =~ "edited-body"
+    assert DateTime.compare(updated.updated_at, updated.inserted_at) == :gt
+    assert_receive {:updated_message, %{id: ^id, content_html: html}}
+    assert html =~ "edited-body"
+
+    outsider = Xamt.AccountsFixtures.user_fixture()
+    outsider_scope = Scope.for_user(outsider)
+
+    assert {:error, :unauthorized} =
+             Messages.update_message(outsider_scope, message.id, %{
+               "content_html" => "<p>nope</p>"
+             })
+
+    assert {:error, :unauthorized} = Messages.delete_message(outsider_scope, message.id)
+
+    {:ok, deleted} = Messages.delete_message(scope, message.id)
+    assert %DateTime{} = deleted.deleted_at
+    assert_receive {:deleted_message, %{id: ^id, deleted_at: %DateTime{}}}
+
+    listed = Messages.list_messages(channel.id)
+    tombstone = Enum.find(listed, &(&1.id == message.id))
+    assert tombstone
+    assert tombstone.deleted_at
+
+    assert {:error, :deleted} =
+             Messages.update_message(scope, message.id, %{"content_html" => "<p>x</p>"})
+
+    assert {:error, :deleted} = Messages.delete_message(scope, message.id)
+
+    assert {:error, :deleted} =
+             Messages.toggle_reaction(scope, message.id, hd(Reaction.emojis()))
+  end
 end

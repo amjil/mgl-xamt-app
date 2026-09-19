@@ -503,4 +503,94 @@ defmodule XamtWeb.ServerLiveTest do
     assert sub.p256dh == "live-p256dh"
     assert sub.auth == "live-auth"
   end
+
+  test "owner can edit a message and the stream shows an edited marker", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>orig-edit-body</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    assert has_element?(view, "#edit-message-#{message.id}")
+    assert has_element?(view, "#message-composer-wrap[data-submit-event='send_message']")
+
+    view |> element("#edit-message-#{message.id}") |> render_click()
+
+    assert has_element?(view, "#composer-cancel-edit")
+    assert has_element?(view, "article.xamt-message--editing")
+    assert has_element?(view, "#message-composer-wrap[data-submit-event='update_message']")
+    assert has_element?(view, "#message-composer-wrap[data-editing-id='#{message.id}']")
+    assert_push_event(view, "populate_composer", %{html: html})
+    assert html =~ "orig-edit-body"
+
+    render_hook(view, "update_message", %{
+      "content_html" => "<p>revised-edit-body</p>",
+      "content_json" => ~s({"type":"rich_text","blocks":[]}),
+      "content_type" => "rich_text"
+    })
+
+    html = render(view)
+    assert html =~ "revised-edit-body"
+    assert has_element?(view, ".xamt-message__edited")
+    refute has_element?(view, "#composer-cancel-edit")
+    refute has_element?(view, "article.xamt-message--editing")
+    assert has_element?(view, "#message-composer-wrap[data-submit-event='send_message']")
+  end
+
+  test "owner can soft-delete a message and the tombstone stays in the stream", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>secret-delete-body</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    assert has_element?(view, "#msg-content-#{message.id}")
+
+    view |> element("#delete-message-#{message.id}") |> render_click()
+
+    assert has_element?(view, "#msg-tombstone-#{message.id}")
+    assert has_element?(view, "article.xamt-message--deleted")
+    refute has_element?(view, "#msg-content-#{message.id}")
+    refute has_element?(view, "#edit-message-#{message.id}")
+    html = render(view)
+    refute html =~ "secret-delete-body"
+    assert html =~ "This message was deleted"
+
+    {:ok, reloaded, reloaded_html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    assert has_element?(reloaded, "#msg-tombstone-#{message.id}")
+    refute reloaded_html =~ "secret-delete-body"
+  end
+
+  test "members cannot edit or delete someone else's message", %{
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>owner-only</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    member = user_fixture()
+    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(member), server.id)
+    member_conn = log_in_user(build_conn(), member)
+    {:ok, view, _html} = live(member_conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    refute has_element?(view, "#edit-message-#{message.id}")
+    refute has_element?(view, "#delete-message-#{message.id}")
+    assert has_element?(view, "#reply-message-#{message.id}")
+  end
 end

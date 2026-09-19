@@ -233,11 +233,8 @@ export const MessageComposer = {
 
     this.handleEvent("composer:clear", () => this.clear())
     this.handleEvent("composer:focus", () => this.editor.focus())
-    this.handleEvent("composer:load", ({ html }) => {
-      if (html != null) this.editor.setHtml(html)
-      hydrateMentions(this._root())
-      this.editor.focus()
-    })
+    this.handleEvent("composer:load", (payload) => this.populate(payload))
+    this.handleEvent("populate_composer", (payload) => this.populate(payload))
 
     this._detachMentions = attachMentionAutocomplete(this)
 
@@ -275,12 +272,25 @@ export const MessageComposer = {
         "<div class=\"block-wrapper\" data-block-type=\"paragraph\"><p class=\"block-content\" contenteditable=\"true\"><br></p></div>"
       )
     }
+    this.syncIme()
     // Stop typing indicator immediately after send/clear
     if (this._isTyping) {
       if (this._canPush()) this.pushEvent("typing_stopped", {})
       this._isTyping = false
       clearTimeout(this._typingTimer)
     }
+  },
+
+  populate({ html } = {}) {
+    if (html != null) this.editor.setHtml(html)
+    hydrateMentions(this._root())
+    this.syncIme()
+    this.editor.focus()
+  },
+
+  syncIme() {
+    // mgl-web-ime keeps composition in ImeCore; reset it after we rewrite the DOM.
+    this.ime?.core?.cancelComposition?.()
   },
 
   _canPush() {
@@ -320,7 +330,11 @@ export const MessageComposer = {
     const hasUploads = this.wrap?.dataset?.hasUploads === "true"
     if (!text && (!json || json.length === 0) && !hasUploads) return
 
-    const event = this.wrap.dataset.submitEvent || this.el.dataset.submitEvent || "send_message"
+    const event =
+      this.wrap.dataset.submitEvent ||
+      (this.wrap.dataset.editingId ? "update_message" : null) ||
+      this.el.dataset.submitEvent ||
+      "send_message"
     const payload = {
       content_html: html,
       content_json: JSON.stringify({ type: "rich_text", blocks: json }),

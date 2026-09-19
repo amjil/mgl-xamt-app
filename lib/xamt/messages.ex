@@ -54,9 +54,7 @@ defmodule Xamt.Messages do
   def update_message(%Scope{user: user}, message_id, attrs) when is_map(attrs) do
     message = get_message!(message_id)
 
-    if message.user_id != user.id do
-      {:error, :unauthorized}
-    else
+    with :ok <- writable?(message, user) do
       content = build_content(attrs, message.content)
 
       raw_html =
@@ -90,23 +88,28 @@ defmodule Xamt.Messages do
     end
   end
 
-  def soft_delete_message(%Scope{user: user}, message_id) do
+  @doc """
+  Soft-deletes a message by writing `deleted_at`.
+
+  Broadcasts the tombstone struct so LiveViews can `stream_insert/3` over the
+  existing DOM node instead of removing it.
+  """
+  def delete_message(%Scope{user: user}, message_id) do
     message = get_message!(message_id)
 
-    if message.user_id != user.id do
-      {:error, :unauthorized}
-    else
-      with {:ok, message} <-
-             message
-             |> Message.delete_changeset()
-             |> Repo.update() do
-        message = Repo.preload(message, @preloads)
-        LastMessageCache.refresh(message.channel_id)
-        broadcast(message.channel_id, :deleted_message, message)
-        {:ok, message}
-      end
+    with :ok <- writable?(message, user),
+         {:ok, message} <-
+           message
+           |> Message.delete_changeset()
+           |> Repo.update() do
+      message = message |> Repo.preload(@preloads, force: true) |> attach_mention_ids()
+      LastMessageCache.refresh(message.channel_id)
+      broadcast(message.channel_id, :deleted_message, strip_for_broadcast(message))
+      {:ok, message}
     end
   end
+
+  def soft_delete_message(scope, message_id), do: delete_message(scope, message_id)
 
   def list_messages(channel_id, opts \\ []) do
     limit = Keyword.get(opts, :limit, @default_limit)
@@ -115,7 +118,7 @@ defmodule Xamt.Messages do
 
     query =
       from m in Message,
-        where: m.channel_id == ^channel_id and is_nil(m.deleted_at),
+        where: m.channel_id == ^channel_id,
         order_by: [desc: m.inserted_at, desc: m.id],
         limit: ^limit,
         preload: ^@preloads
@@ -268,6 +271,14 @@ defmodule Xamt.Messages do
   def toggle_reaction(%Scope{user: user}, message_id, emoji) do
     message = get_message!(message_id)
 
+    if match?(%DateTime{}, message.deleted_at) do
+      {:error, :deleted}
+    else
+      toggle_reaction_on(message, user, emoji)
+    end
+  end
+
+  defp toggle_reaction_on(message, user, emoji) do
     existing =
       Repo.get_by(Reaction, message_id: message.id, user_id: user.id, emoji: emoji)
 
@@ -292,6 +303,10 @@ defmodule Xamt.Messages do
       {:ok, summary}
     end
   end
+
+  defp writable?(%Message{deleted_at: %DateTime{}}, _user), do: {:error, :deleted}
+  defp writable?(%Message{user_id: user_id}, %{id: user_id}), do: :ok
+  defp writable?(_message, _user), do: {:error, :unauthorized}
 
   @doc """
   Reactions for the given messages as `%{message_id => %{emoji => [user_id]}}`.
