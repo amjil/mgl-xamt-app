@@ -239,7 +239,10 @@ defmodule Xamt.Channels do
           ],
           where: is_nil(cr.last_read_at) or cr.last_read_at < fragment("EXCLUDED.last_read_at")
         ),
-      conflict_target: [:user_id, :channel_id]
+      conflict_target: [:user_id, :channel_id],
+      # ON CONFLICT WHERE matching 0 rows is the "already read this far" no-op.
+      # Ecto otherwise raises StaleEntryError on the empty %ChannelRead{}.
+      allow_stale: true
     )
   end
 

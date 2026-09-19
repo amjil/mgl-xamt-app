@@ -681,12 +681,7 @@ var ImeCore = class {
     if (key && /^[1-5]$/.test(key) && hasComp) return true;
     if (hasComp && (key === "ArrowDown" || key === "PageDown")) return true;
     if (hasComp && (key === "ArrowUp" || key === "PageUp")) return true;
-    if (key === "Enter") {
-      if (hasComp) return true;
-      const el = this.adapter.getElement?.();
-      if (el instanceof HTMLInputElement) return false;
-      return true;
-    }
+    if (key === "Enter") return true;
     return false;
   }
   // ─── Composition / preview ─────────────────────────────────
@@ -972,8 +967,6 @@ var ImeCore = class {
       await this.commitCurrent({ addSpaceAfter: false });
       return true;
     }
-    const el = this.adapter.getElement?.();
-    if (el instanceof HTMLInputElement) return false;
     this.adapter.insertText("\n");
     return true;
   }
@@ -1046,6 +1039,30 @@ var ImeCore = class {
     this._session.next();
   }
 };
+
+// src/utils/caret-rect.js
+function measureCaretRect(range, fallbackEl) {
+  if (range) {
+    const rects = range.getClientRects();
+    for (let i = 0; i < rects.length; i++) {
+      const r = rects[i];
+      if (r.width || r.height) return r;
+    }
+    const union = range.getBoundingClientRect();
+    if (union.width || union.height) return union;
+    try {
+      const mirror = range.cloneRange();
+      const span = document.createElement("span");
+      span.textContent = "\u200B";
+      mirror.insertNode(span);
+      const r = span.getBoundingClientRect();
+      span.parentNode?.removeChild(span);
+      if (r.width || r.height || r.top || r.left) return r;
+    } catch {
+    }
+  }
+  return fallbackEl?.getBoundingClientRect?.() ?? null;
+}
 
 // src/adapters/custom.js
 function createCustomAdapter(methods) {
@@ -1245,19 +1262,7 @@ function ContentEditableAdapter(el) {
       sel.removeAllRanges();
       sel.addRange(range);
     },
-    getCaretRect: () => {
-      const range = getRange();
-      if (!range) return el.getBoundingClientRect();
-      const rects = range.getClientRects();
-      if (rects.length) return rects[0];
-      const mirror = range.cloneRange();
-      const span = document.createElement("span");
-      span.textContent = "\u200B";
-      mirror.insertNode(span);
-      const r = span.getBoundingClientRect();
-      span.parentNode?.removeChild(span);
-      return r;
-    }
+    getCaretRect: () => measureCaretRect(getRange(), el)
   });
 }
 
@@ -1997,6 +2002,73 @@ function popupIndexFromDx(dx, count, itemWidth = 36) {
   return Math.max(0, Math.min(count - 1, offset));
 }
 
+// src/utils/popup-position.js
+var DEFAULT_GAP = 8;
+var DEFAULT_MARGIN = 8;
+var MAX_CARET_EXTENT = 36;
+function normalizeCaret(rect) {
+  const left = rect.left;
+  const top = rect.top;
+  let right = rect.right ?? left + (rect.width ?? 0);
+  let bottom = rect.bottom ?? top + (rect.height ?? 0);
+  if (right - left > MAX_CARET_EXTENT) right = left + MAX_CARET_EXTENT;
+  if (bottom - top > MAX_CARET_EXTENT) bottom = top + MAX_CARET_EXTENT;
+  return { left, top, right, bottom };
+}
+function placeNearCaret(rect, panel, viewport, opts = {}) {
+  const gap = opts.gap ?? DEFAULT_GAP;
+  const margin = opts.margin ?? DEFAULT_MARGIN;
+  const placement = opts.placement ?? "auto";
+  const pWidth = panel.width > 0 ? panel.width : 200;
+  const pHeight = panel.height > 0 ? panel.height : 60;
+  const vw = viewport.width;
+  const vh = viewport.height;
+  const caret = normalizeCaret(rect);
+  const anchors = {
+    "below-right": { left: caret.right + gap, top: caret.bottom + gap },
+    "below-left": { left: caret.left - gap - pWidth, top: caret.bottom + gap },
+    "above-left": { left: caret.left - gap - pWidth, top: caret.top - gap - pHeight },
+    "above-right": { left: caret.right + gap, top: caret.top - gap - pHeight }
+  };
+  const order = placement === "left" ? ["below-left", "above-left", "below-right", "above-right"] : placement === "top" ? ["above-left", "above-right", "below-right", "below-left"] : placement === "right" ? ["below-right", "above-right", "below-left", "above-left"] : ["below-right", "below-left", "above-left", "above-right"];
+  const overflow = (left2, top2) => {
+    const ox = Math.max(0, margin - left2) + Math.max(0, left2 + pWidth - (vw - margin));
+    const oy = Math.max(0, margin - top2) + Math.max(0, top2 + pHeight - (vh - margin));
+    return ox + oy;
+  };
+  const overlapsCaret = (left2, top2) => left2 < caret.right + gap && left2 + pWidth > caret.left - gap && top2 < caret.bottom + gap && top2 + pHeight > caret.top - gap;
+  let best = null;
+  let bestOverflow = Infinity;
+  for (const name of order) {
+    const pos = anchors[name];
+    if (!pos || overlapsCaret(pos.left, pos.top)) continue;
+    const ov = overflow(pos.left, pos.top);
+    if (ov === 0) {
+      best = pos;
+      break;
+    }
+    if (ov < bestOverflow) {
+      best = pos;
+      bestOverflow = ov;
+    }
+  }
+  let left = best ? best.left : caret.right + gap;
+  let top = best ? best.top : caret.bottom + gap;
+  const shiftLeft = vw - margin - pWidth;
+  if (left + pWidth > vw - margin && shiftLeft >= caret.right + gap) {
+    left = shiftLeft;
+  } else if (left < margin && margin + pWidth <= caret.left - gap) {
+    left = margin;
+  }
+  const shiftTop = vh - margin - pHeight;
+  if (top + pHeight > vh - margin && shiftTop >= caret.bottom + gap) {
+    top = shiftTop;
+  } else if (top < margin && margin + pHeight <= caret.top - gap) {
+    top = margin;
+  }
+  return { left, top };
+}
+
 // src/components/mgl-candidates.js
 function buildTemplate() {
   const TEMPLATE = document.createElement("template");
@@ -2167,42 +2239,23 @@ var MglCandidates = class extends Base {
     }
   }
   /**
-   * Place popup near caret with collision detection against viewport edges.
+   * Place the desktop popup at the caret's bottom-right when it fits, then
+   * bottom-left or top-left. Never overlap the caret — viewport clamping must
+   * not slide the panel over the insertion point.
    * @param {{left:number, top:number, bottom?:number, right?:number, width?:number, height?:number}} rect
    */
   positionNear(rect, placement = "auto") {
     if (this.getAttribute("variant") === "bar") return;
-    const gap = 8;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
     const panel = this.shadowRoot.querySelector(".panel");
     const pRect = panel ? panel.getBoundingClientRect() : null;
-    const pWidth = pRect ? pRect.width : 200;
-    const pHeight = pRect ? pRect.height : 60;
-    const isVertical = rect.width > rect.height || rect.height < 5;
-    let place = placement === "auto" ? isVertical ? "right" : "bottom" : placement;
-    if (place === "right" && rect.right + gap + pWidth > vw) {
-      place = rect.left - gap - pWidth > 0 ? "left" : "bottom";
-    } else if (place === "bottom" && rect.bottom + gap + pHeight > vh) {
-      place = rect.top - gap - pHeight > 0 ? "top" : "right";
-    }
-    let left = 0;
-    let top = 0;
-    if (place === "right") {
-      left = rect.right + gap;
-      top = rect.top;
-    } else if (place === "left") {
-      left = rect.left - gap - pWidth;
-      top = rect.top;
-    } else if (place === "bottom") {
-      left = rect.left;
-      top = rect.bottom + gap;
-    } else {
-      left = rect.left;
-      top = rect.top - gap - pHeight;
-    }
-    left = Math.max(8, Math.min(left, vw - pWidth - 8));
-    top = Math.max(8, Math.min(top, vh - pHeight - 8));
+    const { left, top } = placeNearCaret(
+      rect,
+      { width: pRect?.width ?? 0, height: pRect?.height ?? 0 },
+      { width: window.innerWidth, height: window.innerHeight },
+      { placement }
+    );
+    this.style.right = "auto";
+    this.style.bottom = "auto";
     this.style.left = `${left}px`;
     this.style.top = `${top}px`;
   }
@@ -3076,9 +3129,11 @@ export {
   detectProfile,
   directCharFromKey,
   getLayout,
+  measureCaretRect,
   mongolPopupCandidates,
   normalizeKey,
   pageCandidates,
+  placeNearCaret,
   resolveKeyboardMode,
   resolvePopupKeys,
   totalPages,

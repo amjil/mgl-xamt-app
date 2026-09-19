@@ -3,7 +3,7 @@
  * Editor DOM is owned by this hook (phx-update="ignore").
  */
 import { createMongolianEditor } from "../../vendor/mongolian-editor.js"
-import { MglIME, createCustomAdapter } from "../../vendor/mgl-web-ime/mgl-web-ime.js"
+import { MglIME, createCustomAdapter, measureCaretRect } from "../../vendor/mgl-web-ime/mgl-web-ime.js"
 import { imeProvider } from "../utils/ime.js"
 import { attachVirtualKeyboard, suppressSystemKeyboard } from "../utils/ime-keyboard.js"
 import {
@@ -132,11 +132,11 @@ function buildEditorAdapter(getRoot) {
       document.execCommand("insertText", false, text)
     },
     getCaretRect: () => {
+      const el = activeEditable(getRoot())
       const sel = window.getSelection()
-      if (!sel || sel.rangeCount === 0) return null
-      const rect = sel.getRangeAt(0).getBoundingClientRect()
-      if (rect.width || rect.height) return rect
-      return activeEditable(getRoot())?.getBoundingClientRect?.() || null
+      const range = sel?.rangeCount ? sel.getRangeAt(0) : null
+      const inside = range && el && (el === range.commonAncestorContainer || el.contains(range.commonAncestorContainer))
+      return measureCaretRect(inside ? range : null, el)
     },
   })
 }

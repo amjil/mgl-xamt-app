@@ -17,6 +17,7 @@ import {adoptImeElements} from "./utils/ime"
 import {initVisualViewport, trackImeKeyboard} from "./utils/viewport"
 import {toast} from "./utils/offline-store"
 import {highlightMessageById} from "./utils/highlight-message"
+import {copyText} from "./utils/clipboard"
 
 // Bind --xamt-vh before LiveSocket so the shell is already keyboard-aware
 initVisualViewport()
@@ -39,7 +40,10 @@ const Hooks = {
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
-  params: {_csrf_token: csrfToken},
+  params: {
+    _csrf_token: csrfToken,
+    timezone_offset: new Date().getTimezoneOffset(),
+  },
   hooks: Hooks,
 })
 
@@ -64,21 +68,23 @@ window.addEventListener("xamt:highlight", (event) => {
   }
 })
 
-window.addEventListener("xamt:copy", async (event) => {
-  const el =
-    event.target instanceof HTMLElement ? event.target.closest("[data-copy]") : null
-  if (!el) return
+// Native click keeps the user-activation token that clipboard APIs require.
+// Capture phase so a LiveView handler cannot swallow the event before we copy.
+window.addEventListener(
+  "click",
+  (event) => {
+    const el = event.target instanceof Element ? event.target.closest("[data-copy]") : null
+    if (!el) return
 
-  const text = el.getAttribute("data-copy")
-  if (!text) return
+    const text = el.getAttribute("data-copy")
+    if (!text) return
 
-  try {
-    await navigator.clipboard.writeText(text)
-    toast("success", el.getAttribute("data-copied") || "Copied")
-  } catch {
-    toast("error", el.getAttribute("data-copy-failed") || "Could not copy")
-  }
-})
+    copyText(text)
+      .then(() => toast("success", el.getAttribute("data-copied") || "Copied"))
+      .catch(() => toast("error", el.getAttribute("data-copy-failed") || "Could not copy"))
+  },
+  true
+)
 
 adoptImeElements()
 window.addEventListener("DOMContentLoaded", () => adoptImeElements())

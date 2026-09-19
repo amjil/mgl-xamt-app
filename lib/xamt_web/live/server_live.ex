@@ -14,6 +14,7 @@ defmodule XamtWeb.ServerLive do
 
   @impl true
   def mount(%{"server_slug" => server_slug} = params, _session, socket) do
+    socket = assign(socket, :timezone_offset, connect_timezone_offset(socket))
     scope = socket.assigns.current_scope
     server = Servers.get_server_by_slug!(server_slug)
 
@@ -1079,7 +1080,12 @@ defmodule XamtWeb.ServerLive do
                     <div class="xamt-message__body">
                       <header class="xamt-message__meta">
                         <strong class="mongol-text">{display_name(message.user)}</strong>
-                        <time class="xamt-message__time">{format_time(message.inserted_at)}</time>
+                        <time
+                          class="xamt-message__time"
+                          datetime={DateTime.to_iso8601(message.inserted_at)}
+                        >
+                          {format_time(message.inserted_at, @timezone_offset)}
+                        </time>
                       </header>
                       <div
                         id={"msg-tombstone-#{message.id}"}
@@ -1119,7 +1125,12 @@ defmodule XamtWeb.ServerLive do
                         <span :if={edited?(message)} class="xamt-message__edited">
                           {gettext("edited")}
                         </span>
-                        <time class="xamt-message__time">{format_time(message.inserted_at)}</time>
+                        <time
+                          class="xamt-message__time"
+                          datetime={DateTime.to_iso8601(message.inserted_at)}
+                        >
+                          {format_time(message.inserted_at, @timezone_offset)}
+                        </time>
                       </header>
                       <div
                         id={"msg-content-#{message.id}"}
@@ -1620,7 +1631,6 @@ defmodule XamtWeb.ServerLive do
             type="button"
             id={"copy-invite-#{invite.id}"}
             class="xamt-icon-btn"
-            phx-click={JS.dispatch("xamt:copy")}
             data-copy={url(~p"/invite/#{invite.code}")}
             data-copied={gettext("Copied")}
             data-copy-failed={gettext("Could not copy")}
@@ -1932,8 +1942,35 @@ defmodule XamtWeb.ServerLive do
     name |> String.trim() |> String.first() || "?"
   end
 
-  defp format_time(nil), do: ""
-  defp format_time(%DateTime{} = dt), do: Calendar.strftime(dt, "%H:%M")
+  # Browser `Date.getTimezoneOffset()`: minutes to add to local time to get UTC.
+  # UTC+8 returns -480, so we subtract that offset to show wall-clock time.
+  defp connect_timezone_offset(socket) do
+    if connected?(socket) do
+      case get_connect_params(socket) do
+        %{"timezone_offset" => offset} when is_integer(offset) and offset in -840..840 ->
+          offset
+
+        %{"timezone_offset" => offset} when is_binary(offset) ->
+          case Integer.parse(offset) do
+            {n, ""} when n in -840..840 -> n
+            _ -> 0
+          end
+
+        _ ->
+          0
+      end
+    else
+      0
+    end
+  end
+
+  defp format_time(nil, _offset), do: ""
+
+  defp format_time(%DateTime{} = dt, offset) when is_integer(offset) do
+    dt
+    |> DateTime.add(-offset, :minute)
+    |> Calendar.strftime("%H:%M")
+  end
 
   defp edited?(%{inserted_at: a, updated_at: b}) when not is_nil(a) and not is_nil(b) do
     DateTime.compare(b, a) == :gt

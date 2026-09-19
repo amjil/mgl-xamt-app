@@ -45,6 +45,33 @@ defmodule XamtWeb.ServerLiveTest do
     assert html =~ message.id or true
   end
 
+  test "displays message time in the client's timezone", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    utc = ~U[2026-09-19 07:13:00Z]
+
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>time check</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    message
+    |> Ecto.Changeset.change(inserted_at: utc, updated_at: utc)
+    |> Xamt.Repo.update!()
+
+    {:ok, view, _html} =
+      conn
+      |> put_connect_params(%{"timezone_offset" => -480})
+      |> live(~p"/servers/#{server.slug}/#{channel.slug}")
+
+    assert has_element?(view, "time.xamt-message__time", "15:13")
+    refute has_element?(view, "time.xamt-message__time", "07:13")
+  end
+
   test "strangers cannot open a private server", %{server: server} do
     stranger = user_fixture()
     conn = log_in_user(build_conn(), stranger)
