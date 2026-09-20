@@ -451,6 +451,8 @@ a.xamt-mention:hover {
   color: var(--xamt-muted);
   cursor: pointer;
   padding: 0.15rem 0;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: color-mix(in srgb, var(--xamt-accent) 18%, transparent);
   transition: color 140ms ease;
 }
 
@@ -556,5 +558,21 @@ a.xamt-mention:hover {
      does not jump when a batched typing diff arrives. */
   min-width: 1.5rem;
   min-height: 1.5rem;
+}
+
+.xamt-message__audio {
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  text-orientation: mixed;
+}
+
+.xamt-audio-player {
+  display: block;
+  height: 2.5rem;
+  width: 16rem;
+  max-width: 100%;
+  border-radius: 9999px;
+  outline: none;
+  accent-color: var(--xamt-accent);
 }
 

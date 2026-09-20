@@ -981,6 +981,10 @@ var ImeCore = class {
   async _insertDirectMobile(ch) {
     this.adapter.insertText(ch);
     this.setState({ pendingSuffixDelete: false });
+    if (this.state.mode === "latin") {
+      if (this.state.candidates.length) this.setState(clearCompositionFields(this.state));
+      return true;
+    }
     const ctx = this.adapter.getTextBeforeCaret?.() ?? this.adapter.getText();
     const last = getLastWord(ctx);
     if (last) await this.queryCandidates(last, "typing");
@@ -1478,6 +1482,12 @@ function attachMobileController(core, options = {}) {
         return core.handleEvent({ type: "command", command: "insert", key: ev.key });
       }
       if (ev.type === "command") {
+        if (ev.command === "layout") {
+          const next = ev.latin ? "latin" : "mongol";
+          if (core.state.mode !== next) core.setMode(next);
+          return true;
+        }
+        if (ev.command === "shift") return false;
         return core.handleEvent(ev);
       }
       return false;
@@ -1654,14 +1664,35 @@ var VirtualKeyboard = class {
       case "special":
         this.special = !this.special;
         this.otherSpecial = false;
+        this.onEvent({
+          type: "command",
+          command: "layout",
+          latin: this.latin,
+          special: this.special,
+          otherSpecial: this.otherSpecial
+        });
         break;
       case "other-special":
         this.otherSpecial = !this.otherSpecial;
+        this.onEvent({
+          type: "command",
+          command: "layout",
+          latin: this.latin,
+          special: this.special,
+          otherSpecial: this.otherSpecial
+        });
         break;
       case "abc":
         this.latin = !this.latin;
         this.special = false;
         this.otherSpecial = false;
+        this.onEvent({
+          type: "command",
+          command: "layout",
+          latin: this.latin,
+          special: this.special,
+          otherSpecial: this.otherSpecial
+        });
         break;
       default:
         this.onEvent({ type: "command", command: actionToCommand(action) });
@@ -2378,13 +2409,17 @@ function buildTemplate2() {
     .row {
       display: flex;
       justify-content: center;
+      align-items: stretch;
       gap: 4px;
       margin: 4px 0;
+      height: 52px;
     }
     button.key {
       flex: 1 1 0;
       min-width: 0;
-      min-height: 46px;
+      /* Same height for Mongol / Latin / symbol layouts */
+      min-height: 52px;
+      height: 52px;
       border: none;
       border-radius: 8px;
       background: var(--key-bg);
@@ -2394,6 +2429,7 @@ function buildTemplate2() {
       color: inherit;
       padding: 0 2px;
       position: relative;
+      box-sizing: border-box;
     }
     button.key.action {
       background: var(--key-action);
@@ -2409,7 +2445,6 @@ function buildTemplate2() {
       writing-mode: vertical-lr;
       text-orientation: mixed;
       font-size: 22px;
-      min-height: 52px;
     }
     .hint {
       position: absolute;
@@ -2607,6 +2642,7 @@ var MglKeyboard = class extends Base2 {
     };
     if (key.type === "action") {
       this._vk.press(key);
+      this._needsRender = true;
       this._cancelPress();
       return;
     }
@@ -2674,7 +2710,13 @@ var MglKeyboard = class extends Base2 {
           if (key.action === "space") btn.classList.add("space");
           const label = document.createElement("span");
           label.className = "label-action";
-          label.textContent = ACTION_LABEL[key.action] ?? key.action;
+          if (key.action === "abc") {
+            label.textContent = this._vk.latin ? "\u182E\u1828" : "ABC";
+          } else if (key.action === "special" && (this._vk.special || this._vk.otherSpecial)) {
+            label.textContent = this._vk.latin ? "ABC" : "\u182E\u1828";
+          } else {
+            label.textContent = ACTION_LABEL[key.action] ?? key.action;
+          }
           if (key.action === "suffix") {
             label.style.writingMode = "vertical-lr";
             label.style.fontSize = "14px";

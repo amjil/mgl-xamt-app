@@ -13,6 +13,26 @@ defmodule Xamt.MessagesTest do
     %{scope: scope, channel: channel, owner: owner, server: server}
   end
 
+  test "stores audio messages and keeps the player payload on broadcast", %{
+    scope: scope,
+    channel: channel
+  } do
+    Phoenix.PubSub.subscribe(Xamt.PubSub, Messages.channel_topic(channel.id))
+
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "🎤 <em>Voice message</em>",
+        "content" => %{"type" => "audio", "url" => "/uploads/voice.webm"}
+      })
+
+    assert message.content_type == "audio"
+    assert message.content["url"] == "/uploads/voice.webm"
+    assert message.search_text =~ "Voice message"
+
+    assert_receive {:new_message, broadcasted}
+    assert broadcasted.content == %{"type" => "audio", "url" => "/uploads/voice.webm"}
+  end
+
   test "stores a reply_to_id and preloads the parent", %{scope: scope, channel: channel} do
     {:ok, parent} =
       Messages.create_message(scope, channel.id, %{

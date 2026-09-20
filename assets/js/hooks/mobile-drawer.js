@@ -19,7 +19,11 @@ export const MobileDrawer = {
         this._start = null
         return
       }
-      this._start = {x: e.touches[0].clientX, y: e.touches[0].clientY}
+      this._start = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+        target: e.target,
+      }
     }
 
     this._onTouchEnd = (e) => {
@@ -33,6 +37,10 @@ export const MobileDrawer = {
       if (dy >= SWIPE_DRIFT) return
 
       const panel = this.openPanel()
+      // Channel/member lists are vertical-lr, so browsing them is a horizontal
+      // drag. Don't treat that as "close the drawer".
+      if (panel && this.startedInRail(start.target)) return
+
       if (panel === "members") {
         if (dx > SWIPE_DISTANCE) this.close()
         return
@@ -72,5 +80,10 @@ export const MobileDrawer = {
 
   close() {
     this.pushEvent("set_mobile_panel", {panel: CLOSED_PANEL})
+  },
+
+  startedInRail(target) {
+    const el = target?.nodeType === 1 ? target : target?.parentElement
+    return Boolean(el?.closest?.(".xamt-rail"))
   },
 }

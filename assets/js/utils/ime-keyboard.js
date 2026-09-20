@@ -21,16 +21,22 @@ function inNode(event, node) {
   return target === node || node.contains?.(target)
 }
 
+const GHOST_MOUSE_MS = 800
+const CLAIM_GRACE_MS = 500
+let lastTouchAt = 0
+
 export function attachVirtualKeyboard(ime, {eager = false} = {}) {
   if (!ime || ime.keyboardMode !== "virtual") return () => {}
 
   ime.hideKeyboard()
 
   const target = ime.targetEl
+  let claimedAt = 0
 
   const claim = () => {
     if (owner && owner !== ime) owner.hideKeyboard()
     owner = ime
+    claimedAt = performance.now()
     ime.showKeyboard()
   }
 
@@ -49,7 +55,18 @@ export function attachVirtualKeyboard(ime, {eager = false} = {}) {
   }
 
   const onDocPointer = (e) => {
+    if (e.pointerType === "touch" || e.pointerType === "pen") {
+      lastTouchAt = performance.now()
+    } else if (
+      e.pointerType === "mouse" &&
+      lastTouchAt > 0 &&
+      performance.now() - lastTouchAt < GHOST_MOUSE_MS
+    ) {
+      return
+    }
     if (owner !== ime) return
+    if (performance.now() - claimedAt < CLAIM_GRACE_MS) return
+    if (e.target?.closest?.("#composer-peek")) return
     if (inNode(e, target)) return
     if (inNode(e, ime.keyboardEl)) return
     if (inNode(e, ime.candidatesEl)) return

@@ -34,7 +34,7 @@ defmodule Xamt.Messages.Message do
       :reply_to_id
     ])
     |> validate_required([:channel_id, :user_id, :content])
-    |> validate_inclusion(:content_type, ~w(plain_text rich_text))
+    |> validate_inclusion(:content_type, ~w(plain_text rich_text audio))
     |> touch_edited_at()
   end
 

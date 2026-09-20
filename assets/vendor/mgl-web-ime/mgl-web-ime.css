@@ -2,7 +2,7 @@
 
 @font-face {
   font-family: "Oyun Qagan Tig";
-  src: url("/fonts/OyunQaganTig.ttf") format("truetype");
+  src: url("./fonts/OyunQaganTig.ttf") format("truetype");
   font-weight: normal;
   font-style: normal;
   font-display: swap;

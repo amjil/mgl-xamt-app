@@ -6,6 +6,7 @@ import topbar from "../vendor/topbar"
 import "../vendor/mgl-web-ime/mgl-web-ime.js"
 import {MongolianIME} from "./hooks/mongolian-ime"
 import {MessageComposer, MessageList} from "./hooks/message-composer"
+import {AudioRecorder} from "./hooks/audio-recorder"
 import {InfiniteScroll} from "./hooks/infinite-scroll"
 import {MongolianScroll, installGlobalMongolianWheelScroll} from "./hooks/mongolian-scroll"
 import {MessageScroll} from "./hooks/message-scroll"
@@ -28,6 +29,7 @@ const Hooks = {
   MongolianIME,
   MessageComposer,
   MessageList,
+  AudioRecorder,
   MessageScroll,
   InfiniteScroll,
   MongolianScroll,

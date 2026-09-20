@@ -105,6 +105,11 @@ defmodule XamtWeb.ServerLive do
         max_file_size: 10_000_000,
         auto_upload: true
       )
+      |> allow_upload(:audio,
+        accept: ~w(audio/* video/mp4),
+        max_entries: 1,
+        max_file_size: 10_485_760
+      )
 
     if channel && is_nil(Map.get(params, "channel_slug")) do
       {:ok, push_navigate(socket, to: ~p"/servers/#{server.slug}/#{channel.slug}")}
@@ -149,6 +154,25 @@ defmodule XamtWeb.ServerLive do
 
   def handle_event("validate_upload", _params, socket) do
     {:noreply, socket}
+  end
+
+  def handle_event("validate_audio", _params, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_event("send_audio", _params, socket) do
+    channel = socket.assigns.active_channel
+
+    cond do
+      is_nil(channel) ->
+        {:noreply, socket}
+
+      not socket.assigns.can_send_messages? ->
+        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+
+      true ->
+        send_audio_message(socket, channel)
+    end
   end
 
   def handle_event("cancel_upload", %{"ref" => ref}, socket) do
@@ -407,11 +431,7 @@ defmodule XamtWeb.ServerLive do
   end
 
   def handle_event("toggle_server_menu", _params, socket) do
-    if socket.assigns.admin? do
-      {:noreply, assign(socket, :show_server_menu, !socket.assigns.show_server_menu)}
-    else
-      {:noreply, socket}
-    end
+    {:noreply, assign(socket, :show_server_menu, !socket.assigns.show_server_menu)}
   end
 
   def handle_event("close_server_menu", _params, socket) do
@@ -1040,6 +1060,17 @@ defmodule XamtWeb.ServerLive do
             </form>
             <button
               type="button"
+              id="mobile-nav-server"
+              class="xamt-mobile-nav__btn xamt-mobile-nav__server"
+              phx-click="toggle_server_menu"
+              aria-label={gettext("Server info")}
+              aria-expanded={@show_server_menu}
+              aria-haspopup="dialog"
+            >
+              <.icon name="hero-information-circle" class="size-5" />
+            </button>
+            <button
+              type="button"
               id="mobile-nav-members"
               class="xamt-mobile-nav__btn xamt-mobile-nav__members"
               phx-click="set_mobile_panel"
@@ -1176,7 +1207,21 @@ defmodule XamtWeb.ServerLive do
                         id={"msg-content-#{message.id}"}
                         class="xamt-message__content mongol-text"
                       >
-                        {raw(safe_html(message, @current_scope.user.id))}
+                        <%= if url = audio_src(message) do %>
+                          <div class="xamt-message__audio">
+                            <audio
+                              id={"msg-audio-#{message.id}"}
+                              class="xamt-audio-player"
+                              controls
+                              preload="metadata"
+                              src={url}
+                            >
+                              {gettext("Voice message")}
+                            </audio>
+                          </div>
+                        <% else %>
+                          {raw(safe_html(message, @current_scope.user.id))}
+                        <% end %>
                         <%= if preview = link_preview(message) do %>
                           <a
                             id={"msg-preview-#{message.id}"}
@@ -1254,7 +1299,9 @@ defmodule XamtWeb.ServerLive do
                           {gettext("Reply")}
                         </button>
                         <button
-                          :if={message.user_id == @current_scope.user.id}
+                          :if={
+                            message.user_id == @current_scope.user.id and is_nil(audio_src(message))
+                          }
                           type="button"
                           id={"edit-message-#{message.id}"}
                           phx-click="edit_message"
@@ -1308,6 +1355,14 @@ defmodule XamtWeb.ServerLive do
               data-channel-id={@active_channel && @active_channel.id}
               data-reply-to-id={@replying_to && @replying_to.id}
             >
+              <button
+                type="button"
+                id="composer-peek"
+                class="xamt-composer__peek"
+                aria-label={gettext("Write a message")}
+              >
+                <.icon name="hero-pencil" class="size-5" />
+              </button>
               <div :if={@replying_to} id="reply-preview" class="xamt-reply-bar">
                 <span class="xamt-quote__mark" aria-hidden="true">↳</span>
                 <span class="xamt-quote__author mongol-text">
@@ -1367,6 +1422,32 @@ defmodule XamtWeb.ServerLive do
                 >
                   <.icon name="hero-photo" class="size-5" />
                 </label>
+                <form
+                  id="audio-form"
+                  phx-change="validate_audio"
+                  phx-submit="send_audio"
+                  phx-hook="AudioRecorder"
+                  data-mic-error={gettext("Microphone access is required to record")}
+                  data-mic-unsupported={gettext("Voice recording is not supported in this browser")}
+                  data-mic-insecure={
+                    gettext(
+                      "Voice recording needs HTTPS. Open https://dev1:4001 on this phone and allow the microphone."
+                    )
+                  }
+                  data-mic-empty={gettext("Recording was empty")}
+                >
+                  <.live_file_input upload={@uploads.audio} class="hidden" />
+                  <button
+                    type="button"
+                    id="btn-record"
+                    class="xamt-btn xamt-btn--soft xamt-record-btn"
+                    title={gettext("Record voice message")}
+                    aria-label={gettext("Record voice message")}
+                    aria-pressed="false"
+                  >
+                    <.icon name="hero-microphone" class="size-5" />
+                  </button>
+                </form>
                 <button
                   :if={@editing_message_id}
                   type="button"
@@ -1597,7 +1678,19 @@ defmodule XamtWeb.ServerLive do
     >
       <div class="xamt-sheet-form xamt-server-menu-sheet">
         <h2 id="server-menu-title" class="xamt-section-title mongol-text">{@server.name}</h2>
-        <nav class="xamt-server-menu-sheet__nav" aria-labelledby="server-menu-title">
+        <p id="server-menu-slug" class="xamt-server-menu-sheet__slug">/{@server.slug}</p>
+        <p
+          :if={@server.description}
+          id="server-menu-description"
+          class="xamt-server-menu-sheet__desc mongol-text"
+        >
+          {@server.description}
+        </p>
+        <nav
+          :if={@can_manage_channels? or @can_manage_server?}
+          class="xamt-server-menu-sheet__nav"
+          aria-labelledby="server-menu-title"
+        >
           <.link
             :if={@can_manage_channels?}
             id="server-menu-new-channel"
@@ -2211,4 +2304,43 @@ defmodule XamtWeb.ServerLive do
     |> Enum.map(fn url -> ~s(<div class="editor-image"><img src="#{url}" /></div>) end)
     |> Enum.join()
   end
+
+  defp send_audio_message(socket, channel) do
+    case XamtWeb.Uploads.consume_audio(socket, :audio) do
+      url when is_binary(url) ->
+        attrs = %{
+          "content" => %{"type" => "audio", "url" => url},
+          "content_html" => "🎤 <em>#{gettext("Voice message")}</em>",
+          "content_type" => "audio",
+          "reply_to_id" => socket.assigns.replying_to && socket.assigns.replying_to.id
+        }
+
+        case Messages.create_message(socket.assigns.current_scope, channel.id, attrs) do
+          {:ok, _message} ->
+            {:noreply, assign(socket, :replying_to, nil)}
+
+          {:error, :rate_limited} ->
+            {:noreply, put_flash(socket, :error, gettext("Messages sent too fast"))}
+
+          {:error, :unauthorized} ->
+            {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+
+          {:error, _changeset} ->
+            {:noreply, put_flash(socket, :error, gettext("Could not send voice message"))}
+        end
+
+      _ ->
+        {:noreply, put_flash(socket, :error, gettext("Could not send voice message"))}
+    end
+  end
+
+  defp audio_src(%{content: %{"type" => "audio", "url" => url}}) when is_binary(url) do
+    cond do
+      String.starts_with?(url, "/uploads/") and not String.contains?(url, "..") -> url
+      String.starts_with?(url, "https://") -> url
+      true -> nil
+    end
+  end
+
+  defp audio_src(_), do: nil
 end

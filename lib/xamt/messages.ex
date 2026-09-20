@@ -492,8 +492,9 @@ defmodule Xamt.Messages do
   end
 
   # Strip nested payload we do not need on the wire.
-  # LiveView rendering only depends on `content_html` and `user`.
-  # Clear `content` (Map) so PubSub does not copy a large AST into every subscriber heap.
+  # LiveView rendering only depends on `content_html` and `user`, except
+  # audio messages which need `type` + `url` to mount a player.
+  # Clear the editor AST so PubSub does not copy it into every subscriber heap.
   # Large `content_html` binaries are refcounted and shared by the BEAM with no copy cost.
   defp strip_for_broadcast(%Message{} = message) do
     reply_to =
@@ -504,8 +505,11 @@ defmodule Xamt.Messages do
 
     message = attach_mention_ids(message)
 
-    %{message | content: %{}, reply_to: reply_to}
+    %{message | content: broadcast_content(message.content), reply_to: reply_to}
   end
+
+  defp broadcast_content(%{"type" => "audio"} = content), do: Map.take(content, ["type", "url"])
+  defp broadcast_content(_), do: %{}
 
   defp attach_mention_ids(%Message{} = message) do
     ids =

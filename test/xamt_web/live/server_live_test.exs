@@ -33,6 +33,7 @@ defmodule XamtWeb.ServerLiveTest do
     assert html =~ server.name
     assert html =~ channel.name
     assert has_element?(view, "#message-composer-wrap[data-channel-id='#{channel.id}']")
+    assert has_element?(view, "#composer-peek")
 
     {:ok, message} =
       Messages.create_message(scope, channel.id, %{
@@ -403,6 +404,42 @@ defmodule XamtWeb.ServerLiveTest do
     view |> element("#mobile-nav-members") |> render_click()
     assert has_element?(view, ".xamt-app--panel-members")
     assert has_element?(view, "#drawer-backdrop")
+  end
+
+  test "server info button opens overlay with name and slug", %{
+    conn: conn,
+    server: server,
+    channel: channel
+  } do
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    assert has_element?(view, "#mobile-nav-server")
+    refute has_element?(view, "#server-menu-drawer")
+
+    view |> element("#mobile-nav-server") |> render_click()
+    assert has_element?(view, "#server-menu-drawer")
+    assert has_element?(view, "#server-menu-title", server.name)
+    assert has_element?(view, "#server-menu-slug", "/#{server.slug}")
+    assert has_element?(view, "#server-menu-new-channel")
+  end
+
+  test "members can open server info but not admin actions", %{
+    conn: _conn,
+    server: server,
+    channel: channel
+  } do
+    member = user_fixture()
+    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(member), server.id)
+    member_conn = log_in_user(build_conn(), member)
+
+    {:ok, view, _html} = live(member_conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    assert has_element?(view, "#mobile-nav-server")
+    refute has_element?(view, "#server-menu")
+
+    view |> element("#mobile-nav-server") |> render_click()
+    assert has_element?(view, "#server-menu-drawer")
+    assert has_element?(view, "#server-menu-title", server.name)
+    refute has_element?(view, "#server-menu-new-channel")
+    refute has_element?(view, "#server-menu-settings")
   end
 
   test "selecting the current channel closes the mobile drawer", %{
@@ -795,5 +832,67 @@ defmodule XamtWeb.ServerLiveTest do
     view |> element("#channel-link-#{other.slug}") |> render_click()
     assert_patch(view, ~p"/servers/#{server.slug}/#{other.slug}")
     refute List.keyfind(TypingTracker.list(channel), user.id, 0)
+  end
+
+  test "renders a native player for voice messages", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "🎤 <em>Voice message</em>",
+        "content" => %{"type" => "audio", "url" => "/uploads/voice-test.webm"}
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    assert has_element?(view, "#audio-form")
+    assert has_element?(view, "#btn-record")
+    assert has_element?(view, "#msg-audio-#{message.id}[src='/uploads/voice-test.webm']")
+    refute has_element?(view, "#edit-message-#{message.id}")
+  end
+
+  test "send_audio persists an uploaded recording", %{
+    conn: conn,
+    server: server,
+    channel: channel
+  } do
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    audio =
+      file_input(view, "#audio-form", :audio, [
+        %{name: "voice.webm", content: <<1, 2, 3, 4>>, type: "audio/webm"}
+      ])
+
+    render_upload(audio, "voice.webm")
+
+    view
+    |> form("#audio-form")
+    |> render_submit()
+
+    assert has_element?(view, "audio.xamt-audio-player")
+  end
+
+  test "send_audio accepts Safari m4a recordings", %{
+    conn: conn,
+    server: server,
+    channel: channel
+  } do
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    audio =
+      file_input(view, "#audio-form", :audio, [
+        %{name: "voice.m4a", content: <<1, 2, 3, 4>>, type: "audio/mp4"}
+      ])
+
+    render_upload(audio, "voice.m4a")
+
+    view
+    |> form("#audio-form")
+    |> render_submit()
+
+    assert has_element?(view, "audio.xamt-audio-player")
   end
 end

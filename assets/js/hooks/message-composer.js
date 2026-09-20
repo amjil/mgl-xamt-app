@@ -21,6 +21,25 @@ function editorRoot(editorEl) {
   return editorEl?.querySelector?.(".editor-content") || editorEl
 }
 
+const OUTSIDE_CLOSE_GRACE_MS = 500
+const GHOST_MOUSE_MS = 800
+
+function isGhostMouseEvent(event, lastTouchAt) {
+  return (
+    event.pointerType === "mouse" &&
+    lastTouchAt > 0 &&
+    performance.now() - lastTouchAt < GHOST_MOUSE_MS
+  )
+}
+
+function isTransientBlurTarget(target) {
+  return (
+    !target ||
+    target === document.body ||
+    target === document.documentElement
+  )
+}
+
 /** Collect image File objects from a paste/drop DataTransfer. */
 function imageFilesFromDataTransfer(data) {
   if (!data) return []
@@ -172,10 +191,44 @@ export const MessageComposer = {
       this._onEditableFocus = (e) => suppressSystemKeyboard(e.target)
       this.host.addEventListener("focusin", this._onEditableFocus)
     }
+    this._openedAt = 0
+    this._lastTouchAt = 0
     this._onHostPointer = () => {
       if (!this.host.contains(document.activeElement)) this.editor.focus()
     }
     this.host.addEventListener("pointerdown", this._onHostPointer)
+    this._onComposerFocus = () => this.setOpen(true)
+    this._onComposerBlur = (e) => {
+      if (this.el.contains(e.relatedTarget) || this.wrap?.contains(e.relatedTarget)) return
+      // iOS/Android fire focusout with no relatedTarget (or body) while the
+      // keyboard / IME / layout settle. Outside taps close via pointerdown.
+      if (isTransientBlurTarget(e.relatedTarget)) return
+      requestAnimationFrame(() => {
+        if (this.withinOpenGrace()) return
+        const active = document.activeElement
+        if (this.wrap?.contains(active)) return
+        if (active?.closest?.("mgl-keyboard, mgl-candidates, .xamt-mention-picker")) return
+        if (!this.hasDraft()) this.setOpen(false)
+      })
+    }
+    this.host.addEventListener("focusin", this._onComposerFocus)
+    this.host.addEventListener("focusout", this._onComposerBlur)
+    this._onDocPointer = (e) => {
+      if (e.pointerType === "touch" || e.pointerType === "pen") {
+        this._lastTouchAt = performance.now()
+      } else if (isGhostMouseEvent(e, this._lastTouchAt)) {
+        return
+      }
+      if (!this.el.classList.contains("is-open")) return
+      if (this.withinOpenGrace()) return
+      if (this.wrap?.contains(e.target)) return
+      if (e.target.closest?.("#composer-peek")) return
+      if (e.target.closest?.("mgl-keyboard, mgl-candidates, .xamt-mention-picker")) return
+      if (this.hasDraft()) return
+      this._root()?.querySelector("[contenteditable]")?.blur?.()
+      this.setOpen(false)
+    }
+    document.addEventListener("pointerdown", this._onDocPointer, true)
     this._detachKeyboard = attachVirtualKeyboard(this.ime)
 
     // Send lives in the toolbar, outside this hook's phx-update="ignore"
@@ -190,7 +243,24 @@ export const MessageComposer = {
       this.wrap = wrap
       this.submit()
     }
+    this._onPeek = (e) => {
+      if (e.type === "pointerdown" && e.isPrimary === false) return
+      if (e.pointerType === "mouse" && e.button != null && e.button !== 0) return
+      const btn = e.target.closest?.("#composer-peek")
+      if (!btn) return
+      const wrap = this.el.closest(".xamt-composer-wrap")
+      if (!wrap?.contains(btn)) return
+      // Open on pointerdown so iOS treats focus as a user gesture, and swallow
+      // the event so the compatibility mouse click cannot hit whatever is now
+      // under the FAB after the composer expands.
+      e.preventDefault()
+      this.wrap = wrap
+      this.setOpen(true)
+      this.editor.focus()
+    }
     document.addEventListener("click", this._onSend)
+    document.addEventListener("pointerdown", this._onPeek, {passive: false})
+    document.addEventListener("click", this._onPeek)
 
     this._flushing = false
     this._onOnline = () => this.flushOfflineQueue()
@@ -233,7 +303,10 @@ export const MessageComposer = {
     })
 
     this.handleEvent("composer:clear", () => this.clear())
-    this.handleEvent("composer:focus", () => this.editor.focus())
+    this.handleEvent("composer:focus", () => {
+      this.setOpen(true)
+      this.editor.focus()
+    })
     this.handleEvent("composer:load", (payload) => this.populate(payload))
     this.handleEvent("populate_composer", (payload) => this.populate(payload))
 
@@ -266,11 +339,16 @@ export const MessageComposer = {
   destroyed() {
     clearTimeout(this._typingTimer)
     document.removeEventListener("click", this._onSend)
+    document.removeEventListener("pointerdown", this._onPeek)
+    document.removeEventListener("click", this._onPeek)
     window.removeEventListener("online", this._onOnline)
     navigator.serviceWorker?.removeEventListener("message", this._onSwMessage)
     this.host?.removeEventListener("paste", this._onPaste, true)
     this.host?.removeEventListener("focusin", this._onEditableFocus)
+    this.host?.removeEventListener("focusin", this._onComposerFocus)
+    this.host?.removeEventListener("focusout", this._onComposerBlur)
     this.host?.removeEventListener("pointerdown", this._onHostPointer)
+    document.removeEventListener("pointerdown", this._onDocPointer, true)
     this._detachMentions?.()
     this._detachKeyboard?.()
     if (this.ime && typeof this.ime.destroy === "function") this.ime.destroy()
@@ -283,6 +361,8 @@ export const MessageComposer = {
       )
     }
     this.syncIme()
+    this.setOpen(false)
+    this._root()?.querySelector("[contenteditable]")?.blur?.()
     // Stop typing indicator immediately after send/clear
     if (this._isTyping) {
       if (this._canPush()) this.pushEvent("typing_stopped", {})
@@ -295,7 +375,23 @@ export const MessageComposer = {
     if (html != null) this.editor.setHtml(html)
     hydrateMentions(this._root())
     this.syncIme()
+    this.setOpen(true)
     this.editor.focus()
+  },
+
+  setOpen(open) {
+    const next = Boolean(open)
+    if (next) this._openedAt = performance.now()
+    this.el.classList.toggle("is-open", next)
+  },
+
+  withinOpenGrace() {
+    return performance.now() - this._openedAt < OUTSIDE_CLOSE_GRACE_MS
+  },
+
+  hasDraft() {
+    const text = (this._root()?.innerText || "").replace(/[\s\u200B-\u200D\uFEFF]/g, "")
+    return text.length > 0
   },
 
   syncIme() {
