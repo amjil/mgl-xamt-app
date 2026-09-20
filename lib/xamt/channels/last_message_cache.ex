@@ -28,17 +28,19 @@ defmodule Xamt.Channels.LastMessageCache do
 
   @impl true
   def handle_info(:load_initial_data, state) do
-    query =
-      from m in Message,
-        where: is_nil(m.deleted_at),
-        distinct: m.channel_id,
-        order_by: [desc: m.channel_id, desc: m.inserted_at, desc: m.id],
-        select: {m.channel_id, m.id, m.inserted_at}
+    if Application.get_env(:xamt, :ets_cache_warmup, true) do
+      query =
+        from m in Message,
+          where: is_nil(m.deleted_at),
+          distinct: m.channel_id,
+          order_by: [desc: m.channel_id, desc: m.inserted_at, desc: m.id],
+          select: {m.channel_id, m.id, m.inserted_at}
 
-    Repo.all(query)
-    |> Enum.each(fn {channel_id, message_id, inserted_at} ->
-      put(channel_id, message_id, inserted_at)
-    end)
+      Repo.all(query)
+      |> Enum.each(fn {channel_id, message_id, inserted_at} ->
+        put(channel_id, message_id, inserted_at)
+      end)
+    end
 
     {:noreply, state}
   end

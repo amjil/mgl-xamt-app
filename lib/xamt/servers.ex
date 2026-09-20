@@ -7,9 +7,10 @@ defmodule Xamt.Servers do
 
   alias Xamt.Accounts.Scope
   alias Xamt.Channels
+  alias Xamt.Channels.ChannelListCache
   alias Xamt.Repo
   alias Xamt.Slug
-  alias Xamt.Servers.{Invite, Server, ServerMember}
+  alias Xamt.Servers.{Invite, Server, ServerCache, ServerMember}
 
   @default_channel_name "general"
   @invite_code_bytes 9
@@ -48,13 +49,15 @@ defmodule Xamt.Servers do
                joined_at: now
              })
              |> Repo.insert(),
-           {:ok, _channel} <-
+           {:ok, channel} <-
              Channels.create_channel(server, %{
                name: @default_channel_name,
                slug: Slug.slugify(@default_channel_name),
                type: "text",
                position: 0
              }) do
+        ServerCache.put(server)
+        ChannelListCache.put(server.id, [channel])
         {:ok, get_server!(server.id)}
       end
     end)
@@ -71,10 +74,34 @@ defmodule Xamt.Servers do
     |> Repo.all()
   end
 
-  def get_server!(id), do: Repo.get!(Server, id) |> Repo.preload([:channels, :members])
+  def get_server!(id) do
+    case ServerCache.get(id) do
+      %Server{} = server ->
+        server
 
+      nil ->
+        server = Repo.get!(Server, id)
+        ServerCache.put(server)
+        server
+    end
+  end
+
+  @doc """
+  Fetches a server by slug, preferring the ETS `ServerCache`.
+
+  Does not preload associations — members and channels are loaded separately
+  on the LiveView hot path.
+  """
   def get_server_by_slug!(slug) when is_binary(slug) do
-    Repo.get_by!(Server, slug: slug) |> Repo.preload([:channels, :members])
+    case ServerCache.get_by_slug(slug) do
+      %Server{} = server ->
+        server
+
+      nil ->
+        server = Repo.get_by!(Server, slug: slug)
+        ServerCache.put(server)
+        server
+    end
   end
 
   def join_server(%Scope{user: user}, server_id) do
@@ -117,9 +144,18 @@ defmodule Xamt.Servers do
     server = get_server!(server_id)
 
     if admin?(server.id, user.id) do
-      server
-      |> Server.changeset(Map.put(normalize_attrs(attrs), "owner_id", server.owner_id))
-      |> Repo.update()
+      old_slug = server.slug
+
+      case server
+           |> Server.changeset(Map.put(normalize_attrs(attrs), "owner_id", server.owner_id))
+           |> Repo.update() do
+        {:ok, updated} ->
+          ServerCache.put(updated, old_slug: old_slug)
+          {:ok, updated}
+
+        other ->
+          other
+      end
     else
       {:error, :unauthorized}
     end

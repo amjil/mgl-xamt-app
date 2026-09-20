@@ -38,6 +38,13 @@ defmodule Xamt.DataCase do
   def setup_sandbox(tags) do
     pid = Ecto.Adapters.SQL.Sandbox.start_owner!(Xamt.Repo, shared: not tags[:async])
     on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+
+    # ETS community caches outlive sandbox rollbacks; clear so ghost rows
+    # from a previous test cannot satisfy the next mount path.
+    Xamt.Servers.ServerCache.reset()
+    Xamt.Channels.ChannelListCache.reset()
+
+    :ok
   end
 
   @doc """

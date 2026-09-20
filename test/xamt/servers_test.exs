@@ -1,5 +1,5 @@
 defmodule Xamt.ServersTest do
-  use Xamt.DataCase, async: true
+  use Xamt.DataCase, async: false
 
   alias Xamt.Accounts.Scope
   alias Xamt.{Channels, Servers}

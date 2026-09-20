@@ -9,7 +9,7 @@ defmodule Xamt.Channels do
   alias Xamt.Repo
   alias Xamt.Servers
   alias Xamt.Servers.Server
-  alias Xamt.Channels.{Channel, ChannelRead, LastMessageCache}
+  alias Xamt.Channels.{Channel, ChannelListCache, ChannelRead, LastMessageCache}
   alias Xamt.Slug
 
   def change_channel(%Channel{} = channel, attrs \\ %{}) do
@@ -44,6 +44,7 @@ defmodule Xamt.Channels do
       })
       |> Repo.update()
       |> with_visible_slug_error()
+      |> tap_invalidate_channels(channel.server_id)
     else
       {:error, :unauthorized}
     end
@@ -62,6 +63,7 @@ defmodule Xamt.Channels do
       true ->
         with {:ok, channel} <- Repo.delete(channel) do
           LastMessageCache.delete(channel.id)
+          ChannelListCache.invalidate(channel.server_id)
           {:ok, channel}
         end
     end
@@ -108,7 +110,15 @@ defmodule Xamt.Channels do
         |> Repo.update_all(set: [position: position])
       end)
 
-      {:ok, ordered}
+      server_id = hd(ordered).server_id
+
+      refreshed =
+        ordered
+        |> Enum.with_index()
+        |> Enum.map(fn {channel, position} -> %{channel | position: position} end)
+
+      ChannelListCache.put(server_id, refreshed)
+      {:ok, refreshed}
     end)
   end
 
@@ -132,6 +142,7 @@ defmodule Xamt.Channels do
     })
     |> Repo.insert()
     |> with_visible_slug_error()
+    |> tap_invalidate_channels(server.id)
   end
 
   defp unique_channel_slug(server_id, slug, attempt \\ 0, exclude_id \\ nil)
@@ -194,11 +205,21 @@ defmodule Xamt.Channels do
   end
 
   def list_channels(server_id) do
-    from(c in Channel,
-      where: c.server_id == ^server_id,
-      order_by: [asc: c.position, asc: c.name]
-    )
-    |> Repo.all()
+    case ChannelListCache.get(server_id) do
+      channels when is_list(channels) ->
+        channels
+
+      nil ->
+        channels =
+          from(c in Channel,
+            where: c.server_id == ^server_id,
+            order_by: [asc: c.position, asc: c.name]
+          )
+          |> Repo.all()
+
+        ChannelListCache.put(server_id, channels)
+        channels
+    end
   end
 
   def get_channel(id), do: Repo.get(Channel, id)
@@ -206,7 +227,13 @@ defmodule Xamt.Channels do
   def get_channel!(id), do: Repo.get!(Channel, id)
 
   def get_channel_by_slug!(server_id, slug) when is_binary(slug) do
-    Repo.get_by!(Channel, server_id: server_id, slug: slug)
+    case Enum.find(list_channels(server_id), &(&1.slug == slug)) do
+      %Channel{} = channel ->
+        channel
+
+      nil ->
+        Repo.get_by!(Channel, server_id: server_id, slug: slug)
+    end
   end
 
   @doc """
@@ -288,9 +315,7 @@ defmodule Xamt.Channels do
   """
   def get_unread_channel_ids(user_id, server_id)
       when is_binary(user_id) and is_binary(server_id) do
-    channel_ids =
-      from(c in Channel, where: c.server_id == ^server_id, select: c.id)
-      |> Repo.all()
+    channel_ids = Enum.map(list_channels(server_id), & &1.id)
 
     if channel_ids == [] do
       []
@@ -317,6 +342,13 @@ defmodule Xamt.Channels do
       end)
     end
   end
+
+  defp tap_invalidate_channels({:ok, %Channel{} = channel}, server_id) do
+    ChannelListCache.invalidate(server_id)
+    {:ok, channel}
+  end
+
+  defp tap_invalidate_channels(other, _server_id), do: other
 
   defp normalize_datetime(%DateTime{} = dt), do: DateTime.truncate(dt, :second)
 

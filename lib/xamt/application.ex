@@ -16,6 +16,8 @@ defmodule Xamt.Application do
       {Task.Supervisor, name: Xamt.TaskSupervisor},
       {XamtWeb.TypingTracker, Application.get_env(:xamt, XamtWeb.TypingTracker, [])},
       Xamt.Channels.LastMessageCache,
+      Xamt.Channels.ChannelListCache,
+      Xamt.Servers.ServerCache,
       Xamt.Messages.RateLimiter,
       XamtWeb.Endpoint
     ]

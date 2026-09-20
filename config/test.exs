@@ -29,6 +29,9 @@ config :xamt, Xamt.Mailer, adapter: Swoosh.Adapters.Test
 # Avoid flaky failures when fixtures create many messages in one window
 config :xamt, Xamt.Messages.RateLimiter, limit: :infinity
 
+# SQL sandbox owns connections per test; GenServers must not warm from Repo.
+config :xamt, :ets_cache_warmup, false
+
 # Short typing-diff window so LiveView tests do not wait 2s.
 config :xamt, XamtWeb.TypingTracker, broadcast_period: 50
 
