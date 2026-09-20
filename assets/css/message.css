@@ -30,7 +30,6 @@
   flex-direction: row;
   align-items: center;
   gap: 0.35rem;
-  margin-inline-start: auto;
 }
 
 .xamt-search__field .xamt-input {
@@ -356,6 +355,7 @@ a.xamt-mention:hover {
   display: inline-flex;
   flex-direction: row;
   align-items: center;
+  justify-content: center;
   gap: 0.15rem;
   padding: 0.2rem 0.25rem;
   border: 1px solid var(--xamt-line);
@@ -365,6 +365,7 @@ a.xamt-mention:hover {
   font-size: 0.8rem;
   line-height: 1.2;
   cursor: pointer;
+  box-sizing: border-box;
   transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
 }
 
@@ -384,7 +385,8 @@ a.xamt-mention:hover {
   -webkit-writing-mode: horizontal-tb;
   text-orientation: mixed;
   -webkit-text-orientation: mixed;
-  display: block;
+  display: grid;
+  place-items: center;
   flex: 0 0 auto;
   line-height: 1;
   font-style: normal;
@@ -406,7 +408,11 @@ a.xamt-mention:hover {
 .xamt-reaction--add {
   writing-mode: horizontal-tb;
   -webkit-writing-mode: horizontal-tb;
-  padding: 0.2rem;
+  display: grid;
+  place-items: center;
+  padding: 0.15rem;
+  inline-size: 1.7rem;
+  block-size: 1.7rem;
 }
 
 .xamt-reaction-picker {
@@ -458,7 +464,7 @@ a.xamt-mention:hover {
     padding: 0.45rem 0.35rem;
   }
 
-  .xamt-reaction {
+  .xamt-reaction:not(.xamt-reaction--add) {
     min-inline-size: 2.25rem;
     min-block-size: 2.25rem;
     padding: 0.25rem;
