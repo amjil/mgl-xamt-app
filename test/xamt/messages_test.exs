@@ -2,7 +2,7 @@ defmodule Xamt.MessagesTest do
   use Xamt.DataCase, async: false
 
   alias Xamt.Accounts.Scope
-  alias Xamt.{Channels, Messages, Servers}
+  alias Xamt.{Channels, Messages, Moderation, Servers}
   alias Xamt.Messages.{RateLimiter, Reaction}
 
   setup do
@@ -331,6 +331,9 @@ defmodule Xamt.MessagesTest do
     assert tombstone
     assert tombstone.deleted_at
 
+    # Authors retracting their own message stay out of the server audit log.
+    assert Moderation.list_audit_logs_for_resource(channel.server_id, message.id) == []
+
     assert {:error, :deleted} =
              Messages.update_message(scope, message.id, %{"content_html" => "<p>x</p>"})
 
@@ -361,7 +364,8 @@ defmodule Xamt.MessagesTest do
   test "manage_messages lets a moderator delete someone else's message", %{
     scope: scope,
     channel: channel,
-    server: server
+    server: server,
+    owner: owner
   } do
     author = Xamt.AccountsFixtures.user_fixture()
     author_scope = Scope.for_user(author)
@@ -373,8 +377,39 @@ defmodule Xamt.MessagesTest do
         "content" => %{"type" => "rich_text"}
       })
 
-    assert {:ok, deleted} = Messages.delete_message(scope, message.id)
+    assert {:ok, deleted} = Messages.delete_message(scope, message.id, "spam")
     assert %DateTime{} = deleted.deleted_at
+
+    [log] = Moderation.list_audit_logs(server.id)
+    assert log.action == "message_deleted"
+    assert log.actor_id == owner.id
+    assert log.target_user_id == author.id
+    assert log.target_resource_id == message.id
+    assert log.reason == "spam"
+    assert log.metadata["channel_id"] == channel.id
+    assert log.metadata["content_snippet"] == "take this down"
+    assert log.metadata["actor_username"] == owner.username
+    assert log.metadata["target_username"] == author.username
+  end
+
+  test "moderator delete without a reason still writes an audit log", %{
+    scope: scope,
+    channel: channel,
+    server: server
+  } do
+    author = Xamt.AccountsFixtures.user_fixture()
+    {:ok, _} = Servers.join_server(Scope.for_user(author), server.id)
+
+    {:ok, message} =
+      Messages.create_message(Scope.for_user(author), channel.id, %{
+        "content_html" => "<p>blank reason</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    assert {:ok, _} = Messages.delete_message(scope, message.id, "   ")
+    [log] = Moderation.list_audit_logs_for_resource(server.id, message.id)
+    assert log.action == "message_deleted"
+    assert is_nil(log.reason)
   end
 
   defp with_query_count(fun) do

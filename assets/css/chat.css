@@ -985,6 +985,17 @@
   opacity: 1;
 }
 
+.xamt-sheet--reason .xamt-sheet__panel {
+  max-width: min(32rem, calc(100vw - 2rem));
+}
+
+.xamt-delete-reason__preview {
+  color: var(--xamt-muted);
+  font-size: 0.9rem;
+  max-inline-size: var(--xamt-field-extent);
+  overflow: hidden;
+}
+
 /* Compact desktop: keep the server rail, overlay channel/member drawers.
    Ultrawide (>1440px) keeps the persistent three-column rails. */
 @media (max-width: 1440px) and (min-width: 961px) {

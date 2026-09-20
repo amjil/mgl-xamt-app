@@ -9,6 +9,7 @@ defmodule Xamt.Messages do
   alias Xamt.Accounts.User
   alias Xamt.Channels.Channel
   alias Xamt.Channels.LastMessageCache
+  alias Xamt.Moderation.AuditLog
   alias Xamt.Repo
   alias Xamt.Servers.Permissions
   alias Xamt.Servers.ServerMember
@@ -92,25 +93,39 @@ defmodule Xamt.Messages do
   @doc """
   Soft-deletes a message by writing `deleted_at`.
 
+  When a moderator deletes someone else's message, an audit log row is written
+  in the same transaction so the tombstone and the record cannot diverge.
+  Authors deleting their own messages do not produce a server audit log.
+
   Broadcasts the tombstone struct so LiveViews can `stream_insert/3` over the
   existing DOM node instead of removing it.
   """
-  def delete_message(%Scope{user: user}, message_id) do
+  def delete_message(%Scope{user: user}, message_id, reason \\ nil) do
     message = get_message!(message_id)
 
-    with :ok <- deletable?(message, user),
-         {:ok, message} <-
-           message
-           |> Message.delete_changeset()
-           |> Repo.update() do
-      message = preload_message!(message)
-      LastMessageCache.refresh(message.channel_id)
-      broadcast(message.channel_id, :deleted_message, strip_for_broadcast(message))
-      {:ok, message}
+    with :ok <- deletable?(message, user) do
+      moderated? = message.user_id != user.id
+
+      Ecto.Multi.new()
+      |> Ecto.Multi.update(:message, Message.delete_changeset(message))
+      |> maybe_insert_message_deleted_log(moderated?, message, user, reason)
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{message: deleted}} ->
+          deleted = preload_message!(deleted)
+          LastMessageCache.refresh(deleted.channel_id)
+          broadcast(deleted.channel_id, :deleted_message, strip_for_broadcast(deleted))
+          {:ok, deleted}
+
+        {:error, _op, value, _changes} ->
+          {:error, value}
+      end
     end
   end
 
-  def soft_delete_message(scope, message_id), do: delete_message(scope, message_id)
+  def soft_delete_message(scope, message_id, reason \\ nil) do
+    delete_message(scope, message_id, reason)
+  end
 
   def list_messages(channel_id, opts \\ []) do
     limit = Keyword.get(opts, :limit, @default_limit)
@@ -314,6 +329,46 @@ defmodule Xamt.Messages do
   defp deletable?(%Message{} = message, user) do
     authorize_channel_perm(user.id, message.channel_id, :manage_messages)
   end
+
+  defp maybe_insert_message_deleted_log(multi, false, _message, _user, _reason) do
+    Ecto.Multi.put(multi, :audit_log, nil)
+  end
+
+  defp maybe_insert_message_deleted_log(multi, true, message, user, reason) do
+    snippet =
+      message
+      |> plain_text()
+      |> String.slice(0, 100)
+
+    attrs = %{
+      server_id: channel_server_id(message.channel_id),
+      actor_id: user.id,
+      target_user_id: message.user_id,
+      target_resource_id: message.id,
+      action: "message_deleted",
+      reason: present_reason(reason),
+      metadata: %{
+        "channel_id" => message.channel_id,
+        "content_snippet" => snippet,
+        "actor_username" => user.username,
+        "target_username" => message_author_username(message)
+      }
+    }
+
+    Ecto.Multi.insert(multi, :audit_log, AuditLog.changeset(%AuditLog{}, attrs))
+  end
+
+  defp message_author_username(%{user: %User{username: username}}), do: username
+  defp message_author_username(_), do: nil
+
+  defp present_reason(reason) when is_binary(reason) do
+    case String.trim(reason) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp present_reason(_), do: nil
 
   defp authorize_channel_perm(user_id, channel_id, perm) do
     case member_permissions(user_id, channel_id) do

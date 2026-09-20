@@ -85,6 +85,7 @@ defmodule XamtWeb.ServerLive do
       |> assign(:typing_users, list_typists(channel, scope.user.id))
       |> assign(:editing_message_id, nil)
       |> assign(:replying_to, nil)
+      |> assign(:deleting_message, nil)
       |> assign(:channel_form, to_form(Channels.change_channel(%Channel{}), as: :channel))
       |> assign_member_permissions(current_member)
       |> assign(:server_form, to_form(Servers.change_server(server), as: :server))
@@ -308,22 +309,39 @@ defmodule XamtWeb.ServerLive do
 
   def handle_event("delete_message", %{"id" => id}, socket) do
     message = Messages.get_message!(id)
-    current_member = socket.assigns.current_member
+    current_user_id = socket.assigns.current_scope.user.id
+    is_mine = message.user_id == current_user_id
+    is_mod = socket.assigns.can_manage_messages?
 
-    is_mine = message.user_id == socket.assigns.current_scope.user.id
+    cond do
+      is_mine ->
+        delete_current_message(socket, id)
 
-    is_mod =
-      current_member &&
-        Permissions.has_permission?(current_member.permissions, :manage_messages)
+      is_mod ->
+        {:noreply,
+         socket
+         |> assign(:deleting_message, message)
+         |> assign(
+           :delete_reason_form,
+           to_form(%{"reason" => "", "id" => message.id}, as: :audit)
+         )}
 
-    if is_mine or is_mod do
-      case Messages.delete_message(socket.assigns.current_scope, id) do
-        {:ok, _} -> {:noreply, socket}
-        {:error, _} -> {:noreply, put_flash(socket, :error, gettext("Could not delete message"))}
-      end
-    else
-      {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+      true ->
+        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
     end
+  end
+
+  def handle_event("confirm_delete_message", %{"audit" => audit}, socket) do
+    id = audit["id"]
+    reason = audit["reason"]
+
+    socket
+    |> assign(:deleting_message, nil)
+    |> delete_current_message(id, reason)
+  end
+
+  def handle_event("cancel_delete_message", _params, socket) do
+    {:noreply, assign(socket, :deleting_message, nil)}
   end
 
   def handle_event("load_older", _params, socket) do
@@ -1251,7 +1269,10 @@ defmodule XamtWeb.ServerLive do
                           id={"delete-message-#{message.id}"}
                           phx-click="delete_message"
                           phx-value-id={message.id}
-                          data-confirm={gettext("Delete this message?")}
+                          data-confirm={
+                            message.user_id == @current_scope.user.id &&
+                              gettext("Delete this message?")
+                          }
                         >
                           <.icon name="hero-trash" class="size-4" />
                           {gettext("Delete")}
@@ -1369,6 +1390,12 @@ defmodule XamtWeb.ServerLive do
         </section>
       </div>
 
+      <.delete_reason_overlay
+        :if={@deleting_message}
+        message={@deleting_message}
+        form={@delete_reason_form}
+      />
+
       <.server_menu_overlay
         :if={@show_server_menu && @active_channel}
         server={@server}
@@ -1389,6 +1416,19 @@ defmodule XamtWeb.ServerLive do
       />
     </div>
     """
+  end
+
+  defp delete_current_message(socket, id, reason \\ nil) do
+    case Messages.delete_message(socket.assigns.current_scope, id, reason) do
+      {:ok, _} ->
+        {:noreply, socket}
+
+      {:error, :unauthorized} ->
+        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, gettext("Could not delete message"))}
+    end
   end
 
   defp assign_member_permissions(socket, nil) do
@@ -1482,6 +1522,63 @@ defmodule XamtWeb.ServerLive do
         {render_slot(@inner_block)}
       </div>
     </details>
+    """
+  end
+
+  attr :message, :map, required: true
+  attr :form, :map, required: true
+
+  defp delete_reason_overlay(assigns) do
+    ~H"""
+    <.drawer
+      id="delete-reason-drawer"
+      class="xamt-sheet--menu xamt-sheet--reason"
+      show
+      on_cancel={JS.push("cancel_delete_message")}
+    >
+      <div class="xamt-sheet-form">
+        <h2 id="delete-reason-title" class="xamt-section-title mongol-text">
+          {gettext("Delete message")}
+        </h2>
+        <p id="delete-reason-preview" class="xamt-delete-reason__preview mongol-text">
+          {Messages.excerpt(@message, 80)}
+        </p>
+        <.form
+          for={@form}
+          id="delete-reason-form"
+          phx-submit="confirm_delete_message"
+          novalidate
+          class="xamt-form xamt-form--vertical"
+        >
+          <.input field={@form[:id]} type="hidden" />
+          <.input
+            field={@form[:reason]}
+            id="delete-reason"
+            label={gettext("Reason (optional)")}
+            phx-hook="MongolianIME"
+            class="xamt-input mongol-input"
+            autocomplete="off"
+          />
+          <div class="xamt-form__actions">
+            <button
+              type="submit"
+              id="delete-reason-submit"
+              class="xamt-btn xamt-btn--primary mongol-text"
+            >
+              {gettext("Delete")}
+            </button>
+            <button
+              type="button"
+              id="delete-reason-cancel"
+              class="xamt-btn mongol-text"
+              phx-click="cancel_delete_message"
+            >
+              {gettext("Cancel")}
+            </button>
+          </div>
+        </.form>
+      </div>
+    </.drawer>
     """
   end
 
@@ -1763,6 +1860,7 @@ defmodule XamtWeb.ServerLive do
     |> assign(:typing_users, list_typists(channel, scope.user.id))
     |> assign(:editing_message_id, nil)
     |> assign(:replying_to, nil)
+    |> assign(:deleting_message, nil)
     |> assign(:mobile_panel, :messages)
     |> assign(:search_q, "")
     |> assign(:search_results, nil)

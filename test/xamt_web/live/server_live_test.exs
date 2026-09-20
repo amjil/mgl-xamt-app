@@ -645,8 +645,42 @@ defmodule XamtWeb.ServerLiveTest do
 
     view |> element("#delete-message-#{message.id}") |> render_click()
 
+    assert has_element?(view, "#delete-reason-form")
+    assert has_element?(view, "#delete-reason-preview", "mod-delete-me")
+    refute has_element?(view, "#msg-tombstone-#{message.id}")
+
+    view
+    |> form("#delete-reason-form", audit: %{reason: "spam"})
+    |> render_submit()
+
+    refute has_element?(view, "#delete-reason-form")
     assert has_element?(view, "#msg-tombstone-#{message.id}")
     refute has_element?(view, "#msg-content-#{message.id}")
+  end
+
+  test "moderators can cancel a delete without removing the message", %{
+    conn: conn,
+    server: server,
+    channel: channel
+  } do
+    member = user_fixture()
+    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(member), server.id)
+
+    {:ok, message} =
+      Messages.create_message(Accounts.Scope.for_user(member), channel.id, %{
+        "content_html" => "<p>keep-me</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    view |> element("#delete-message-#{message.id}") |> render_click()
+    assert has_element?(view, "#delete-reason-form")
+
+    view |> element("#delete-reason-cancel") |> render_click()
+
+    refute has_element?(view, "#delete-reason-form")
+    assert has_element?(view, "#msg-content-#{message.id}")
+    refute has_element?(view, "#msg-tombstone-#{message.id}")
   end
 
   test "typing_started tracks the user without a per-keystroke broadcast", %{
