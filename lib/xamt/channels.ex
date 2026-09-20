@@ -18,10 +18,10 @@ defmodule Xamt.Channels do
   end
 
   @doc """
-  Creates a channel on behalf of a user. Only server admins and owners may.
+  Creates a channel on behalf of a user. Requires `:manage_channels`.
   """
   def create_channel(%Scope{user: user}, %Server{} = server, attrs) when is_map(attrs) do
-    if Servers.admin?(server.id, user.id) do
+    if Servers.can?(server.id, user.id, :manage_channels) do
       create_channel(server, attrs)
     else
       {:error, :unauthorized}
@@ -31,7 +31,7 @@ defmodule Xamt.Channels do
   def update_channel(%Scope{user: user}, channel_id, attrs) when is_map(attrs) do
     channel = get_channel!(channel_id)
 
-    if Servers.admin?(channel.server_id, user.id) do
+    if Servers.can?(channel.server_id, user.id, :manage_channels) do
       name = Map.get(attrs, "name") || Map.get(attrs, :name)
       base_slug = Map.get(attrs, "slug") || Map.get(attrs, :slug) || Slug.slugify(name)
 
@@ -54,7 +54,7 @@ defmodule Xamt.Channels do
     channel = get_channel!(channel_id)
 
     cond do
-      not Servers.admin?(channel.server_id, user.id) ->
+      not Servers.can?(channel.server_id, user.id, :manage_channels) ->
         {:error, :unauthorized}
 
       last_channel?(channel.server_id) ->
@@ -75,7 +75,7 @@ defmodule Xamt.Channels do
   def move_channel(%Scope{user: user}, channel_id, direction) when direction in [:up, :down] do
     channel = get_channel!(channel_id)
 
-    if Servers.admin?(channel.server_id, user.id) do
+    if Servers.can?(channel.server_id, user.id, :manage_channels) do
       ordered = list_channels(channel.server_id)
       index = Enum.find_index(ordered, &(&1.id == channel.id))
       target = if direction == :up, do: index - 1, else: index + 1

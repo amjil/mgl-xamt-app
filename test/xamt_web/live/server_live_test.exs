@@ -626,6 +626,29 @@ defmodule XamtWeb.ServerLiveTest do
     assert has_element?(view, "#reply-message-#{message.id}")
   end
 
+  test "owners can delete another member's message from the stream", %{
+    conn: conn,
+    server: server,
+    channel: channel
+  } do
+    member = user_fixture()
+    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(member), server.id)
+
+    {:ok, message} =
+      Messages.create_message(Accounts.Scope.for_user(member), channel.id, %{
+        "content_html" => "<p>mod-delete-me</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    assert has_element?(view, "#delete-message-#{message.id}")
+
+    view |> element("#delete-message-#{message.id}") |> render_click()
+
+    assert has_element?(view, "#msg-tombstone-#{message.id}")
+    refute has_element?(view, "#msg-content-#{message.id}")
+  end
+
   test "typing_started tracks the user without a per-keystroke broadcast", %{
     conn: conn,
     user: user,

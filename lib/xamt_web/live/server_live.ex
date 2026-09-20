@@ -4,6 +4,7 @@ defmodule XamtWeb.ServerLive do
   alias Xamt.{Channels, Messages, Servers}
   alias Xamt.Channels.Channel
   alias Xamt.Messages.Reaction
+  alias Xamt.Servers.Permissions
   alias Xamt.Servers.Server
   alias XamtWeb.Presence
   alias XamtWeb.TypingTracker
@@ -66,12 +67,14 @@ defmodule XamtWeb.ServerLive do
 
     unread_ids = Channels.get_unread_channel_ids(scope.user.id, server.id)
     user_servers = Servers.list_servers_for_user(scope)
+    current_member = Servers.get_member(server.id, scope.user.id)
 
     socket =
       socket
       |> assign(:page_title, server.name)
       |> assign(:server, server)
       |> assign(:member?, true)
+      |> assign(:current_member, current_member)
       |> assign(:user_servers, user_servers)
       |> assign(:channels, channels)
       |> assign(:members_offset, @member_page_size)
@@ -83,7 +86,7 @@ defmodule XamtWeb.ServerLive do
       |> assign(:editing_message_id, nil)
       |> assign(:replying_to, nil)
       |> assign(:channel_form, to_form(Channels.change_channel(%Channel{}), as: :channel))
-      |> assign(:admin?, Servers.admin?(server.id, scope.user.id))
+      |> assign_member_permissions(current_member)
       |> assign(:server_form, to_form(Servers.change_server(server), as: :server))
       |> assign(:invites, Servers.list_invites(server.id))
       |> assign(:editing_channel, nil)
@@ -205,6 +208,9 @@ defmodule XamtWeb.ServerLive do
         {:error, :rate_limited} ->
           {:noreply, put_flash(socket, :error, gettext("Messages sent too fast"))}
 
+        {:error, :unauthorized} ->
+          {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+
         {:error, _changeset} ->
           {:noreply, put_flash(socket, :error, gettext("Could not send message"))}
       end
@@ -301,9 +307,22 @@ defmodule XamtWeb.ServerLive do
   end
 
   def handle_event("delete_message", %{"id" => id}, socket) do
-    case Messages.delete_message(socket.assigns.current_scope, id) do
-      {:ok, _} -> {:noreply, socket}
-      {:error, _} -> {:noreply, put_flash(socket, :error, gettext("Could not delete message"))}
+    message = Messages.get_message!(id)
+    current_member = socket.assigns.current_member
+
+    is_mine = message.user_id == socket.assigns.current_scope.user.id
+
+    is_mod =
+      current_member &&
+        Permissions.has_permission?(current_member.permissions, :manage_messages)
+
+    if is_mine or is_mod do
+      case Messages.delete_message(socket.assigns.current_scope, id) do
+        {:ok, _} -> {:noreply, socket}
+        {:error, _} -> {:noreply, put_flash(socket, :error, gettext("Could not delete message"))}
+      end
+    else
+      {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
     end
   end
 
@@ -786,7 +805,7 @@ defmodule XamtWeb.ServerLive do
               <div class="xamt-rail__section-head">
                 <span class="mongol-text">{gettext("Channels")}</span>
                 <.link
-                  :if={@admin? and @active_channel}
+                  :if={@can_manage_channels? and @active_channel}
                   id="toggle-channel-form"
                   patch={~p"/servers/#{@server.slug}/#{@active_channel.slug}/new"}
                   class="xamt-icon-btn"
@@ -826,7 +845,7 @@ defmodule XamtWeb.ServerLive do
                   </.link>
 
                   <.action_menu
-                    :if={@admin?}
+                    :if={@can_manage_channels?}
                     id={"channel-menu-#{ch.id}"}
                     label={gettext("Channel actions")}
                   >
@@ -898,12 +917,14 @@ defmodule XamtWeb.ServerLive do
 
                   <.action_menu
                     :if={
-                      @admin? and member.role != "owner" and member.user_id != @current_scope.user.id
+                      (@can_kick_members? or @can_manage_server?) and member.role != "owner" and
+                        member.user_id != @current_scope.user.id
                     }
                     id={"member-menu-#{member.user_id}"}
                     label={gettext("Member actions")}
                   >
                     <button
+                      :if={@can_manage_server?}
                       type="button"
                       class="xamt-icon-btn"
                       phx-click="set_member_role"
@@ -917,6 +938,7 @@ defmodule XamtWeb.ServerLive do
                       />
                     </button>
                     <button
+                      :if={@can_kick_members?}
                       type="button"
                       class="xamt-icon-btn"
                       phx-click="kick_member"
@@ -1224,7 +1246,7 @@ defmodule XamtWeb.ServerLive do
                           {gettext("Edit")}
                         </button>
                         <button
-                          :if={message.user_id == @current_scope.user.id}
+                          :if={message.user_id == @current_scope.user.id or @can_manage_messages?}
                           type="button"
                           id={"delete-message-#{message.id}"}
                           phx-click="delete_message"
@@ -1351,6 +1373,8 @@ defmodule XamtWeb.ServerLive do
         :if={@show_server_menu && @active_channel}
         server={@server}
         active_channel={@active_channel}
+        can_manage_channels?={@can_manage_channels?}
+        can_manage_server?={@can_manage_server?}
       />
 
       <.server_overlay
@@ -1365,6 +1389,32 @@ defmodule XamtWeb.ServerLive do
       />
     </div>
     """
+  end
+
+  defp assign_member_permissions(socket, nil) do
+    assign(socket,
+      admin?: false,
+      can_manage_server?: false,
+      can_manage_channels?: false,
+      can_kick_members?: false,
+      can_manage_messages?: false,
+      can_send_messages?: false
+    )
+  end
+
+  defp assign_member_permissions(socket, member) do
+    perms = member.permissions
+    can_manage_server? = Permissions.has_permission?(perms, :manage_server)
+    can_manage_channels? = Permissions.has_permission?(perms, :manage_channels)
+
+    assign(socket,
+      admin?: can_manage_server? or can_manage_channels?,
+      can_manage_server?: can_manage_server?,
+      can_manage_channels?: can_manage_channels?,
+      can_kick_members?: Permissions.has_permission?(perms, :kick_members),
+      can_manage_messages?: Permissions.has_permission?(perms, :manage_messages),
+      can_send_messages?: Permissions.has_permission?(perms, :send_messages)
+    )
   end
 
   defp assign_messages(socket, messages) do
@@ -1437,6 +1487,8 @@ defmodule XamtWeb.ServerLive do
 
   attr :server, :map, required: true
   attr :active_channel, :map, required: true
+  attr :can_manage_channels?, :boolean, default: false
+  attr :can_manage_server?, :boolean, default: false
 
   defp server_menu_overlay(assigns) do
     ~H"""
@@ -1450,6 +1502,7 @@ defmodule XamtWeb.ServerLive do
         <h2 id="server-menu-title" class="xamt-section-title mongol-text">{@server.name}</h2>
         <nav class="xamt-server-menu-sheet__nav" aria-labelledby="server-menu-title">
           <.link
+            :if={@can_manage_channels?}
             id="server-menu-new-channel"
             patch={~p"/servers/#{@server.slug}/#{@active_channel.slug}/new"}
             class="xamt-btn xamt-btn--soft mongol-text"
@@ -1457,6 +1510,7 @@ defmodule XamtWeb.ServerLive do
             {gettext("Create channel")}
           </.link>
           <.link
+            :if={@can_manage_server?}
             id="server-menu-settings"
             patch={~p"/servers/#{@server.slug}/#{@active_channel.slug}/settings"}
             class="xamt-btn mongol-text"
@@ -1719,7 +1773,7 @@ defmodule XamtWeb.ServerLive do
   end
 
   defp apply_action(socket, :new_channel, _params) do
-    if socket.assigns.admin? do
+    if socket.assigns.can_manage_channels? do
       assign(socket,
         show_server_menu: false,
         editing_channel: nil,
@@ -1734,7 +1788,7 @@ defmodule XamtWeb.ServerLive do
     channel = Enum.find(socket.assigns.channels, &(&1.slug == slug))
 
     cond do
-      not socket.assigns.admin? ->
+      not socket.assigns.can_manage_channels? ->
         deny_overlay(socket)
 
       is_nil(channel) ->
@@ -1752,7 +1806,7 @@ defmodule XamtWeb.ServerLive do
   end
 
   defp apply_action(socket, :edit_server, _params) do
-    if socket.assigns.admin? do
+    if socket.assigns.can_manage_server? do
       socket
       |> assign(:show_server_menu, false)
       |> assign(:server_form, to_form(Servers.change_server(socket.assigns.server), as: :server))

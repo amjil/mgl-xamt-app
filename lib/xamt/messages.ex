@@ -10,6 +10,7 @@ defmodule Xamt.Messages do
   alias Xamt.Channels.Channel
   alias Xamt.Channels.LastMessageCache
   alias Xamt.Repo
+  alias Xamt.Servers.Permissions
   alias Xamt.Servers.ServerMember
   alias Xamt.Messages.{Mention, Message, RateLimiter, Reaction}
 
@@ -23,6 +24,7 @@ defmodule Xamt.Messages do
     {content_html, mention_ids} = prepare_mentions(raw_html, channel_id)
 
     with :ok <- RateLimiter.check_rate(user.id),
+         :ok <- authorize_channel_perm(user.id, channel_id, :send_messages),
          {:ok, message} <-
            Repo.transact(fn ->
              with {:ok, message} <-
@@ -96,7 +98,7 @@ defmodule Xamt.Messages do
   def delete_message(%Scope{user: user}, message_id) do
     message = get_message!(message_id)
 
-    with :ok <- writable?(message, user),
+    with :ok <- deletable?(message, user),
          {:ok, message} <-
            message
            |> Message.delete_changeset()
@@ -305,6 +307,33 @@ defmodule Xamt.Messages do
   defp writable?(%Message{deleted_at: %DateTime{}}, _user), do: {:error, :deleted}
   defp writable?(%Message{user_id: user_id}, %{id: user_id}), do: :ok
   defp writable?(_message, _user), do: {:error, :unauthorized}
+
+  defp deletable?(%Message{deleted_at: %DateTime{}}, _user), do: {:error, :deleted}
+  defp deletable?(%Message{user_id: user_id}, %{id: user_id}), do: :ok
+
+  defp deletable?(%Message{} = message, user) do
+    authorize_channel_perm(user.id, message.channel_id, :manage_messages)
+  end
+
+  defp authorize_channel_perm(user_id, channel_id, perm) do
+    case member_permissions(user_id, channel_id) do
+      nil ->
+        {:error, :unauthorized}
+
+      perms ->
+        if Permissions.has_permission?(perms, perm), do: :ok, else: {:error, :unauthorized}
+    end
+  end
+
+  defp member_permissions(user_id, channel_id) do
+    from(m in ServerMember,
+      join: c in Channel,
+      on: c.server_id == m.server_id,
+      where: m.user_id == ^user_id and c.id == ^channel_id,
+      select: m.permissions
+    )
+    |> Repo.one()
+  end
 
   @doc """
   Reactions for the given messages as `%{message_id => %{emoji => [user_id]}}`.

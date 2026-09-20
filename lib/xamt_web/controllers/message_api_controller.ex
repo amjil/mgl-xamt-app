@@ -30,6 +30,11 @@ defmodule XamtWeb.MessageApiController do
           |> put_status(:too_many_requests)
           |> json(%{status: "error", detail: "rate_limited"})
 
+        {:error, :unauthorized} ->
+          conn
+          |> put_status(:forbidden)
+          |> json(%{status: "error", detail: "forbidden"})
+
         {:error, _changeset} ->
           conn
           |> put_status(:unprocessable_entity)

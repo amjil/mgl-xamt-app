@@ -340,6 +340,43 @@ defmodule Xamt.MessagesTest do
              Messages.toggle_reaction(scope, message.id, hd(Reaction.emojis()))
   end
 
+  test "members without send_messages cannot post", %{
+    scope: scope,
+    channel: channel,
+    server: server
+  } do
+    muted = Xamt.AccountsFixtures.user_fixture()
+    muted_scope = Scope.for_user(muted)
+    {:ok, _} = Servers.join_server(muted_scope, server.id)
+
+    {:ok, _} = Servers.revoke_permission(scope, server.id, muted.id, :send_messages)
+
+    assert {:error, :unauthorized} =
+             Messages.create_message(muted_scope, channel.id, %{
+               "content_html" => "<p>nope</p>",
+               "content" => %{"type" => "rich_text"}
+             })
+  end
+
+  test "manage_messages lets a moderator delete someone else's message", %{
+    scope: scope,
+    channel: channel,
+    server: server
+  } do
+    author = Xamt.AccountsFixtures.user_fixture()
+    author_scope = Scope.for_user(author)
+    {:ok, _} = Servers.join_server(author_scope, server.id)
+
+    {:ok, message} =
+      Messages.create_message(author_scope, channel.id, %{
+        "content_html" => "<p>take this down</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    assert {:ok, deleted} = Messages.delete_message(scope, message.id)
+    assert %DateTime{} = deleted.deleted_at
+  end
+
   defp with_query_count(fun) do
     parent = self()
     handler_id = "query-count-#{System.unique_integer([:positive])}"

@@ -3,7 +3,7 @@ defmodule Xamt.ServersTest do
 
   alias Xamt.Accounts.Scope
   alias Xamt.{Channels, Servers}
-  alias Xamt.Servers.Server
+  alias Xamt.Servers.{Permissions, Server}
 
   setup do
     owner = Xamt.AccountsFixtures.user_fixture()
@@ -128,5 +128,59 @@ defmodule Xamt.ServersTest do
     assert hd(empty).user_id == owner_scope.user.id
 
     assert Servers.search_members(server.id, "no-such-member") == []
+  end
+
+  test "create_server and join_server stamp role permission presets", %{
+    owner_scope: owner_scope,
+    member_scope: member_scope,
+    server: server
+  } do
+    owner_member = Servers.get_member(server.id, owner_scope.user.id)
+    assert owner_member.permissions == Permissions.owner_perms()
+
+    {:ok, joined} = Servers.join_server(member_scope, server.id)
+    assert joined.role == "member"
+    assert joined.permissions == Permissions.default_member_perms()
+  end
+
+  test "change_role rewrites the bitmask from the role preset", %{
+    owner_scope: owner_scope,
+    member_scope: member_scope,
+    member: member,
+    server: server
+  } do
+    {:ok, _} = Servers.join_server(member_scope, server.id)
+
+    {:ok, promoted} = Servers.change_role(owner_scope, server.id, member.id, "admin")
+    assert promoted.role == "admin"
+    assert promoted.permissions == Permissions.admin_perms()
+
+    {:ok, demoted} = Servers.change_role(owner_scope, server.id, member.id, "member")
+    assert demoted.permissions == Permissions.default_member_perms()
+  end
+
+  test "a member granted kick_members can kick, and shows up as a moderator", %{
+    owner_scope: owner_scope,
+    member_scope: member_scope,
+    member: member,
+    server: server
+  } do
+    {:ok, _} = Servers.join_server(member_scope, server.id)
+
+    assert {:error, :unauthorized} =
+             Servers.kick_member(member_scope, server.id, owner_scope.user.id)
+
+    {:ok, _} = Servers.grant_permission(owner_scope, server.id, member.id, :kick_members)
+    assert Servers.can?(server.id, member.id, :kick_members)
+
+    target = Xamt.AccountsFixtures.user_fixture()
+    {:ok, _} = Servers.join_server(Scope.for_user(target), server.id)
+
+    assert {:ok, _} = Servers.kick_member(member_scope, server.id, target.id)
+    refute Servers.member?(server.id, target.id)
+
+    moderators = Servers.list_moderators(server.id)
+    assert Enum.any?(moderators, &(&1.user_id == member.id))
+    assert Enum.any?(moderators, &(&1.user_id == owner_scope.user.id))
   end
 end

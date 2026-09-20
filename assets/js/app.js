@@ -37,6 +37,21 @@ const Hooks = {
   WebPush,
 }
 
+// Jittered backoff for reconnect/rejoin so a server restart or regional
+// outage does not stampede the node when every client retries at once.
+const backoffJitter = (tries) => {
+  const intervals = [
+    [1000, 3000],
+    [3000, 10000],
+    [10000, 30000],
+  ]
+
+  const index = Math.min(tries - 1, intervals.length - 1)
+  const [min, max] = intervals[index]
+
+  return Math.floor(Math.random() * (max - min + 1)) + min
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
@@ -45,6 +60,8 @@ const liveSocket = new LiveSocket("/live", Socket, {
     timezone_offset: new Date().getTimezoneOffset(),
   },
   hooks: Hooks,
+  reconnectAfterMs: backoffJitter,
+  rejoinAfterMs: backoffJitter,
 })
 
 topbar.config({

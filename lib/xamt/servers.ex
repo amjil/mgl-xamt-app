@@ -4,13 +4,14 @@ defmodule Xamt.Servers do
   """
 
   import Ecto.Query, warn: false
+  import Xamt.Servers.Permissions, only: [has_perm: 2]
 
   alias Xamt.Accounts.Scope
   alias Xamt.Channels
   alias Xamt.Channels.ChannelListCache
   alias Xamt.Repo
   alias Xamt.Slug
-  alias Xamt.Servers.{Invite, Server, ServerCache, ServerMember}
+  alias Xamt.Servers.{Invite, Server, ServerCache, ServerMember, Permissions}
 
   @default_channel_name "general"
   @invite_code_bytes 9
@@ -143,7 +144,7 @@ defmodule Xamt.Servers do
   def update_server(%Scope{user: user}, server_id, attrs) do
     server = get_server!(server_id)
 
-    if admin?(server.id, user.id) do
+    if can?(server.id, user.id, :manage_server) do
       old_slug = server.slug
 
       case server
@@ -164,7 +165,7 @@ defmodule Xamt.Servers do
   ## Invites
 
   def create_invite(%Scope{user: user}, server_id, attrs \\ %{}) do
-    if admin?(server_id, user.id) do
+    if can?(server_id, user.id, :manage_server) do
       %Invite{}
       |> Invite.changeset(%{
         server_id: server_id,
@@ -191,7 +192,7 @@ defmodule Xamt.Servers do
   def delete_invite(%Scope{user: user}, invite_id) do
     invite = Repo.get!(Invite, invite_id)
 
-    if admin?(invite.server_id, user.id) do
+    if can?(invite.server_id, user.id, :manage_server) do
       Repo.delete(invite)
     else
       {:error, :unauthorized}
@@ -293,10 +294,38 @@ defmodule Xamt.Servers do
   end
 
   @doc """
-  Removes a member. Owners cannot be kicked, and admins cannot kick each other.
+  Members of `server_id` whose bitmask includes `perm`.
+
+  Filters in PostgreSQL with `&` so only matching rows are loaded.
+  """
+  def list_members_with_perm(server_id, perm) when is_atom(perm) do
+    flag = Permissions.flag!(perm)
+
+    from(sm in ServerMember,
+      where: sm.server_id == ^server_id,
+      where: fragment("(? & ?) = ?", sm.permissions, ^flag, ^flag),
+      order_by: [asc: sm.inserted_at],
+      preload: [:user]
+    )
+    |> Repo.all()
+  end
+
+  @doc "Members who can kick others — typical moderators."
+  def list_moderators(server_id) do
+    ServerMember
+    |> where([sm], sm.server_id == ^server_id)
+    |> where([sm], has_perm(sm.permissions, :kick_members))
+    |> order_by([sm], asc: sm.inserted_at)
+    |> preload(:user)
+    |> Repo.all()
+  end
+
+  @doc """
+  Removes a member. Owners cannot be kicked, and only the owner may kick an admin.
+  Requires `:kick_members` on the actor.
   """
   def kick_member(%Scope{user: actor}, server_id, user_id) do
-    with :ok <- authorize_member_change(server_id, actor.id, user_id),
+    with :ok <- authorize_kick(server_id, actor.id, user_id),
          %ServerMember{} = member <- get_member(server_id, user_id) do
       Repo.delete(member)
     else
@@ -306,7 +335,7 @@ defmodule Xamt.Servers do
   end
 
   def change_role(%Scope{user: actor}, server_id, user_id, role) when role in ~w(admin member) do
-    with :ok <- authorize_member_change(server_id, actor.id, user_id),
+    with :ok <- authorize_role_change(server_id, actor.id, user_id),
          %ServerMember{} = member <- get_member(server_id, user_id) do
       member
       |> ServerMember.changeset(%{
@@ -322,17 +351,52 @@ defmodule Xamt.Servers do
     end
   end
 
-  defp authorize_member_change(server_id, actor_id, target_id) do
+  def grant_permission(%Scope{user: actor}, server_id, user_id, perm) do
+    update_member_permissions(actor.id, server_id, user_id, &Permissions.grant(&1, perm))
+  end
+
+  def revoke_permission(%Scope{user: actor}, server_id, user_id, perm) do
+    update_member_permissions(actor.id, server_id, user_id, &Permissions.revoke(&1, perm))
+  end
+
+  defp update_member_permissions(actor_id, server_id, user_id, fun) do
+    with :ok <- require_perm(server_id, actor_id, :manage_server),
+         %ServerMember{} = member <- get_member(server_id, user_id) do
+      member
+      |> ServerMember.permissions_changeset(fun.(member.permissions))
+      |> Repo.update()
+    else
+      nil -> {:error, :not_found}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp authorize_kick(server_id, actor_id, target_id) do
+    with :ok <- require_perm(server_id, actor_id, :kick_members) do
+      authorize_member_hierarchy(server_id, actor_id, target_id)
+    end
+  end
+
+  defp authorize_role_change(server_id, actor_id, target_id) do
+    with :ok <- require_perm(server_id, actor_id, :manage_server) do
+      authorize_member_hierarchy(server_id, actor_id, target_id)
+    end
+  end
+
+  defp authorize_member_hierarchy(server_id, actor_id, target_id) do
     target = get_member(server_id, target_id)
 
     cond do
       actor_id == target_id -> {:error, :unauthorized}
-      not admin?(server_id, actor_id) -> {:error, :unauthorized}
       match?(%ServerMember{role: "owner"}, target) -> {:error, :unauthorized}
       owner?(server_id, actor_id) -> :ok
       match?(%ServerMember{role: "admin"}, target) -> {:error, :unauthorized}
       true -> :ok
     end
+  end
+
+  defp require_perm(server_id, user_id, perm) do
+    if can?(server_id, user_id, perm), do: :ok, else: {:error, :unauthorized}
   end
 
   def member?(server_id, user_id) do
@@ -344,6 +408,14 @@ defmodule Xamt.Servers do
 
   def get_member(server_id, user_id) do
     Repo.get_by(ServerMember, server_id: server_id, user_id: user_id)
+  end
+
+  @doc "True when the member's bitmask includes `perm`."
+  def can?(server_id, user_id, perm) when is_atom(perm) do
+    case get_member(server_id, user_id) do
+      %ServerMember{permissions: perms} -> Permissions.has_permission?(perms, perm)
+      _ -> false
+    end
   end
 
   def owner?(server_id, user_id) do
