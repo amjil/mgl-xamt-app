@@ -333,8 +333,60 @@ export const AudioRecorder = {
 
   uploadFile(file) {
     this.upload("audio", [file])
-    requestAnimationFrame(() => {
-      this.el.requestSubmit()
-    })
+    // LiveView auto_upload starts on the change event; submit once the
+    // entry is done so a slow nginx/Tailscale hop cannot crash the LV
+    // by consuming an in-progress upload.
+    this.submitWhenUploaded()
   },
+
+  submitWhenUploaded() {
+    const input = this.el.querySelector("input[data-phx-upload-ref]")
+    if (!input) {
+      toast("error", this.el.dataset.micEmpty || "Recording was empty")
+      return
+    }
+
+    let tries = 0
+    const maxTries = 600
+
+    const tick = () => {
+      if (this._unmounted) return
+      tries += 1
+
+      const active = refsOf(input, "data-phx-active-refs")
+      const done = refsOf(input, "data-phx-done-refs")
+      const pre = refsOf(input, "data-phx-preflighted-refs")
+
+      if (active.length > 0 && active.every((ref) => done.includes(ref))) {
+        this.el.requestSubmit()
+        return
+      }
+
+      // Preflight finished but entry never completed (rejected / cancelled).
+      if (tries > 15 && pre.length > 0 && done.length === 0 && active.length === 0) {
+        toast(
+          "error",
+          this.el.dataset.micUploadError || "Could not upload voice message"
+        )
+        return
+      }
+
+      if (tries >= maxTries) {
+        toast(
+          "error",
+          this.el.dataset.micUploadError || "Could not upload voice message"
+        )
+        return
+      }
+
+      setTimeout(tick, 100)
+    }
+
+    // First paint may still be awaiting LiveView's upload ref attributes.
+    requestAnimationFrame(() => setTimeout(tick, 50))
+  },
+}
+
+function refsOf(input, attr) {
+  return (input.getAttribute(attr) || "").split(",").map((s) => s.trim()).filter(Boolean)
 }

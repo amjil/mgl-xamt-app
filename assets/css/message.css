@@ -561,18 +561,30 @@ a.xamt-mention:hover {
 }
 
 .xamt-message__audio {
+  /* Keep native controls in horizontal-tb, then stand the strip upright
+     so it reads with the vertical Mongolian column. */
   writing-mode: horizontal-tb;
   -webkit-writing-mode: horizontal-tb;
   text-orientation: mixed;
+  position: relative;
+  width: 2.75rem;
+  height: 16rem;
+  max-height: min(16rem, calc(var(--xamt-vh) - 10rem));
+  flex: 0 0 auto;
 }
 
 .xamt-audio-player {
+  position: absolute;
+  left: 50%;
+  top: 50%;
   display: block;
   height: 2.5rem;
   width: 16rem;
-  max-width: 100%;
+  max-width: none;
   border-radius: 9999px;
   outline: none;
   accent-color: var(--xamt-accent);
+  transform: translate(-50%, -50%) rotate(90deg);
+  transform-origin: center center;
 }
 

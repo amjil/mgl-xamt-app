@@ -106,9 +106,13 @@ defmodule XamtWeb.ServerLive do
         auto_upload: true
       )
       |> allow_upload(:audio,
-        accept: ~w(audio/* video/mp4),
+        accept: ~w(audio/* video/webm video/mp4),
         max_entries: 1,
-        max_file_size: 10_485_760
+        max_file_size: 10_485_760,
+        # Remote nginx → Tailscale hops need longer than the 10s default
+        # or a stalled chunk leaves entries in-progress and crashes on consume.
+        auto_upload: true,
+        chunk_timeout: 60_000
       )
 
     if channel && is_nil(Map.get(params, "channel_slug")) do
@@ -1435,6 +1439,7 @@ defmodule XamtWeb.ServerLive do
                     )
                   }
                   data-mic-empty={gettext("Recording was empty")}
+                  data-mic-upload-error={gettext("Could not upload voice message")}
                 >
                   <.live_file_input upload={@uploads.audio} class="hidden" />
                   <button
@@ -2306,31 +2311,44 @@ defmodule XamtWeb.ServerLive do
   end
 
   defp send_audio_message(socket, channel) do
-    case XamtWeb.Uploads.consume_audio(socket, :audio) do
-      url when is_binary(url) ->
-        attrs = %{
-          "content" => %{"type" => "audio", "url" => url},
-          "content_html" => "🎤 <em>#{gettext("Voice message")}</em>",
-          "content_type" => "audio",
-          "reply_to_id" => socket.assigns.replying_to && socket.assigns.replying_to.id
-        }
+    {done, in_progress} = Phoenix.LiveView.uploaded_entries(socket, :audio)
 
-        case Messages.create_message(socket.assigns.current_scope, channel.id, attrs) do
-          {:ok, _message} ->
-            {:noreply, assign(socket, :replying_to, nil)}
+    socket =
+      Enum.reduce(in_progress, socket, fn entry, acc ->
+        cancel_upload(acc, :audio, entry.ref)
+      end)
 
-          {:error, :rate_limited} ->
-            {:noreply, put_flash(socket, :error, gettext("Messages sent too fast"))}
+    cond do
+      done == [] ->
+        {:noreply, put_flash(socket, :error, gettext("Could not send voice message"))}
 
-          {:error, :unauthorized} ->
-            {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+      true ->
+        case XamtWeb.Uploads.consume_audio(socket, :audio) do
+          url when is_binary(url) ->
+            attrs = %{
+              "content" => %{"type" => "audio", "url" => url},
+              "content_html" => "🎤 <em>#{gettext("Voice message")}</em>",
+              "content_type" => "audio",
+              "reply_to_id" => socket.assigns.replying_to && socket.assigns.replying_to.id
+            }
 
-          {:error, _changeset} ->
+            case Messages.create_message(socket.assigns.current_scope, channel.id, attrs) do
+              {:ok, _message} ->
+                {:noreply, assign(socket, :replying_to, nil)}
+
+              {:error, :rate_limited} ->
+                {:noreply, put_flash(socket, :error, gettext("Messages sent too fast"))}
+
+              {:error, :unauthorized} ->
+                {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+
+              {:error, _changeset} ->
+                {:noreply, put_flash(socket, :error, gettext("Could not send voice message"))}
+            end
+
+          _ ->
             {:noreply, put_flash(socket, :error, gettext("Could not send voice message"))}
         end
-
-      _ ->
-        {:noreply, put_flash(socket, :error, gettext("Could not send voice message"))}
     end
   end
 
