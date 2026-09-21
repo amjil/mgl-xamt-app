@@ -2,7 +2,6 @@ defmodule XamtWeb.ServerLive do
   use XamtWeb, :live_view
 
   alias Xamt.{Channels, Messages, Servers}
-  alias Xamt.Accounts.User
   alias Xamt.Channels.Channel
   alias Xamt.Messages.Reaction
   alias Xamt.Servers.Permissions
@@ -67,7 +66,6 @@ defmodule XamtWeb.ServerLive do
       end
 
     unread_ids = Channels.get_unread_channel_ids(scope.user.id, server.id)
-    user_servers = Servers.list_servers_for_user(scope)
     current_member = Servers.get_member(server.id, scope.user.id)
 
     socket =
@@ -76,7 +74,6 @@ defmodule XamtWeb.ServerLive do
       |> assign(:server, server)
       |> assign(:member?, true)
       |> assign(:current_member, current_member)
-      |> assign(:user_servers, user_servers)
       |> assign(:channels, channels)
       |> assign(:members_offset, @member_page_size)
       |> assign(:has_more_members, length(members) == @member_page_size)
@@ -89,8 +86,6 @@ defmodule XamtWeb.ServerLive do
       |> assign(:deleting_message, nil)
       |> assign(:channel_form, to_form(Channels.change_channel(%Channel{}), as: :channel))
       |> assign_member_permissions(current_member)
-      |> assign(:server_form, to_form(Servers.change_server(server), as: :server))
-      |> assign(:invites, Servers.list_invites(server.id))
       |> assign(:editing_channel, nil)
       |> assign(:show_server_menu, false)
       |> assign(:mobile_panel, :messages)
@@ -474,43 +469,6 @@ defmodule XamtWeb.ServerLive do
     end
   end
 
-  def handle_event("save_server", %{"server" => params}, socket) do
-    case Servers.update_server(socket.assigns.current_scope, socket.assigns.server.id, params) do
-      {:ok, server} ->
-        {:noreply,
-         socket
-         |> assign(:server, server)
-         |> assign(:server_form, to_form(Servers.change_server(server), as: :server))
-         |> put_flash(:info, gettext("Server updated"))}
-
-      {:error, :unauthorized} ->
-        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
-
-      {:error, changeset} ->
-        {:noreply, assign(socket, :server_form, to_form(changeset, as: :server))}
-    end
-  end
-
-  def handle_event("create_invite", _params, socket) do
-    case Servers.create_invite(socket.assigns.current_scope, socket.assigns.server.id) do
-      {:ok, _invite} ->
-        {:noreply, assign(socket, :invites, Servers.list_invites(socket.assigns.server.id))}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
-    end
-  end
-
-  def handle_event("delete_invite", %{"id" => id}, socket) do
-    case Servers.delete_invite(socket.assigns.current_scope, id) do
-      {:ok, _} ->
-        {:noreply, assign(socket, :invites, Servers.list_invites(socket.assigns.server.id))}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
-    end
-  end
-
   def handle_event("kick_member", %{"user-id" => user_id}, socket) do
     server = socket.assigns.server
 
@@ -808,54 +766,21 @@ defmodule XamtWeb.ServerLive do
           >
             <.icon name="hero-x-mark" class="size-5" />
           </button>
-          <.link navigate={~p"/"} class="xamt-brand-mark" title="Xamt">X</.link>
           <.link
-            :for={s <- @user_servers}
-            navigate={~p"/servers/#{s.slug}"}
-            class={"xamt-server-dot #{if s.id == @server.id, do: "is-active"}"}
-            title={s.name}
+            navigate={~p"/"}
+            id="drawer-home"
+            class="xamt-brand-mark"
+            title={gettext("Home")}
+            aria-label={gettext("Home")}
           >
-            {server_initial(s.name)}
-          </.link>
-          <.link
-            :if={User.can_create_server?(@current_scope.user)}
-            navigate={~p"/?create=1"}
-            id="create-server-rail"
-            class="xamt-server-dot xamt-server-dot--add"
-            title={gettext("Create server")}
-            aria-label={gettext("Create server")}
-          >
-            <.icon name="hero-plus" class="size-6" />
-          </.link>
-          <.link
-            navigate={~p"/profile/#{@current_scope.user.username}"}
-            id="current-user-chip"
-            class="xamt-user-chip xamt-user-chip--rail"
-            title={display_name(@current_scope.user)}
-          >
-            <.avatar user={@current_scope.user} />
-            <span class="mongol-text">{display_name(@current_scope.user)}</span>
+            X
           </.link>
         </aside>
 
         <aside class="xamt-rail xamt-rail--channels">
           <div class="xamt-rail__pane xamt-rail__pane--top">
-            <header class="xamt-rail__header">
-              <button
-                :if={@admin?}
-                type="button"
-                id="server-menu"
-                class="xamt-server-menu__summary"
-                phx-click="toggle_server_menu"
-                aria-label={gettext("Server menu")}
-                aria-expanded={@show_server_menu}
-                aria-haspopup="dialog"
-              >
-                <h1 class="xamt-rail__title mongol-text">{@server.name}</h1>
-                <.icon name="hero-chevron-down" class="size-3" />
-              </button>
-              <h1 :if={not @admin?} class="xamt-rail__title mongol-text">{@server.name}</h1>
-              <p class="xamt-rail__sub">/{@server.slug}</p>
+            <header id="server-info" class="xamt-rail__header">
+              <h1 class="xamt-rail__title mongol-text">{@server.name}</h1>
             </header>
 
             <div class="xamt-rail__section">
@@ -1538,7 +1463,6 @@ defmodule XamtWeb.ServerLive do
         server={@server}
         active_channel={@active_channel}
         can_manage_channels?={@can_manage_channels?}
-        can_manage_server?={@can_manage_server?}
       />
 
       <.server_overlay
@@ -1548,8 +1472,6 @@ defmodule XamtWeb.ServerLive do
         active_channel={@active_channel}
         channel_form={@channel_form}
         editing_channel={@editing_channel}
-        server_form={@server_form}
-        invites={@invites}
       />
     </div>
     """
@@ -1749,7 +1671,6 @@ defmodule XamtWeb.ServerLive do
   attr :server, :map, required: true
   attr :active_channel, :map, required: true
   attr :can_manage_channels?, :boolean, default: false
-  attr :can_manage_server?, :boolean, default: false
 
   defp server_menu_overlay(assigns) do
     ~H"""
@@ -1770,25 +1691,16 @@ defmodule XamtWeb.ServerLive do
           {@server.description}
         </p>
         <nav
-          :if={@can_manage_channels? or @can_manage_server?}
+          :if={@can_manage_channels?}
           class="xamt-server-menu-sheet__nav"
           aria-labelledby="server-menu-title"
         >
           <.link
-            :if={@can_manage_channels?}
             id="server-menu-new-channel"
             patch={~p"/servers/#{@server.slug}/#{@active_channel.slug}/new"}
             class="xamt-btn xamt-btn--soft mongol-text"
           >
             {gettext("Create channel")}
-          </.link>
-          <.link
-            :if={@can_manage_server?}
-            id="server-menu-settings"
-            patch={~p"/servers/#{@server.slug}/#{@active_channel.slug}/settings"}
-            class="xamt-btn mongol-text"
-          >
-            {gettext("Server settings")}
           </.link>
         </nav>
       </div>
@@ -1801,13 +1713,11 @@ defmodule XamtWeb.ServerLive do
   attr :active_channel, :map, required: true
   attr :channel_form, :map, required: true
   attr :editing_channel, :map
-  attr :server_form, :map, required: true
-  attr :invites, :list, required: true
 
   defp server_overlay(assigns) do
     ~H"""
     <.drawer
-      :if={@live_action in [:new_channel, :edit_channel, :edit_server]}
+      :if={@live_action in [:new_channel, :edit_channel]}
       id="server-drawer"
       show
       on_cancel={JS.patch(~p"/servers/#{@server.slug}/#{@active_channel.slug}")}
@@ -1828,12 +1738,6 @@ defmodule XamtWeb.ServerLive do
         submit_label={gettext("Save")}
         name_id="edit-channel-name"
         return_to={~p"/servers/#{@server.slug}/#{@active_channel.slug}"}
-      />
-      <.server_settings
-        :if={@live_action == :edit_server}
-        server={@server}
-        form={@server_form}
-        invites={@invites}
       />
     </.drawer>
     """
@@ -1878,104 +1782,6 @@ defmodule XamtWeb.ServerLive do
           </.link>
         </div>
       </.form>
-    </div>
-    """
-  end
-
-  attr :server, :map, required: true
-  attr :form, :map, required: true
-  attr :invites, :list, required: true
-
-  defp server_settings(assigns) do
-    ~H"""
-    <div id="server-settings" class="xamt-sheet-form">
-      <h2 class="xamt-section-title mongol-text">{gettext("Server settings")}</h2>
-
-      <.form
-        for={@form}
-        id="server-settings-form"
-        phx-submit="save_server"
-        class="xamt-form xamt-form--vertical"
-      >
-        <.input
-          field={@form[:name]}
-          id="server-settings-name"
-          label={gettext("Name")}
-          phx-hook="MongolianIME"
-          class="xamt-input mongol-input"
-          autocomplete="off"
-        />
-        <.input
-          field={@form[:description]}
-          id="server-settings-description"
-          type="textarea"
-          label={gettext("Description")}
-          phx-hook="MongolianIME"
-          class="xamt-textarea mongol-input"
-        />
-        <div class="xamt-field">
-          <label>
-            <span class="xamt-field__label mongol-text">{gettext("Visibility")}</span>
-            <select name={@form[:visibility].name} id="server-settings-visibility" class="xamt-select">
-              <option value="private" selected={@server.visibility == "private"}>
-                {gettext("Private — invite only")}
-              </option>
-              <option value="public" selected={@server.visibility == "public"}>
-                {gettext("Public — anyone can find and join")}
-              </option>
-            </select>
-          </label>
-        </div>
-        <div class="xamt-form__actions">
-          <button
-            type="submit"
-            id="server-settings-save"
-            class="xamt-btn xamt-btn--primary mongol-text"
-          >
-            {gettext("Save")}
-          </button>
-        </div>
-      </.form>
-
-      <div class="xamt-rail__section-head">
-        <span class="mongol-text">{gettext("Invites")}</span>
-        <button
-          type="button"
-          id="create-invite"
-          class="xamt-icon-btn"
-          phx-click="create_invite"
-          aria-label={gettext("Create invite")}
-        >
-          +
-        </button>
-      </div>
-
-      <ul class="xamt-invite-list">
-        <li :for={invite <- @invites} class="xamt-invite">
-          <code>/invite/{invite.code}</code>
-          <span :if={invite.max_uses} class="xamt-invite__uses">{invite.uses}/{invite.max_uses}</span>
-          <button
-            type="button"
-            id={"copy-invite-#{invite.id}"}
-            class="xamt-icon-btn"
-            data-copy={url(~p"/invite/#{invite.code}")}
-            data-copied={gettext("Copied")}
-            data-copy-failed={gettext("Could not copy")}
-            aria-label={gettext("Copy invite link")}
-          >
-            <.icon name="hero-clipboard" class="size-3" />
-          </button>
-          <button
-            type="button"
-            class="xamt-icon-btn"
-            phx-click="delete_invite"
-            phx-value-id={invite.id}
-            aria-label={gettext("Delete invite")}
-          >
-            <.icon name="hero-x-mark" class="size-3" />
-          </button>
-        </li>
-      </ul>
     </div>
     """
   end
@@ -2076,16 +1882,6 @@ defmodule XamtWeb.ServerLive do
           editing_channel: channel,
           channel_form: to_form(Channels.change_channel(channel), as: :channel)
         )
-    end
-  end
-
-  defp apply_action(socket, :edit_server, _params) do
-    if socket.assigns.can_manage_server? do
-      socket
-      |> assign(:show_server_menu, false)
-      |> assign(:server_form, to_form(Servers.change_server(socket.assigns.server), as: :server))
-    else
-      deny_overlay(socket)
     end
   end
 
@@ -2266,10 +2062,6 @@ defmodule XamtWeb.ServerLive do
   defp display_name(%{username: name}) when is_binary(name), do: name
   defp display_name(%{email: email}), do: email
   defp display_name(_), do: "?"
-
-  defp server_initial(name) when is_binary(name) do
-    name |> String.trim() |> String.first() || "?"
-  end
 
   # Browser `Date.getTimezoneOffset()`: minutes to add to local time to get UTC.
   # UTC+8 returns -480, so we subtract that offset to show wall-clock time.

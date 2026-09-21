@@ -81,9 +81,10 @@ defmodule Xamt.Servers do
       on: m.server_id == s.id,
       where: m.user_id == ^user.id,
       order_by: [asc: s.name],
-      preload: [:channels]
+      select: %{s | viewer_permissions: m.permissions}
     )
     |> Repo.all()
+    |> Repo.preload(:channels)
   end
 
   def get_server!(id) do

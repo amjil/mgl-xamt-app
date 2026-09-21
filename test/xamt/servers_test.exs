@@ -130,6 +130,22 @@ defmodule Xamt.ServersTest do
     assert Servers.search_members(server.id, "no-such-member") == []
   end
 
+  test "list_servers_for_user includes the viewer's permission bitmask", %{
+    owner_scope: owner_scope,
+    member_scope: member_scope,
+    server: server
+  } do
+    {:ok, _} = Servers.join_server(member_scope, server.id)
+
+    [owned] = Servers.list_servers_for_user(owner_scope)
+    assert owned.id == server.id
+    assert owned.viewer_permissions == Permissions.owner_perms()
+
+    [joined] = Servers.list_servers_for_user(member_scope)
+    assert joined.id == server.id
+    assert joined.viewer_permissions == Permissions.default_member_perms()
+  end
+
   test "create_server and join_server stamp role permission presets", %{
     owner_scope: owner_scope,
     member_scope: member_scope,

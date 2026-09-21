@@ -269,7 +269,7 @@ body:has(.xamt-app) {
 .xamt-home {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 1.5rem;
   height: 100%;
   max-inline-size: none;
@@ -302,6 +302,7 @@ body:has(.xamt-app) {
   gap: 1.15rem;
   min-block-size: 0;
   flex: 0 0 auto;
+  inline-size: 100%;
 }
 
 .xamt-home__toolbar,
@@ -448,20 +449,56 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
   margin: 0;
   display: flex;
   flex-direction: column; /* vertical-lr: cards left to right */
-  align-items: flex-start;
+  align-items: stretch;
   gap: 0.65rem;
+  inline-size: 100%;
 }
 
 .xamt-server-list__item {
   flex: 0 0 auto;
   display: flex;
+  position: relative;
+  align-items: stretch;
+  inline-size: 100%;
+}
+
+.xamt-server-list__item.has-settings .xamt-server-card {
+  padding-inline-end: 2.2rem;
+}
+
+.xamt-server-card__settings {
+  position: absolute;
+  inset-block-start: 0.4rem;
+  inset-inline-end: 0.35rem;
+  z-index: 1;
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  background: var(--xamt-bg);
+  border: 1px solid var(--xamt-line);
+  border-radius: 999px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  color: var(--xamt-muted);
+  opacity: 0.88;
+  transition:
+    opacity 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease;
+}
+
+.xamt-server-card__settings:hover,
+.xamt-server-card__settings:focus-visible {
+  opacity: 1;
+  color: var(--xamt-accent-2);
+  background: var(--xamt-bg-3);
+  border-color: color-mix(in srgb, var(--xamt-accent-2) 48%, var(--xamt-line));
 }
 
 .xamt-server-card {
   display: flex;
   flex-direction: row; /* vertical-lr: icon above, text below */
   gap: 0.7rem;
-  align-items: center;
+  align-items: flex-start;
   padding: 0.95rem 0.85rem;
   border-radius: var(--xamt-radius);
   background:
@@ -470,13 +507,15 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
   border: 1px solid var(--xamt-line);
   text-decoration: none;
   color: inherit;
+  box-sizing: border-box;
   block-size: auto;
-  inline-size: auto;
-  max-inline-size: 18rem;
+  inline-size: 100%;
+  max-inline-size: none;
+  min-inline-size: 16rem;
   min-block-size: 4.5rem;
   width: auto;
   height: auto;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
   transition:
     border-color 160ms ease,
@@ -502,7 +541,7 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
 }
 
 .xamt-server-card__name {
-  max-inline-size: 14rem;
+  max-inline-size: none;
 }
 
 .xamt-server-card__slug {

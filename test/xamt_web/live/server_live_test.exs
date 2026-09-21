@@ -46,25 +46,28 @@ defmodule XamtWeb.ServerLiveTest do
     assert html =~ message.id or true
   end
 
-  test "creators see the rail create-server control", %{
+  test "chat drawer has close and home, not server switcher", %{
     conn: conn,
     server: server,
     channel: channel
   } do
     {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
-    assert has_element?(view, "#create-server-rail")
+    assert has_element?(view, "#drawer-close")
+    assert has_element?(view, "#drawer-home")
+    refute has_element?(view, "#create-server-rail")
+    refute has_element?(view, "#current-user-chip")
+    refute has_element?(view, ".xamt-server-dot")
   end
 
-  test "regular members do not see the rail create-server control", %{
+  test "drawer home returns to the home page", %{
+    conn: conn,
     server: server,
     channel: channel
   } do
-    member = user_fixture()
-    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(member), server.id)
-    member_conn = log_in_user(build_conn(), member)
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
 
-    {:ok, view, _html} = live(member_conn, ~p"/servers/#{server.slug}/#{channel.slug}")
-    refute has_element?(view, "#create-server-rail")
+    assert {:error, {:live_redirect, %{to: "/"}}} =
+             view |> element("#drawer-home") |> render_click()
   end
 
   test "displays message time in the client's timezone", %{
@@ -223,28 +226,19 @@ defmodule XamtWeb.ServerLiveTest do
     assert has_element?(view, "#channel-menu-#{channel.id}")
   end
 
-  test "invite settings expose a copyable absolute URL", %{
+  test "chat page has no server-settings entry", %{
     conn: conn,
     server: server,
-    channel: channel,
-    scope: scope
+    channel: channel
   } do
-    {:ok, invite} = Servers.create_invite(scope, server.id)
     {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
-    refute has_element?(view, "#server-menu-drawer")
-
-    view |> element("#server-menu") |> render_click()
-    assert has_element?(view, "#server-menu-drawer")
-    assert has_element?(view, "#server-menu-new-channel")
-
-    view |> element("#server-menu-settings") |> render_click()
-    assert_patch(view, ~p"/servers/#{server.slug}/#{channel.slug}/settings")
-
-    assert has_element?(view, "#server-drawer")
-    assert has_element?(view, "#copy-invite-#{invite.id}")
-    html = render(view)
-    assert html =~ "/invite/#{invite.code}"
-    assert html =~ ~s(data-copy=")
+    refute has_element?(view, "#server-menu")
+    refute has_element?(view, "#server-menu-settings")
+    refute has_element?(view, "#edit-server-form")
+    refute has_element?(view, "#server-settings")
+    assert has_element?(view, "#server-info h1", server.name)
+    refute has_element?(view, "#server-info button")
+    refute has_element?(view, "#server-info", "/#{server.slug}")
   end
 
   test "admin can open the create-channel drawer from the plus control", %{
@@ -262,7 +256,7 @@ defmodule XamtWeb.ServerLiveTest do
     assert has_element?(view, "#channel_name")
   end
 
-  test "admin can open the create-channel drawer from the server menu overlay", %{
+  test "admin can open the create-channel drawer from the server info overlay", %{
     conn: conn,
     server: server,
     channel: channel
@@ -270,7 +264,7 @@ defmodule XamtWeb.ServerLiveTest do
     {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
     refute has_element?(view, "#server-menu-drawer")
 
-    view |> element("#server-menu") |> render_click()
+    view |> element("#mobile-nav-server") |> render_click()
     assert has_element?(view, "#server-menu-drawer")
 
     view |> element("#server-menu-new-channel") |> render_click()

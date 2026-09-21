@@ -12,6 +12,7 @@ defmodule Xamt.Servers.Server do
     field :description, :string
     field :icon, :string
     field :visibility, :string, default: "private"
+    field :viewer_permissions, :integer, virtual: true
 
     belongs_to :owner, Xamt.Accounts.User, foreign_key: :owner_id
     has_many :members, Xamt.Servers.ServerMember
