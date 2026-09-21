@@ -6,7 +6,7 @@ defmodule Xamt.ChannelsTest do
   alias Xamt.Channels.ChannelRead
 
   setup do
-    owner = Xamt.AccountsFixtures.user_fixture()
+    owner = Xamt.AccountsFixtures.creator_fixture()
     scope = Scope.for_user(owner)
     {:ok, server} = Servers.create_server(scope, %{"name" => "Reads"})
     channel = hd(Channels.list_channels(server.id))

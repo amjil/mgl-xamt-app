@@ -19,6 +19,8 @@ user =
   |> User.confirm_changeset()
   |> Repo.update!()
 
+{:ok, user} = Accounts.update_user_global_role(user, "creator")
+
 scope = Scope.for_user(user)
 
 {:ok, _server} =
@@ -27,4 +29,6 @@ scope = Scope.for_user(user)
     "slug" => "mongol-bichig"
   })
 
-IO.puts("Seeded demo user demo@xamt.local (username: demo) and server mongol-bichig")
+IO.puts(
+  "Seeded demo user demo@xamt.local (username: demo, role: creator) and server mongol-bichig"
+)

@@ -11,6 +11,7 @@ defmodule Xamt.Accounts.User do
     field :avatar, :string
     field :bio, :string
     field :status, :string, default: "offline"
+    field :global_role, :string, default: "user"
     field :password, :string, virtual: true, redact: true
     field :hashed_password, :string, redact: true
     field :confirmed_at, :utc_datetime
@@ -18,6 +19,19 @@ defmodule Xamt.Accounts.User do
 
     timestamps(type: :utc_datetime)
   end
+
+  @global_roles ~w(user creator admin)
+  @server_creator_roles ~w(creator admin)
+
+  def global_roles, do: @global_roles
+
+  @doc """
+  True when the user may create a new server (admin or creator).
+  """
+  def can_create_server?(%__MODULE__{global_role: role}) when role in @server_creator_roles,
+    do: true
+
+  def can_create_server?(_), do: false
 
   @doc false
   def invite_changeset(user, attrs, opts \\ []) do
@@ -197,6 +211,19 @@ defmodule Xamt.Accounts.User do
   def confirm_changeset(user) do
     now = DateTime.utc_now(:second)
     change(user, confirmed_at: now)
+  end
+
+  @doc """
+  Changeset for operators to assign a global role.
+
+  Keep `:global_role` out of registration and profile changesets so users
+  cannot escalate themselves via public forms.
+  """
+  def admin_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:global_role])
+    |> validate_required([:global_role])
+    |> validate_inclusion(:global_role, @global_roles)
   end
 
   @doc """

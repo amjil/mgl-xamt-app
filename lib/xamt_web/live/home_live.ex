@@ -1,6 +1,7 @@
 defmodule XamtWeb.HomeLive do
   use XamtWeb, :live_view
 
+  alias Xamt.Accounts.User
   alias Xamt.Servers
   alias Xamt.Servers.Server
 
@@ -21,26 +22,46 @@ defmodule XamtWeb.HomeLive do
      |> assign(:servers, servers)
      |> assign(:discoverable, discoverable)
      |> assign(:form, to_form(Servers.change_server(%Server{}), as: :server))
-     |> assign(:show_create, false)}
+     |> assign(:show_create, false)
+     |> assign(:can_create_server?, can_create_server?(scope))}
+  end
+
+  @impl true
+  def handle_params(params, _uri, socket) do
+    {:noreply,
+     assign(
+       socket,
+       :show_create,
+       params["create"] == "1" and socket.assigns.can_create_server?
+     )}
   end
 
   @impl true
   def handle_event("toggle_create", _params, socket) do
-    {:noreply, assign(socket, :show_create, !socket.assigns.show_create)}
+    if socket.assigns.can_create_server? do
+      {:noreply, assign(socket, :show_create, !socket.assigns.show_create)}
+    else
+      {:noreply, deny_create(socket)}
+    end
   end
 
   def handle_event("create_server", %{"server" => params}, socket) do
-    scope = socket.assigns.current_scope
+    if socket.assigns.can_create_server? do
+      case Servers.create_server(socket.assigns.current_scope, params) do
+        {:ok, server} ->
+          {:noreply,
+           socket
+           |> put_flash(:info, gettext("Server created"))
+           |> push_navigate(to: ~p"/servers/#{server.slug}")}
 
-    case Servers.create_server(scope, params) do
-      {:ok, server} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, gettext("Server created"))
-         |> push_navigate(to: ~p"/servers/#{server.slug}")}
+        {:error, %Ecto.Changeset{} = changeset} ->
+          {:noreply, assign(socket, form: to_form(changeset, as: :server), show_create: true)}
 
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, assign(socket, form: to_form(changeset, as: :server), show_create: true)}
+        {:error, :unauthorized} ->
+          {:noreply, deny_create(socket)}
+      end
+    else
+      {:noreply, deny_create(socket)}
     end
   end
 
@@ -65,6 +86,7 @@ defmodule XamtWeb.HomeLive do
             <div class="xamt-home__toolbar">
               <h2 class="xamt-section-title mongol-text">{gettext("Your servers")}</h2>
               <button
+                :if={@can_create_server?}
                 type="button"
                 id="toggle-create-server"
                 class="xamt-btn xamt-btn--soft mongol-text"
@@ -133,7 +155,11 @@ defmodule XamtWeb.HomeLive do
             <div :if={@servers == []} class="xamt-empty xamt-empty--card">
               <span class="xamt-ornament" aria-hidden="true"></span>
               <p class="mongol-text">
-                {gettext("No servers yet. Create one to start chatting.")}
+                <%= if @can_create_server? do %>
+                  {gettext("No servers yet. Create one to start chatting.")}
+                <% else %>
+                  {gettext("No servers yet. Join a public server or wait for an invite.")}
+                <% end %>
               </p>
             </div>
           </section>
@@ -176,4 +202,13 @@ defmodule XamtWeb.HomeLive do
   end
 
   defp server_initial(_), do: "?"
+
+  defp can_create_server?(%{user: %User{} = user}), do: User.can_create_server?(user)
+  defp can_create_server?(_), do: false
+
+  defp deny_create(socket) do
+    socket
+    |> assign(:show_create, false)
+    |> put_flash(:error, gettext("You don't have permission to create a server"))
+  end
 end

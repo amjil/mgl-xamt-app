@@ -9,7 +9,7 @@ defmodule XamtWeb.ServerLiveTest do
   alias XamtWeb.TypingTracker
 
   setup %{conn: conn} do
-    user = user_fixture()
+    user = creator_fixture()
     scope = Accounts.Scope.for_user(user)
     {:ok, server} = Servers.create_server(scope, %{"name" => "Test Server"})
     channel = hd(Channels.list_channels(server.id))
@@ -44,6 +44,27 @@ defmodule XamtWeb.ServerLiveTest do
     html = render(view)
     assert html =~ "ᠮᠣᠩᠭᠣᠯ"
     assert html =~ message.id or true
+  end
+
+  test "creators see the rail create-server control", %{
+    conn: conn,
+    server: server,
+    channel: channel
+  } do
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    assert has_element?(view, "#create-server-rail")
+  end
+
+  test "regular members do not see the rail create-server control", %{
+    server: server,
+    channel: channel
+  } do
+    member = user_fixture()
+    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(member), server.id)
+    member_conn = log_in_user(build_conn(), member)
+
+    {:ok, view, _html} = live(member_conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    refute has_element?(view, "#create-server-rail")
   end
 
   test "displays message time in the client's timezone", %{
@@ -106,7 +127,7 @@ defmodule XamtWeb.ServerLiveTest do
     {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
 
     view
-    |> element("button[phx-click=reply_message][phx-value-id='#{message.id}']")
+    |> element("#reply-message-#{message.id}")
     |> render_click()
 
     assert has_element?(view, "#reply-preview")

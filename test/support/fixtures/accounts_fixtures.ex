@@ -41,13 +41,42 @@ defmodule Xamt.AccountsFixtures do
   end
 
   def user_fixture(attrs \\ %{}) do
+    {global_role, attrs} = pop_global_role(attrs)
+
     {:ok, user} =
       attrs
       |> valid_user_attributes()
       |> Accounts.register_user()
 
+    maybe_set_global_role(user, global_role)
+  end
+
+  def creator_fixture(attrs \\ %{}) do
+    attrs
+    |> Map.put(:global_role, "creator")
+    |> user_fixture()
+  end
+
+  def admin_fixture(attrs \\ %{}) do
+    attrs
+    |> Map.put(:global_role, "admin")
+    |> user_fixture()
+  end
+
+  defp pop_global_role(attrs) do
+    cond do
+      is_map_key(attrs, :global_role) -> Map.pop(attrs, :global_role)
+      is_map_key(attrs, "global_role") -> Map.pop(attrs, "global_role")
+      true -> {nil, attrs}
+    end
+  end
+
+  defp maybe_set_global_role(user, role) when is_binary(role) do
+    {:ok, user} = Accounts.update_user_global_role(user, role)
     user
   end
+
+  defp maybe_set_global_role(user, _), do: user
 
   def user_scope_fixture do
     user = user_fixture()

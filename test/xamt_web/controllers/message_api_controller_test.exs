@@ -11,7 +11,7 @@ defmodule XamtWeb.MessageApiControllerTest do
   setup %{conn: conn} do
     RateLimiter.reset()
 
-    user = user_fixture()
+    user = creator_fixture()
     scope = Scope.for_user(user)
     {:ok, server} = Servers.create_server(scope, %{"name" => "Sync Server"})
     channel = hd(Channels.list_channels(server.id))

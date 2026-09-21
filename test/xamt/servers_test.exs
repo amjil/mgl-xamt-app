@@ -6,7 +6,7 @@ defmodule Xamt.ServersTest do
   alias Xamt.Servers.{Permissions, Server}
 
   setup do
-    owner = Xamt.AccountsFixtures.user_fixture()
+    owner = Xamt.AccountsFixtures.creator_fixture()
     member = Xamt.AccountsFixtures.user_fixture()
     outsider = Xamt.AccountsFixtures.user_fixture()
     owner_scope = Scope.for_user(owner)
@@ -182,5 +182,18 @@ defmodule Xamt.ServersTest do
     moderators = Servers.list_moderators(server.id)
     assert Enum.any?(moderators, &(&1.user_id == member.id))
     assert Enum.any?(moderators, &(&1.user_id == owner_scope.user.id))
+  end
+
+  test "regular users cannot create a server" do
+    scope = Scope.for_user(Xamt.AccountsFixtures.user_fixture())
+
+    assert {:error, :unauthorized} =
+             Servers.create_server(scope, %{"name" => "Forbidden Hall"})
+  end
+
+  test "admins can create a server" do
+    scope = Scope.for_user(Xamt.AccountsFixtures.admin_fixture())
+    assert {:ok, server} = Servers.create_server(scope, %{"name" => "Admin Hall"})
+    assert server.name == "Admin Hall"
   end
 end

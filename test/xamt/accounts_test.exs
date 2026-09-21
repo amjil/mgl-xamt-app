@@ -94,6 +94,14 @@ defmodule Xamt.AccountsTest do
       assert user.hashed_password
       assert user.confirmed_at
       assert user.status == "offline"
+      assert user.global_role == "user"
+    end
+
+    test "ignores global_role from registration params" do
+      {:ok, user} =
+        Accounts.register_user(Map.put(valid_user_attributes(), :global_role, "admin"))
+
+      assert user.global_role == "user"
     end
   end
 
@@ -402,6 +410,37 @@ defmodule Xamt.AccountsTest do
   describe "inspect/2 for the User module" do
     test "does not include password" do
       refute inspect(%User{password: "123456"}) =~ "password: \"123456\""
+    end
+  end
+
+  describe "update_user_global_role/2" do
+    test "promotes a user to creator or admin" do
+      user = user_fixture()
+      assert user.global_role == "user"
+      refute User.can_create_server?(user)
+
+      {:ok, creator} = Accounts.update_user_global_role(user, "creator")
+      assert creator.global_role == "creator"
+      assert User.can_create_server?(creator)
+
+      {:ok, admin} = Accounts.update_user_global_role(creator, "admin")
+      assert admin.global_role == "admin"
+      assert User.can_create_server?(admin)
+    end
+
+    test "rejects unknown roles" do
+      user = user_fixture()
+      assert {:error, changeset} = Accounts.update_user_global_role(user, "superadmin")
+      assert "is invalid" in errors_on(changeset).global_role
+    end
+  end
+
+  describe "profile_changeset/2" do
+    test "cannot change global_role" do
+      user = user_fixture()
+      changeset = User.profile_changeset(user, %{global_role: "admin", display_name: "Pat"})
+      assert Ecto.Changeset.get_field(changeset, :global_role) == "user"
+      refute Ecto.Changeset.get_change(changeset, :global_role)
     end
   end
 end

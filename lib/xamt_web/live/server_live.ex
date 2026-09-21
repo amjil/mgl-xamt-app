@@ -2,6 +2,7 @@ defmodule XamtWeb.ServerLive do
   use XamtWeb, :live_view
 
   alias Xamt.{Channels, Messages, Servers}
+  alias Xamt.Accounts.User
   alias Xamt.Channels.Channel
   alias Xamt.Messages.Reaction
   alias Xamt.Servers.Permissions
@@ -817,6 +818,16 @@ defmodule XamtWeb.ServerLive do
             {server_initial(s.name)}
           </.link>
           <.link
+            :if={User.can_create_server?(@current_scope.user)}
+            navigate={~p"/?create=1"}
+            id="create-server-rail"
+            class="xamt-server-dot xamt-server-dot--add"
+            title={gettext("Create server")}
+            aria-label={gettext("Create server")}
+          >
+            <.icon name="hero-plus" class="size-6" />
+          </.link>
+          <.link
             navigate={~p"/profile/#{@current_scope.user.username}"}
             id="current-user-chip"
             class="xamt-user-chip xamt-user-chip--rail"
@@ -1264,6 +1275,68 @@ defmodule XamtWeb.ServerLive do
                         <% end %>
                       </div>
                       <div class="xamt-reactions">
+                        <details
+                          id={"msg-menu-#{message.id}"}
+                          class="xamt-message__menu"
+                          phx-click-away={JS.remove_attribute("open")}
+                        >
+                          <summary
+                            class="xamt-message__menu-toggle"
+                            title={gettext("Message actions")}
+                            aria-label={gettext("Message actions")}
+                          >
+                            <.icon name="hero-ellipsis-vertical" class="size-4" />
+                          </summary>
+                          <div
+                            class="xamt-message__actions"
+                            role="toolbar"
+                            aria-label={gettext("Message actions")}
+                          >
+                            <button
+                              type="button"
+                              id={"reply-message-#{message.id}"}
+                              class="xamt-message__action"
+                              phx-click="reply_message"
+                              phx-value-id={message.id}
+                              title={gettext("Reply")}
+                              aria-label={gettext("Reply")}
+                            >
+                              <.icon name="hero-arrow-uturn-left" class="size-4" />
+                            </button>
+                            <button
+                              :if={
+                                message.user_id == @current_scope.user.id and
+                                  is_nil(audio_src(message))
+                              }
+                              type="button"
+                              id={"edit-message-#{message.id}"}
+                              class="xamt-message__action"
+                              phx-click="edit_message"
+                              phx-value-id={message.id}
+                              title={gettext("Edit")}
+                              aria-label={gettext("Edit")}
+                            >
+                              <.icon name="hero-pencil" class="size-4" />
+                            </button>
+                            <button
+                              :if={message.user_id == @current_scope.user.id or @can_manage_messages?}
+                              type="button"
+                              id={"delete-message-#{message.id}"}
+                              class="xamt-message__action xamt-message__action--danger"
+                              phx-click="delete_message"
+                              phx-value-id={message.id}
+                              title={gettext("Delete")}
+                              aria-label={gettext("Delete")}
+                              data-confirm={
+                                message.user_id == @current_scope.user.id &&
+                                  gettext("Delete this message?")
+                              }
+                            >
+                              <.icon name="hero-trash" class="size-4" />
+                            </button>
+                          </div>
+                        </details>
+
                         <button
                           :for={{emoji, user_ids} <- reactions_for(@reactions, message.id)}
                           type="button"
@@ -1271,6 +1344,7 @@ defmodule XamtWeb.ServerLive do
                             "xamt-reaction",
                             @current_scope.user.id in user_ids && "is-mine"
                           ]}
+                          data-digits={reaction_digits(user_ids)}
                           phx-click="toggle_reaction"
                           phx-value-id={message.id}
                           phx-value-emoji={emoji}
@@ -1295,43 +1369,6 @@ defmodule XamtWeb.ServerLive do
                             <span class="xamt-reaction__emoji">{emoji}</span>
                           </button>
                         </div>
-                      </div>
-
-                      <div class="xamt-message__actions">
-                        <button
-                          type="button"
-                          id={"reply-message-#{message.id}"}
-                          phx-click="reply_message"
-                          phx-value-id={message.id}
-                        >
-                          {gettext("Reply")}
-                        </button>
-                        <button
-                          :if={
-                            message.user_id == @current_scope.user.id and is_nil(audio_src(message))
-                          }
-                          type="button"
-                          id={"edit-message-#{message.id}"}
-                          phx-click="edit_message"
-                          phx-value-id={message.id}
-                        >
-                          <.icon name="hero-pencil" class="size-4" />
-                          {gettext("Edit")}
-                        </button>
-                        <button
-                          :if={message.user_id == @current_scope.user.id or @can_manage_messages?}
-                          type="button"
-                          id={"delete-message-#{message.id}"}
-                          phx-click="delete_message"
-                          phx-value-id={message.id}
-                          data-confirm={
-                            message.user_id == @current_scope.user.id &&
-                              gettext("Delete this message?")
-                          }
-                        >
-                          <.icon name="hero-trash" class="size-4" />
-                          {gettext("Delete")}
-                        </button>
                       </div>
                     </div>
                   <% end %>
@@ -1608,6 +1645,10 @@ defmodule XamtWeb.ServerLive do
 
   defp picker_emojis(reactions, message_id) do
     Reaction.emojis() -- Map.keys(Map.get(reactions, message_id, %{}))
+  end
+
+  defp reaction_digits(user_ids) do
+    user_ids |> length() |> Integer.to_string() |> String.length()
   end
 
   defp maybe_done_loading(socket, _event, true), do: socket

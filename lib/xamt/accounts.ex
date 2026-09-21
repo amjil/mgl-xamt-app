@@ -110,6 +110,17 @@ defmodule Xamt.Accounts do
     User.profile_changeset(user, attrs, validate_unique: false)
   end
 
+  @doc """
+  Assigns a global role from the operator console or seeds.
+
+  Valid roles are `user`, `creator`, and `admin`.
+  """
+  def update_user_global_role(%User{} = user, global_role) when is_binary(global_role) do
+    user
+    |> User.admin_changeset(%{global_role: global_role})
+    |> Repo.update()
+  end
+
   ## Settings
 
   @doc """

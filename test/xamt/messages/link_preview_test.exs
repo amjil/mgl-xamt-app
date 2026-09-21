@@ -6,7 +6,7 @@ defmodule Xamt.Messages.LinkPreviewTest do
   alias Xamt.Messages.LinkPreview
 
   setup do
-    owner = Xamt.AccountsFixtures.user_fixture()
+    owner = Xamt.AccountsFixtures.creator_fixture()
     scope = Scope.for_user(owner)
     {:ok, server} = Servers.create_server(scope, %{"name" => "Preview"})
     channel = hd(Channels.list_channels(server.id))

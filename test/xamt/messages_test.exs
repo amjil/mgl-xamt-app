@@ -6,7 +6,7 @@ defmodule Xamt.MessagesTest do
   alias Xamt.Messages.{RateLimiter, Reaction}
 
   setup do
-    owner = Xamt.AccountsFixtures.user_fixture()
+    owner = Xamt.AccountsFixtures.creator_fixture()
     scope = Scope.for_user(owner)
     {:ok, server} = Servers.create_server(scope, %{"name" => "Test"})
     channel = hd(Channels.list_channels(server.id))
@@ -212,7 +212,7 @@ defmodule Xamt.MessagesTest do
         "content" => %{"type" => "rich_text"}
       })
 
-    other_owner = Xamt.AccountsFixtures.user_fixture()
+    other_owner = Xamt.AccountsFixtures.creator_fixture()
     other_scope = Scope.for_user(other_owner)
     {:ok, other_server} = Servers.create_server(other_scope, %{"name" => "Other"})
     other_channel = hd(Channels.list_channels(other_server.id))

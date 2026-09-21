@@ -7,7 +7,7 @@ defmodule Xamt.CommunityCacheTest do
   alias Xamt.Servers.ServerCache
 
   setup do
-    owner = Xamt.AccountsFixtures.user_fixture()
+    owner = Xamt.AccountsFixtures.creator_fixture()
     scope = Scope.for_user(owner)
     {:ok, server} = Servers.create_server(scope, %{"name" => "Cached Hall"})
     %{scope: scope, server: server}

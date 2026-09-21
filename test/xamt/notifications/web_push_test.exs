@@ -6,7 +6,7 @@ defmodule Xamt.Notifications.WebPushTest do
   alias Xamt.Notifications.WebPush
 
   setup do
-    owner = Xamt.AccountsFixtures.user_fixture()
+    owner = Xamt.AccountsFixtures.creator_fixture()
     scope = Scope.for_user(owner)
     {:ok, server} = Servers.create_server(scope, %{"name" => "Push"})
     channel = hd(Channels.list_channels(server.id))

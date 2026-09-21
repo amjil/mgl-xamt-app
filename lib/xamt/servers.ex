@@ -6,7 +6,7 @@ defmodule Xamt.Servers do
   import Ecto.Query, warn: false
   import Xamt.Servers.Permissions, only: [has_perm: 2]
 
-  alias Xamt.Accounts.Scope
+  alias Xamt.Accounts.{Scope, User}
   alias Xamt.Channels
   alias Xamt.Channels.ChannelListCache
   alias Xamt.Repo
@@ -21,7 +21,18 @@ defmodule Xamt.Servers do
     |> Ecto.Changeset.cast(attrs, [:name, :slug, :description, :icon, :visibility])
   end
 
-  def create_server(%Scope{user: user}, attrs) when is_map(attrs) do
+  @doc """
+  Creates a server. Only users with a global role of `admin` or `creator` may call this.
+  """
+  def create_server(%Scope{user: user} = scope, attrs) when is_map(attrs) do
+    if User.can_create_server?(user) do
+      insert_server(scope, attrs)
+    else
+      {:error, :unauthorized}
+    end
+  end
+
+  defp insert_server(%Scope{user: user}, attrs) do
     name = Map.get(attrs, "name") || Map.get(attrs, :name)
     base_slug = Map.get(attrs, "slug") || Map.get(attrs, :slug) || Slug.slugify(name)
     slug = unique_server_slug(base_slug)

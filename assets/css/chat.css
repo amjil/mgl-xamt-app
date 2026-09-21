@@ -164,6 +164,18 @@
   box-shadow: 0 0 0 5px var(--xamt-gold-soft);
 }
 
+.xamt-server-dot--add {
+  background: transparent;
+  border-style: dashed;
+  color: var(--xamt-muted);
+}
+
+.xamt-server-dot--add:hover {
+  color: var(--xamt-accent-2);
+  border-color: var(--xamt-accent-2);
+  background: color-mix(in srgb, var(--xamt-gold-soft) 55%, transparent);
+}
+
 .xamt-rail__header {
   flex: 0 0 auto;
   padding: 1.05rem 0.85rem;
