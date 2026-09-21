@@ -152,6 +152,51 @@ defmodule XamtWeb.MessageApiControllerTest do
     assert %{"status" => "error", "detail" => "invalid_channel"} = json_response(conn, 422)
   end
 
+  test "sanitizes XSS payloads from the sync API", %{conn: conn, channel: channel} do
+    conn =
+      conn
+      |> with_csrf()
+      |> post(~p"/api/messages/sync", %{
+        "channel_id" => channel.id,
+        "content_html" => ~s(<p>ok<img src=x onerror="alert(1)"><script>x</script></p>),
+        "content_type" => "rich_text"
+      })
+
+    assert %{"status" => "ok"} = json_response(conn, 200)
+    [message] = Messages.list_messages(channel.id)
+    refute message.content_html =~ "onerror"
+    refute message.content_html =~ "<script"
+    assert message.content_html =~ "ok"
+  end
+
+  test "rejects cross-channel reply_to_id", %{
+    conn: conn,
+    scope: scope,
+    channel: channel,
+    server: server
+  } do
+    {:ok, other} = Channels.create_channel(scope, server, %{"name" => "elsewhere"})
+
+    {:ok, foreign} =
+      Messages.create_message(scope, other.id, %{
+        "content_html" => "<p>parent</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    conn =
+      conn
+      |> with_csrf()
+      |> post(~p"/api/messages/sync", %{
+        "channel_id" => channel.id,
+        "content_html" => "<p>reply</p>",
+        "reply_to_id" => foreign.id,
+        "content_type" => "rich_text"
+      })
+
+    assert %{"status" => "error", "detail" => "invalid_reply"} = json_response(conn, 422)
+    assert Messages.list_messages(channel.id) == []
+  end
+
   defp with_csrf(conn) do
     conn = get(conn, ~p"/")
     token = Plug.CSRFProtection.get_csrf_token()

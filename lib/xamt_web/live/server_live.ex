@@ -240,6 +240,9 @@ defmodule XamtWeb.ServerLive do
         {:error, :unauthorized} ->
           {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
 
+        {:error, :invalid_reply} ->
+          {:noreply, put_flash(socket, :error, gettext("Could not send message"))}
+
         {:error, _changeset} ->
           {:noreply, put_flash(socket, :error, gettext("Could not send message"))}
       end
@@ -247,10 +250,10 @@ defmodule XamtWeb.ServerLive do
   end
 
   def handle_event("edit_message", %{"id" => id}, socket) do
-    message = Messages.get_message!(id)
     previous_id = socket.assigns.editing_message_id
 
-    if own_active_message?(socket, message) and is_nil(message.deleted_at) do
+    with {:ok, message} <- Messages.get_message_for_user(socket.assigns.current_scope, id),
+         true <- own_active_message?(socket, message) and is_nil(message.deleted_at) do
       html = message.content_html || ""
 
       {:noreply,
@@ -261,14 +264,14 @@ defmodule XamtWeb.ServerLive do
        |> stream_insert(:messages, message)
        |> push_event("populate_composer", %{html: html})}
     else
-      {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+      _ ->
+        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
     end
   end
 
   def handle_event("reply_message", %{"id" => id}, socket) do
-    message = Messages.get_message!(id)
-
-    if active_channel_message?(socket, message) do
+    with {:ok, message} <- Messages.get_message_for_user(socket.assigns.current_scope, id),
+         true <- active_channel_message?(socket, message) do
       {:noreply,
        socket
        |> assign(:replying_to, message)
@@ -276,7 +279,8 @@ defmodule XamtWeb.ServerLive do
        |> assign(:mobile_panel, :messages)
        |> push_event("composer:focus", %{})}
     else
-      {:noreply, socket}
+      _ ->
+        {:noreply, socket}
     end
   end
 
@@ -336,7 +340,16 @@ defmodule XamtWeb.ServerLive do
   end
 
   def handle_event("delete_message", %{"id" => id}, socket) do
-    message = Messages.get_message!(id)
+    case Messages.get_message_for_user(socket.assigns.current_scope, id) do
+      {:ok, message} ->
+        delete_message_action(socket, id, message)
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+    end
+  end
+
+  defp delete_message_action(socket, id, message) do
     current_user_id = socket.assigns.current_scope.user.id
     is_mine = message.user_id == current_user_id
     is_mod = socket.assigns.can_manage_messages?
@@ -619,7 +632,11 @@ defmodule XamtWeb.ServerLive do
       if q == "" do
         nil
       else
-        Messages.search_messages(Enum.map(socket.assigns.channels, & &1.id), q)
+        Messages.search_server_messages(
+          socket.assigns.current_scope,
+          socket.assigns.server.id,
+          q
+        )
       end
 
     {:noreply,
@@ -2111,9 +2128,10 @@ defmodule XamtWeb.ServerLive do
   end
 
   defp restream_message(socket, id) when is_binary(id) do
-    stream_insert(socket, :messages, Messages.get_message!(id))
-  rescue
-    Ecto.NoResultsError -> socket
+    case Messages.get_message_for_user(socket.assigns.current_scope, id) do
+      {:ok, message} -> stream_insert(socket, :messages, message)
+      {:error, _} -> socket
+    end
   end
 
   defp restream_message(socket, _), do: socket
@@ -2249,14 +2267,22 @@ defmodule XamtWeb.ServerLive do
     }
   end
 
+  # `content_html` is sanitized on write; scrub again here so older rows and any
+  # missed path cannot reach `raw/1` with attacker-controlled markup.
   defp safe_html(message, current_user_id)
 
   defp safe_html(%{content_html: html}, current_user_id)
-       when is_binary(html) and html != "",
-       do: decorate_own_mentions(html, current_user_id)
+       when is_binary(html) and html != "" do
+    html
+    |> Xamt.Messages.HtmlSanitizer.sanitize()
+    |> decorate_own_mentions(current_user_id)
+  end
 
-  defp safe_html(%{content: %{"html" => html}}, current_user_id) when is_binary(html),
-    do: decorate_own_mentions(html, current_user_id)
+  defp safe_html(%{content: %{"html" => html}}, current_user_id) when is_binary(html) do
+    html
+    |> Xamt.Messages.HtmlSanitizer.sanitize()
+    |> decorate_own_mentions(current_user_id)
+  end
 
   defp safe_html(%{content: content}, _current_user_id) when is_map(content),
     do: Phoenix.HTML.html_escape(inspect(content))
@@ -2341,6 +2367,9 @@ defmodule XamtWeb.ServerLive do
 
               {:error, :unauthorized} ->
                 {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+
+              {:error, :invalid_reply} ->
+                {:noreply, put_flash(socket, :error, gettext("Could not send voice message"))}
 
               {:error, _changeset} ->
                 {:noreply, put_flash(socket, :error, gettext("Could not send voice message"))}

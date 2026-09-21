@@ -4,6 +4,11 @@ defmodule Xamt.Messages.RateLimiter do
 
   Keys are `{user_id, window}` buckets stored in ETS so checks stay in-process
   and do not hit Postgres on the hot path.
+
+  This is intentionally single-node: each BEAM node has its own ETS table, so
+  limits are not shared across a cluster. That is fine for one Phoenix instance;
+  if Xamt runs multi-node, swap this for a central store (Postgres / Redis) or
+  accept that the effective limit scales with node count.
   """
 
   use GenServer

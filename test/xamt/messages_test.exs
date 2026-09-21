@@ -130,6 +130,106 @@ defmodule Xamt.MessagesTest do
     assert {:ok, %{}} = Messages.toggle_reaction(scope, message.id, hd(Reaction.emojis()))
   end
 
+  test "rejects reactions from users outside the server", %{
+    scope: scope,
+    channel: channel
+  } do
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>react me</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    outsider = Xamt.AccountsFixtures.user_fixture()
+
+    assert {:error, :unauthorized} =
+             Messages.toggle_reaction(Scope.for_user(outsider), message.id, hd(Reaction.emojis()))
+  end
+
+  test "sanitizes dangerous HTML before persist", %{scope: scope, channel: channel} do
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" =>
+          ~s(<p>safe<img src=x onerror="alert(1)"><script>document.cookie</script></p>),
+        "content" => %{"type" => "rich_text"}
+      })
+
+    refute message.content_html =~ "onerror"
+    refute message.content_html =~ "<script"
+    refute message.content_html =~ "document.cookie"
+    assert message.content_html =~ "safe"
+    assert message.content["html"] == message.content_html
+  end
+
+  test "rejects reply_to_id from another channel", %{
+    scope: scope,
+    channel: channel,
+    server: server
+  } do
+    {:ok, other} = Channels.create_channel(scope, server, %{"name" => "other-reply"})
+
+    {:ok, foreign} =
+      Messages.create_message(scope, other.id, %{
+        "content_html" => "<p>foreign parent</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    assert {:error, :invalid_reply} =
+             Messages.create_message(scope, channel.id, %{
+               "content_html" => "<p>sneaky reply</p>",
+               "content" => %{"type" => "rich_text"},
+               "reply_to_id" => foreign.id
+             })
+  end
+
+  test "get_message_for_user requires channel membership", %{
+    scope: scope,
+    channel: channel
+  } do
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>mine</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    assert {:ok, loaded} = Messages.get_message_for_user(scope, message.id)
+    assert loaded.id == message.id
+
+    outsider = Xamt.AccountsFixtures.user_fixture()
+
+    assert {:error, :unauthorized} =
+             Messages.get_message_for_user(Scope.for_user(outsider), message.id)
+  end
+
+  test "search_server_messages only covers the user's server", %{
+    scope: scope,
+    channel: channel,
+    server: server
+  } do
+    {:ok, _} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>server-needle-alpha</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    other_owner = Xamt.AccountsFixtures.user_fixture()
+    other_scope = Scope.for_user(other_owner)
+    {:ok, other_server} = Servers.create_server(other_scope, %{"name" => "Other"})
+    other_channel = hd(Channels.list_channels(other_server.id))
+
+    {:ok, _} =
+      Messages.create_message(other_scope, other_channel.id, %{
+        "content_html" => "<p>server-needle-alpha</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    hits = Messages.search_server_messages(scope, server.id, "server-needle-alpha")
+    assert length(hits) == 1
+    assert hd(hits).channel_id == channel.id
+
+    assert Messages.search_server_messages(scope, other_server.id, "server-needle-alpha") == []
+  end
+
   test "indexes and finds traditional Mongolian after NNBSP / FVS normalisation", %{
     scope: scope,
     channel: channel

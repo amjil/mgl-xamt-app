@@ -35,6 +35,11 @@ defmodule XamtWeb.MessageApiController do
           |> put_status(:forbidden)
           |> json(%{status: "error", detail: "forbidden"})
 
+        {:error, :invalid_reply} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{status: "error", detail: "invalid_reply"})
+
         {:error, _changeset} ->
           conn
           |> put_status(:unprocessable_entity)

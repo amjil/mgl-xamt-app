@@ -1,6 +1,12 @@
 defmodule Xamt.Messages do
   @moduledoc """
   Channel messages and real-time broadcasts.
+
+  Authorization belongs here: prefer scope-taking entry points
+  (`create_message/3`, `update_message/3`, `delete_message/3`,
+  `toggle_reaction/3`, `get_message_for_user/2`, `search_server_messages/3`)
+  over bare `get_message!/1` / `search_messages/2` from LiveViews and HTTP.
+  Message HTML is scrubbed by `Xamt.Messages.HtmlSanitizer` before persist.
   """
 
   import Ecto.Query, warn: false
@@ -13,19 +19,22 @@ defmodule Xamt.Messages do
   alias Xamt.Repo
   alias Xamt.Servers.Permissions
   alias Xamt.Servers.ServerMember
-  alias Xamt.Messages.{Mention, Message, RateLimiter, Reaction}
+  alias Xamt.Messages.{HtmlSanitizer, Mention, Message, RateLimiter, Reaction}
 
   @default_limit 50
   @mention_tag_re ~r/<(span|a)\b([^>]*\bdata-mention-id=["']([^"']+)["'][^>]*)>(.*?)<\/\1>/si
   @mention_id_re ~r/data-mention-id=["']([0-9a-fA-F-]{36})["']/
 
   def create_message(%Scope{user: user}, channel_id, attrs) when is_map(attrs) do
-    content = build_content(attrs)
     raw_html = Map.get(attrs, "content_html") || Map.get(attrs, :content_html)
     {content_html, mention_ids} = prepare_mentions(raw_html, channel_id)
+    attrs = put_sanitized_html(attrs, content_html)
+    content = build_content(attrs)
+    reply_to_id = normalize_reply_to_id(attrs)
 
     with :ok <- RateLimiter.check_rate(user.id),
          :ok <- authorize_channel_perm(user.id, channel_id, :send_messages),
+         :ok <- validate_reply_to(reply_to_id, channel_id),
          {:ok, message} <-
            Repo.transact(fn ->
              with {:ok, message} <-
@@ -37,7 +46,7 @@ defmodule Xamt.Messages do
                       content_type: content_type(attrs, content),
                       content_html: content_html,
                       search_text: search_normalize(plain_text(content_html)),
-                      reply_to_id: Map.get(attrs, "reply_to_id") || Map.get(attrs, :reply_to_id)
+                      reply_to_id: reply_to_id
                     })
                     |> Repo.insert(),
                   :ok <- replace_mentions(message.id, mention_ids) do
@@ -54,16 +63,15 @@ defmodule Xamt.Messages do
   end
 
   def update_message(%Scope{user: user}, message_id, attrs) when is_map(attrs) do
-    message = get_message!(message_id)
-
-    with :ok <- writable?(message, user) do
-      content = build_content(attrs, message.content)
-
+    with {:ok, message} <- fetch_message(message_id),
+         :ok <- writable?(message, user) do
       raw_html =
         Map.get(attrs, "content_html") || Map.get(attrs, :content_html) ||
           message.content_html
 
       {content_html, mention_ids} = prepare_mentions(raw_html, message.channel_id)
+      attrs = put_sanitized_html(attrs, content_html)
+      content = build_content(attrs, message.content)
       previous_mention_ids = message.mentioned_user_ids || []
 
       with {:ok, message} <-
@@ -101,9 +109,8 @@ defmodule Xamt.Messages do
   existing DOM node instead of removing it.
   """
   def delete_message(%Scope{user: user}, message_id, reason \\ nil) do
-    message = get_message!(message_id)
-
-    with :ok <- deletable?(message, user) do
+    with {:ok, message} <- fetch_message(message_id),
+         :ok <- deletable?(message, user) do
       moderated? = message.user_id != user.id
 
       Ecto.Multi.new()
@@ -147,6 +154,19 @@ defmodule Xamt.Messages do
     |> with_assoc_joins()
     |> Repo.one!()
     |> attach_mention_ids()
+  end
+
+  @doc """
+  Loads a message only when the user may view its channel.
+
+  Prefer this (or other scope-taking APIs) over `get_message!/1` from LiveViews
+  and controllers so authorization cannot be skipped by accident.
+  """
+  def get_message_for_user(%Scope{user: user}, id) do
+    with {:ok, message} <- fetch_message(id),
+         :ok <- authorize_channel_perm(user.id, message.channel_id, :view_channel) do
+      {:ok, message}
+    end
   end
 
   @doc """
@@ -238,6 +258,9 @@ defmodule Xamt.Messages do
 
   @doc """
   Full-text search across the given channels, newest first.
+
+  Prefer `search_server_messages/3` from LiveViews and controllers: this
+  lower-level form trusts the caller to supply only authorized channel IDs.
   """
   def search_messages(channel_ids, query, opts \\ [])
   def search_messages([], _query, _opts), do: []
@@ -263,6 +286,25 @@ defmodule Xamt.Messages do
   end
 
   @doc """
+  Searches messages in a server the user belongs to.
+
+  Channel IDs are resolved inside the context from membership, so callers cannot
+  widen the search to foreign servers by inventing IDs.
+  """
+  def search_server_messages(%Scope{user: user}, server_id, query, opts \\ [])
+      when is_binary(server_id) do
+    if Xamt.Servers.member?(server_id, user.id) do
+      channel_ids =
+        from(c in Channel, where: c.server_id == ^server_id, select: c.id)
+        |> Repo.all()
+
+      search_messages(channel_ids, query, opts)
+    else
+      []
+    end
+  end
+
+  @doc """
   Shortens `plain_text/1` for the quoted preview shown above a reply.
   """
   def excerpt(message, limit \\ 60) do
@@ -284,12 +326,13 @@ defmodule Xamt.Messages do
   can re-insert the stream item without another query.
   """
   def toggle_reaction(%Scope{user: user}, message_id, emoji) do
-    message = get_message!(message_id)
-
-    if match?(%DateTime{}, message.deleted_at) do
-      {:error, :deleted}
-    else
-      toggle_reaction_on(message, user, emoji)
+    with {:ok, message} <- fetch_message(message_id),
+         :ok <- authorize_channel_perm(user.id, message.channel_id, :view_channel) do
+      if match?(%DateTime{}, message.deleted_at) do
+        {:error, :deleted}
+      else
+        toggle_reaction_on(message, user, emoji)
+      end
     end
   end
 
@@ -524,6 +567,7 @@ defmodule Xamt.Messages do
   defp attach_mention_ids(other), do: other
 
   defp prepare_mentions(html, channel_id) when is_binary(html) and is_binary(channel_id) do
+    html = HtmlSanitizer.sanitize(html)
     server_id = channel_server_id(channel_id)
     ids = extract_mention_ids(html)
     users = mentionable_users(server_id, ids)
@@ -531,6 +575,51 @@ defmodule Xamt.Messages do
   end
 
   defp prepare_mentions(_html, _channel_id), do: {"", []}
+
+  defp put_sanitized_html(attrs, content_html) when is_map(attrs) do
+    attrs
+    |> Map.put("content_html", content_html)
+    |> Map.put(:content_html, content_html)
+    |> maybe_put_nested_html(content_html)
+  end
+
+  defp maybe_put_nested_html(attrs, content_html) do
+    case Map.get(attrs, "content") || Map.get(attrs, :content) do
+      content when is_map(content) ->
+        Map.put(attrs, "content", Map.put(content, "html", content_html))
+
+      _ ->
+        attrs
+    end
+  end
+
+  defp normalize_reply_to_id(attrs) when is_map(attrs) do
+    case Map.get(attrs, "reply_to_id") || Map.get(attrs, :reply_to_id) do
+      id when is_binary(id) and id != "" -> id
+      _ -> nil
+    end
+  end
+
+  defp validate_reply_to(nil, _channel_id), do: :ok
+
+  defp validate_reply_to(reply_to_id, channel_id) when is_binary(reply_to_id) do
+    case Repo.one(
+           from(m in Message,
+             where: m.id == ^reply_to_id,
+             select: m.channel_id
+           )
+         ) do
+      ^channel_id -> :ok
+      _ -> {:error, :invalid_reply}
+    end
+  end
+
+  defp fetch_message(id) do
+    case Repo.one(from(m in Message, where: m.id == ^id) |> with_assoc_joins()) do
+      %Message{} = message -> {:ok, attach_mention_ids(message)}
+      nil -> {:error, :not_found}
+    end
+  end
 
   defp extract_mention_ids(html) do
     @mention_id_re
