@@ -5,7 +5,7 @@ defmodule Xamt.Messages.HtmlSanitizerTest do
 
   test "strips script tags and event handlers" do
     html =
-      ~s(<p>hi<img src=x onerror="alert(1)"><script>alert(1)</script></p>)
+      ~s|<p>hi<img src=x onerror="alert(1)"><script>alert(1)</script></p>|
 
     cleaned = HtmlSanitizer.sanitize(html)
 
@@ -29,7 +29,7 @@ defmodule Xamt.Messages.HtmlSanitizerTest do
 
   test "drops javascript hrefs and path traversal uploads" do
     html =
-      ~s(<a href="javascript:alert(1)">x</a><img src="/uploads/../secret">)
+      ~s|<a href="javascript:alert(1)">x</a><img src="/uploads/../secret">|
 
     cleaned = HtmlSanitizer.sanitize(html)
 

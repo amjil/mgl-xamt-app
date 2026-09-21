@@ -158,7 +158,7 @@ defmodule XamtWeb.MessageApiControllerTest do
       |> with_csrf()
       |> post(~p"/api/messages/sync", %{
         "channel_id" => channel.id,
-        "content_html" => ~s(<p>ok<img src=x onerror="alert(1)"><script>x</script></p>),
+        "content_html" => ~s|<p>ok<img src=x onerror="alert(1)"><script>x</script></p>|,
         "content_type" => "rich_text"
       })
 

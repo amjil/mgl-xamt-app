@@ -150,7 +150,7 @@ defmodule Xamt.MessagesTest do
     {:ok, message} =
       Messages.create_message(scope, channel.id, %{
         "content_html" =>
-          ~s(<p>safe<img src=x onerror="alert(1)"><script>document.cookie</script></p>),
+          ~s|<p>safe<img src=x onerror="alert(1)"><script>document.cookie</script></p>|,
         "content" => %{"type" => "rich_text"}
       })
 

@@ -19,7 +19,10 @@ defmodule Xamt.Messages.HtmlSanitizer do
   ))
 
   @allowed_attrs %{
-    "a" => MapSet.new(~w(href class data-mention-id data-mention-username data-phx-link data-phx-link-state data-you)),
+    "a" =>
+      MapSet.new(
+        ~w(href class data-mention-id data-mention-username data-phx-link data-phx-link-state data-you)
+      ),
     "img" => MapSet.new(~w(src alt class width height)),
     "div" => MapSet.new(~w(class data-block-type data-checked data-collapsed data-index)),
     "span" => MapSet.new(~w(class data-mention-id data-mention-username)),

@@ -349,29 +349,6 @@ defmodule XamtWeb.ServerLive do
     end
   end
 
-  defp delete_message_action(socket, id, message) do
-    current_user_id = socket.assigns.current_scope.user.id
-    is_mine = message.user_id == current_user_id
-    is_mod = socket.assigns.can_manage_messages?
-
-    cond do
-      is_mine ->
-        delete_current_message(socket, id)
-
-      is_mod ->
-        {:noreply,
-         socket
-         |> assign(:deleting_message, message)
-         |> assign(
-           :delete_reason_form,
-           to_form(%{"reason" => "", "id" => message.id}, as: :audit)
-         )}
-
-      true ->
-        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
-    end
-  end
-
   def handle_event("confirm_delete_message", %{"audit" => audit}, socket) do
     id = audit["id"]
     reason = audit["reason"]
@@ -1519,6 +1496,29 @@ defmodule XamtWeb.ServerLive do
       />
     </div>
     """
+  end
+
+  defp delete_message_action(socket, id, message) do
+    current_user_id = socket.assigns.current_scope.user.id
+    is_mine = message.user_id == current_user_id
+    is_mod = socket.assigns.can_manage_messages?
+
+    cond do
+      is_mine ->
+        delete_current_message(socket, id)
+
+      is_mod ->
+        {:noreply,
+         socket
+         |> assign(:deleting_message, message)
+         |> assign(
+           :delete_reason_form,
+           to_form(%{"reason" => "", "id" => message.id}, as: :audit)
+         )}
+
+      true ->
+        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+    end
   end
 
   defp delete_current_message(socket, id, reason \\ nil) do
