@@ -797,6 +797,16 @@ defmodule XamtWeb.ServerLive do
         >
         </button>
         <aside class="xamt-rail xamt-rail--servers">
+          <button
+            type="button"
+            id="drawer-close"
+            class="xamt-drawer-close"
+            phx-click="set_mobile_panel"
+            phx-value-panel="messages"
+            aria-label={gettext("Close panel")}
+          >
+            <.icon name="hero-x-mark" class="size-5" />
+          </button>
           <.link navigate={~p"/"} class="xamt-brand-mark" title="Xamt">X</.link>
           <.link
             :for={s <- @user_servers}
@@ -1408,62 +1418,72 @@ defmodule XamtWeb.ServerLive do
                 <.live_file_input upload={@uploads.media} />
               </form>
 
-              <div id="message-composer" phx-hook="MessageComposer" phx-update="ignore">
-                <div class="xamt-composer__editor" id="composer-editor-host"></div>
-              </div>
+              <div class="xamt-composer__field">
+                <div id="message-composer" phx-hook="MessageComposer" phx-update="ignore">
+                  <div class="xamt-composer__editor" id="composer-editor-host"></div>
+                </div>
 
-              <div id="composer-toolbar" class="xamt-composer__toolbar">
-                <label
-                  for={@uploads.media.ref}
-                  class="xamt-btn xamt-btn--soft"
-                  title={gettext("Upload Media")}
-                >
-                  <.icon name="hero-photo" class="size-5" />
-                </label>
-                <form
-                  id="audio-form"
-                  phx-change="validate_audio"
-                  phx-submit="send_audio"
-                  phx-hook="AudioRecorder"
-                  data-mic-error={gettext("Microphone access is required to record")}
-                  data-mic-unsupported={gettext("Voice recording is not supported in this browser")}
-                  data-mic-insecure={
-                    gettext(
-                      "Voice recording needs HTTPS. Open https://dev1:4001 on this phone and allow the microphone."
-                    )
-                  }
-                  data-mic-empty={gettext("Recording was empty")}
-                  data-mic-upload-error={gettext("Could not upload voice message")}
-                >
-                  <.live_file_input upload={@uploads.audio} class="hidden" />
+                <div id="composer-toolbar" class="xamt-composer__toolbar">
+                  <label
+                    for={@uploads.media.ref}
+                    class="xamt-btn xamt-btn--soft"
+                    title={gettext("Upload Media")}
+                    aria-label={gettext("Upload Media")}
+                  >
+                    <.icon name="hero-photo" class="size-4" />
+                  </label>
+                  <form
+                    id="audio-form"
+                    phx-change="validate_audio"
+                    phx-submit="send_audio"
+                    phx-hook="AudioRecorder"
+                    data-mic-error={gettext("Microphone access is required to record")}
+                    data-mic-unsupported={gettext("Voice recording is not supported in this browser")}
+                    data-mic-insecure={
+                      gettext(
+                        "Voice recording needs HTTPS. Open https://dev1:4001 on this phone and allow the microphone."
+                      )
+                    }
+                    data-mic-empty={gettext("Recording was empty")}
+                    data-mic-upload-error={gettext("Could not upload voice message")}
+                  >
+                    <.live_file_input upload={@uploads.audio} class="hidden" />
+                    <button
+                      type="button"
+                      id="btn-record"
+                      class="xamt-btn xamt-btn--soft xamt-record-btn"
+                      title={gettext("Record voice message")}
+                      aria-label={gettext("Record voice message")}
+                      aria-pressed="false"
+                    >
+                      <.icon name="hero-microphone" class="size-4" />
+                    </button>
+                  </form>
+                  <button
+                    :if={@editing_message_id}
+                    type="button"
+                    id="composer-cancel-edit"
+                    class="xamt-btn xamt-btn--soft"
+                    phx-click="cancel_edit"
+                    title={gettext("Cancel")}
+                    aria-label={gettext("Cancel")}
+                  >
+                    <.icon name="hero-x-mark" class="size-4" />
+                  </button>
                   <button
                     type="button"
-                    id="btn-record"
-                    class="xamt-btn xamt-btn--soft xamt-record-btn"
-                    title={gettext("Record voice message")}
-                    aria-label={gettext("Record voice message")}
-                    aria-pressed="false"
+                    id="composer-send"
+                    class="xamt-btn xamt-btn--primary"
+                    data-composer-send
+                    title={if @editing_message_id, do: gettext("Save"), else: gettext("Send")}
+                    aria-label={if @editing_message_id, do: gettext("Save"), else: gettext("Send")}
                   >
-                    <.icon name="hero-microphone" class="size-5" />
+                    <.icon
+                      name={if @editing_message_id, do: "hero-check", else: "hero-paper-airplane"}
+                      class="size-4"
+                    />
                   </button>
-                </form>
-                <button
-                  :if={@editing_message_id}
-                  type="button"
-                  id="composer-cancel-edit"
-                  class="xamt-btn xamt-btn--sm"
-                  phx-click="cancel_edit"
-                >
-                  {gettext("Cancel")}
-                </button>
-                <button
-                  type="button"
-                  id="composer-send"
-                  class="xamt-btn xamt-btn--primary mongol-text"
-                  data-composer-send
-                >
-                  {if @editing_message_id, do: gettext("Save"), else: gettext("Send")}
-                </button>
+                </div>
               </div>
             </div>
           </div>

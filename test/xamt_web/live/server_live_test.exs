@@ -388,6 +388,14 @@ defmodule XamtWeb.ServerLiveTest do
     view |> element("#mobile-nav-menu") |> render_click()
     assert has_element?(view, ".xamt-app--panel-channels")
     assert has_element?(view, "#drawer-backdrop")
+    assert has_element?(view, "#drawer-close")
+
+    view |> element("#drawer-close") |> render_click()
+    assert has_element?(view, ".xamt-app--panel-messages")
+    refute has_element?(view, "#drawer-backdrop")
+
+    view |> element("#mobile-nav-menu") |> render_click()
+    assert has_element?(view, ".xamt-app--panel-channels")
 
     view |> element("#drawer-backdrop") |> render_click()
     assert has_element?(view, ".xamt-app--panel-messages")
