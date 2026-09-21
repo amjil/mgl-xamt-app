@@ -9,11 +9,24 @@
   overscroll-behavior-x: contain;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
+  /* Nested overflow:auto cards steal pans on iOS; this is the only scroller.
+     touch-action is not inherited — apply it to descendants too so a pan
+     that starts on a message still moves the list. */
+  touch-action: pan-x pinch-zoom;
   padding: 1rem;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 1rem;
+}
+
+.xamt-messages * {
+  touch-action: pan-x pinch-zoom;
+}
+
+.xamt-messages audio,
+.xamt-messages .xamt-audio-player {
+  touch-action: auto;
 }
 
 /* Wraps the list + empty state so the jump button can be anchored to it */
@@ -88,7 +101,8 @@
 }
 
 /* Hug the written columns. The card is stretched to the pane height, so long
-   text wraps to extra columns (the card grows right) instead of a fixed box. */
+   text wraps to extra columns (the card grows right) instead of a nested
+   scroller that eats mobile pans. */
 .xamt-message__content {
   flex: 0 0 auto;
   align-self: stretch;
@@ -96,12 +110,8 @@
   inline-size: 100%;
   max-inline-size: 100%;
   width: fit-content;
-  max-width: min(32rem, 70vw);
   min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  overscroll-behavior-x: contain;
-  -webkit-overflow-scrolling: touch;
+  overflow: visible;
 }
 
 .xamt-message__content .block-wrapper,
@@ -117,7 +127,6 @@
 .xamt-message__content pre {
   margin: 0;
   width: fit-content;
-  max-width: 100%;
   min-width: 0;
   max-height: 100%;
 }
@@ -166,7 +175,6 @@
   gap: 0.75rem;
   flex: 0 0 auto;
   width: fit-content;
-  max-width: 100%;
   padding: 0.45rem 0.4rem;
   border-radius: 0.7rem;
   overflow: visible;
@@ -211,7 +219,6 @@
   align-items: flex-start;
   gap: 0.15rem;
   width: fit-content;
-  max-width: 100%;
   min-width: 0;
   height: 100%;
   min-height: 0;
@@ -269,7 +276,7 @@
   text-align: start;
   cursor: pointer;
   max-block-size: 100%;
-  overflow: hidden;
+  overflow: clip;
 }
 
 .xamt-quote:hover {
@@ -289,7 +296,7 @@
 .xamt-quote__text {
   min-height: 0;
   max-block-size: 100%;
-  overflow: hidden;
+  overflow: clip;
 }
 
 .xamt-reply-bar {
@@ -546,7 +553,7 @@ a.xamt-mention:hover {
   box-sizing: border-box;
   writing-mode: horizontal-tb;
   -webkit-writing-mode: horizontal-tb;
-  touch-action: manipulation;
+  touch-action: pan-x pinch-zoom;
   -webkit-tap-highlight-color: color-mix(in srgb, var(--xamt-accent) 18%, transparent);
   transition:
     background-color 140ms ease,
@@ -603,7 +610,7 @@ a.xamt-mention:hover {
   border-radius: 0.5rem;
   display: grid;
   place-items: center;
-  touch-action: manipulation;
+  touch-action: pan-x pinch-zoom;
   -webkit-tap-highlight-color: color-mix(in srgb, var(--xamt-accent) 18%, transparent);
   transition:
     background-color 140ms ease,
@@ -623,10 +630,6 @@ a.xamt-mention:hover {
 }
 
 @media (max-width: 960px) {
-  .xamt-message__content {
-    max-width: min(20rem, calc(100vw - var(--xamt-toolbar-w) - 3.5rem));
-  }
-
   .xamt-message__action {
     width: 2.25rem;
     height: 2.25rem;

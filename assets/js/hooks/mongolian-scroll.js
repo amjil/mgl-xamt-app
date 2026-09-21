@@ -12,7 +12,6 @@ const SCROLL_CONTAINERS = [
   ".xamt-rail__section",
   ".xamt-composer__editor",
   ".xamt-upload-preview",
-  ".xamt-message__content",
   ".xamt-settings-panel",
   ".xamt-sheet__body",
 ].join(", ")
