@@ -11,9 +11,10 @@ defmodule Xamt.Messages.LinkPreview do
 
   Video iframes are never stored. `iframe_src/1` rebuilds them at render
   time and only returns `youtube-nocookie.com` or `player.bilibili.com`.
-  Those hosts are cross-origin, so a sandbox of `allow-scripts` plus
-  `allow-same-origin` can run the player without granting it the Xamt
-  origin's cookies.
+  Those hosts are cross-origin, so the player cannot read Xamt cookies.
+  We intentionally omit the HTML `sandbox` attribute: with sandbox, mobile
+  browsers (especially iOS Safari and in-app WebViews) block the player's
+  native fullscreen even when `allow-fullscreen` is listed.
   """
 
   alias Xamt.Messages
@@ -31,8 +32,7 @@ defmodule Xamt.Messages.LinkPreview do
   @aid_re ~r/^[0-9]{1,16}$/
   @book_path_re ~r/^\/books\/([A-Za-z0-9_-]{1,64})\/?$/
 
-  @iframe_sandbox "allow-scripts allow-same-origin allow-presentation"
-  @iframe_allow "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+  @iframe_allow "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share"
 
   @blocked_hosts MapSet.new([
                    "localhost",
@@ -45,15 +45,7 @@ defmodule Xamt.Messages.LinkPreview do
                  ])
 
   @doc """
-  Sandbox token list for third-party video iframes.
-
-  `allow-scripts` with `allow-same-origin` is safe only because `iframe_src/1`
-  never points at the application host.
-  """
-  def iframe_sandbox, do: @iframe_sandbox
-
-  @doc """
-  Feature policy for the video player. Playback only; no navigation or forms.
+  Feature policy for the video player. Playback and fullscreen only.
   """
   def iframe_allow, do: @iframe_allow
 
@@ -66,19 +58,19 @@ defmodule Xamt.Messages.LinkPreview do
   """
   def iframe_src(%{"type" => "video", "provider" => "YouTube", "video_id" => id}) do
     if youtube_id?(id) do
-      "https://www.youtube-nocookie.com/embed/#{id}"
+      "https://www.youtube-nocookie.com/embed/#{id}?playsinline=1&rel=0"
     end
   end
 
   def iframe_src(%{"type" => "video", "provider" => "Bilibili", "video_id" => "BV" <> _ = bvid}) do
     if Regex.match?(@bvid_re, bvid) do
-      "https://player.bilibili.com/player.html?bvid=#{bvid}&high_quality=1&danmaku=0&autoplay=0"
+      "https://player.bilibili.com/player.html?isOutside=true&bvid=#{bvid}&p=1&high_quality=1&danmaku=0&autoplay=0"
     end
   end
 
   def iframe_src(%{"type" => "video", "provider" => "Bilibili", "video_id" => "av" <> aid}) do
     if Regex.match?(@aid_re, aid) do
-      "https://player.bilibili.com/player.html?aid=#{aid}&high_quality=1&danmaku=0&autoplay=0"
+      "https://player.bilibili.com/player.html?isOutside=true&aid=#{aid}&p=1&high_quality=1&danmaku=0&autoplay=0"
     end
   end
 

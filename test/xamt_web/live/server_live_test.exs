@@ -884,15 +884,31 @@ defmodule XamtWeb.ServerLiveTest do
         "iframe_url" => "javascript:alert(1)"
       })
 
-    assert has_element?(
-             view,
-             "#msg-embed-frame-#{video.id}[sandbox='allow-scripts allow-same-origin allow-presentation']"
-           )
+    assert has_element?(view, "#msg-embed-frame-#{video.id}")
+    refute has_element?(view, "#msg-embed-frame-#{video.id}[sandbox]")
+    assert has_element?(view, "#msg-embed-open-#{video.id}")
 
     html = render(view)
-    assert html =~ "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"
+    assert html =~ "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?playsinline=1"
     assert html =~ "xamt-embed-island"
+    assert html =~ ~s(referrerpolicy="strict-origin-when-cross-origin")
     refute html =~ "javascript:"
+    refute html =~ "sandbox="
+
+    {:ok, _} =
+      Messages.put_link_preview(video, %{
+        "type" => "video",
+        "provider" => "Bilibili",
+        "video_id" => "BV1NgY5zUEiM",
+        "url" =>
+          "https://www.bilibili.com/video/BV1NgY5zUEiM/?share_source=copy_web&vd_source=afac77442229c491cfe53a1ce797831d",
+        "title" => "MGL斯琴布和"
+      })
+
+    html = render(view)
+    assert html =~ "isOutside=true"
+    assert html =~ "bvid=BV1NgY5zUEiM"
+    assert html =~ "Open original"
 
     {:ok, _} =
       Messages.put_link_preview(video, %{

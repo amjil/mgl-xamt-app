@@ -149,7 +149,7 @@ defmodule Xamt.Messages.LinkPreviewTest do
     }
 
     assert LinkPreview.iframe_src(youtube) ==
-             "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"
+             "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?playsinline=1&rel=0"
 
     assert LinkPreview.iframe_src(%{youtube | "video_id" => "short"}) == nil
     assert LinkPreview.iframe_src(%{youtube | "video_id" => "dQw4w9WgXcQ/evil"}) == nil
@@ -157,15 +157,15 @@ defmodule Xamt.Messages.LinkPreviewTest do
     assert LinkPreview.iframe_src(%{
              "type" => "video",
              "provider" => "Bilibili",
-             "video_id" => "BV1xx411c7mD"
+             "video_id" => "BV1NgY5zUEiM"
            }) ==
-             "https://player.bilibili.com/player.html?bvid=BV1xx411c7mD&high_quality=1&danmaku=0&autoplay=0"
+             "https://player.bilibili.com/player.html?isOutside=true&bvid=BV1NgY5zUEiM&p=1&high_quality=1&danmaku=0&autoplay=0"
 
     assert LinkPreview.iframe_src(%{
              "type" => "video",
              "provider" => "Bilibili",
              "video_id" => "av170001"
-           }) =~ "aid=170001"
+           }) =~ "isOutside=true&aid=170001"
 
     assert LinkPreview.audio_sample_url(%{
              "type" => "audio_book",
@@ -232,14 +232,15 @@ defmodule Xamt.Messages.LinkPreviewTest do
 
     {:ok, message} =
       Messages.create_message(scope, channel.id, %{
-        "content_html" => ~s(<p>https://www.bilibili.com/video/BV1xx411c7mD</p>),
+        "content_html" =>
+          ~s(<p> https://www.bilibili.com/video/BV1NgY5zUEiM/?share_source=copy_web&amp;vd_source=afac77442229c491cfe53a1ce797831d</p>),
         "content" => %{"type" => "rich_text"}
       })
 
     preview = Messages.get_message!(message.id).link_preview
     assert preview["type"] == "video"
     assert preview["provider"] == "Bilibili"
-    assert preview["video_id"] == "BV1xx411c7mD"
+    assert preview["video_id"] == "BV1NgY5zUEiM"
     assert preview["title"] == "Bilibili Title"
 
     {:ok, legacy} =

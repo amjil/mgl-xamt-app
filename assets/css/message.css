@@ -27,7 +27,9 @@
 .xamt-messages audio,
 .xamt-messages iframe,
 .xamt-messages .xamt-audio-player,
-.xamt-messages .xamt-embed-island {
+.xamt-messages .xamt-embed-island,
+.xamt-messages .xamt-embed-island *,
+.xamt-messages .xamt-embed-video {
   touch-action: auto;
 }
 
@@ -956,21 +958,39 @@ a.xamt-mention:hover {
 }
 
 .xamt-embed-video {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
   width: min(20rem, 70vh);
-  border-radius: 0.75rem;
-  overflow: hidden;
-  border: 1px solid var(--xamt-line);
-  background: #000;
-  box-shadow: var(--xamt-shadow);
+  max-width: 100%;
 }
 
 .xamt-embed-island iframe {
   display: block;
   width: 100%;
-  height: 11.25rem;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  min-height: 11.25rem;
   max-width: 100%;
   border: 0;
+  border-radius: 0.75rem;
   background: #000;
+  box-shadow: var(--xamt-shadow);
+  /* Avoid clipping the player's fullscreen chrome on mobile WebViews. */
+  overflow: visible;
+}
+
+.xamt-embed-video__open {
+  align-self: flex-start;
+  color: var(--xamt-muted);
+  font-size: 0.75rem;
+  line-height: 1.3;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+.xamt-embed-video__open:hover {
+  color: var(--xamt-accent);
 }
 
 .xamt-embed-audio {

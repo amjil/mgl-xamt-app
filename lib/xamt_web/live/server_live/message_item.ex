@@ -322,13 +322,24 @@ defmodule XamtWeb.ServerLive.MessageItem do
                       id={"msg-embed-frame-#{@message.id}"}
                       src={@embed_src}
                       title={@preview["title"] || gettext("Embedded video")}
-                      sandbox={LinkPreview.iframe_sandbox()}
                       allow={LinkPreview.iframe_allow()}
                       allowfullscreen
-                      referrerpolicy="no-referrer"
+                      webkitallowfullscreen
+                      mozallowfullscreen
+                      referrerpolicy="strict-origin-when-cross-origin"
                       loading="lazy"
                     >
                     </iframe>
+                    <a
+                      :if={@embed_href}
+                      id={"msg-embed-open-#{@message.id}"}
+                      href={@embed_href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="xamt-embed-video__open"
+                    >
+                      {gettext("Open original")}
+                    </a>
                   </div>
                 <% else %>
                   <%= if @preview["type"] == "audio_book" do %>
