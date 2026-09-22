@@ -110,6 +110,33 @@ defmodule Xamt.Accounts do
     User.profile_changeset(user, attrs, validate_unique: false)
   end
 
+  @custom_status_presets [
+    %{"emoji" => "🏍️", "text" => "Out on a motorcycle ride"},
+    %{"emoji" => "🚗", "text" => "On a road trip"},
+    %{"emoji" => "🎧", "text" => "Listening to an audiobook"}
+  ]
+
+  @doc """
+  Preset custom statuses for the picker UI.
+  """
+  def custom_status_presets, do: @custom_status_presets
+
+  @doc """
+  Updates a user's custom status (emoji + text).
+  """
+  def update_user_custom_status(user, attrs) do
+    user
+    |> User.custom_status_changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Returns a changeset for tracking custom status changes.
+  """
+  def change_user_custom_status(user, attrs \\ %{}) do
+    User.custom_status_changeset(user, attrs)
+  end
+
   @doc """
   Assigns a global role from the operator console or seeds.
 

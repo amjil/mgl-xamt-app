@@ -11,6 +11,7 @@ const SCROLL_CONTAINERS = [
   ".xamt-messages",
   ".xamt-rail__section",
   ".xamt-composer__editor",
+  ".xamt-composer-wrap--poll",
   ".xamt-upload-preview",
   ".xamt-settings-panel",
   ".xamt-sheet__body",

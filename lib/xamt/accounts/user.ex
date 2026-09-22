@@ -11,6 +11,8 @@ defmodule Xamt.Accounts.User do
     field :avatar, :string
     field :bio, :string
     field :status, :string, default: "offline"
+    field :status_emoji, :string
+    field :status_text, :string
     field :global_role, :string, default: "user"
     field :password, :string, virtual: true, redact: true
     field :hashed_password, :string, redact: true
@@ -75,6 +77,30 @@ defmodule Xamt.Accounts.User do
     |> validate_length(:bio, max: 500)
     |> validate_inclusion(:status, ~w(online idle dnd offline), message: "is invalid")
   end
+
+  @doc """
+  A changeset for updating the user's custom status (emoji + text).
+  Blank emoji and text clear the status to nil.
+  """
+  def custom_status_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:status_emoji, :status_text])
+    |> update_change(:status_emoji, &blank_to_nil/1)
+    |> update_change(:status_text, &blank_to_nil/1)
+    |> validate_length(:status_emoji, max: 10)
+    |> validate_length(:status_text, max: 50)
+  end
+
+  defp blank_to_nil(nil), do: nil
+
+  defp blank_to_nil(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp blank_to_nil(value), do: value
 
   defp validate_username(changeset, opts) do
     changeset =

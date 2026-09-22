@@ -577,6 +577,103 @@
   box-sizing: border-box;
 }
 
+/* Poll mode: capped column width; scroll block-axis (physical right) for more fields. */
+.xamt-composer-wrap--poll {
+  min-block-size: 12rem;
+  max-block-size: min(20rem, 50vw);
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.xamt-poll-composer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.85rem;
+  /* Grow along block axis (to the right); wrap scrolls, form does not nest-scroll. */
+  block-size: max-content;
+  inline-size: 100%;
+  width: max-content;
+  height: auto;
+  min-height: 0;
+  padding: 0.55rem 0.45rem;
+  border: 1px solid var(--xamt-line);
+  border-radius: 0.85rem;
+  background: var(--xamt-bg);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--xamt-shade) 12%, transparent);
+  overflow: visible;
+}
+
+.xamt-poll-composer__head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+
+.xamt-poll-composer__icon {
+  color: var(--xamt-accent);
+  flex: 0 0 auto;
+}
+
+.xamt-poll-composer__title {
+  font-weight: 650;
+  color: var(--xamt-text);
+}
+
+.xamt-poll-composer__options {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
+}
+
+.xamt-poll-composer__label {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--xamt-muted);
+}
+
+.xamt-poll-composer__option-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.xamt-poll-composer__option-row .xamt-field {
+  flex: 0 0 auto;
+}
+
+.xamt-poll-composer__add {
+  align-self: flex-start;
+}
+
+.xamt-poll-composer__actions {
+  /* In vertical-lr, row stacks top→bottom so Cancel + Send share one column. */
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin-block-start: 0.15rem;
+}
+
+.xamt-poll-composer__actions .xamt-btn {
+  flex: 0 0 auto;
+}
+
+/* Checkbox label follows Mongolian column too */
+.xamt-poll-composer .xamt-field .xamt-field__label {
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  font-family: var(--xamt-font-mongol);
+}
+
 .xamt-composer__peek {
   display: none;
 }
@@ -1095,6 +1192,169 @@
   max-width: min(32rem, calc(100vw - 2rem));
 }
 
+/* Poll voter details: slide in from the right, scroll along block axis. */
+.xamt-sheet--poll-details .xamt-sheet__frame {
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
+  padding: 0;
+}
+
+.xamt-sheet--poll-details .xamt-sheet__panel {
+  width: min(26rem, 92vw);
+  height: 100%;
+  max-height: none;
+  border-radius: 0;
+  border-left: 1px solid var(--xamt-line);
+  transform: translateX(100%);
+  opacity: 1;
+}
+
+.xamt-sheet--poll-details.is-open .xamt-sheet__panel {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+@media (min-width: 960px) {
+  .xamt-sheet--poll-details .xamt-sheet__frame {
+    display: flex;
+    justify-content: flex-end;
+    align-items: stretch;
+    padding: 0;
+  }
+
+  .xamt-sheet--poll-details .xamt-sheet__panel {
+    width: min(28rem, 40vw);
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+    transform: translateX(100%);
+    opacity: 1;
+  }
+
+  .xamt-sheet--poll-details.is-open .xamt-sheet__panel {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.xamt-poll-details {
+  gap: 0.85rem;
+  min-block-size: max-content;
+  padding-block-end: 1rem;
+}
+
+.xamt-poll-details__question {
+  margin: 0;
+  font-weight: 650;
+  color: var(--xamt-text);
+  max-inline-size: var(--xamt-field-extent);
+}
+
+.xamt-poll-details__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--xamt-muted);
+}
+
+.xamt-poll-details__total {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.xamt-poll-details__count {
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: sideways;
+  -webkit-text-orientation: sideways;
+  font-family: var(--xamt-font-ui);
+  font-weight: 600;
+  color: var(--xamt-text);
+}
+
+.xamt-poll-details__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.xamt-poll-details__option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.55rem 0.45rem;
+  border: 1px solid var(--xamt-line);
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, var(--xamt-bg) 80%, transparent);
+  min-inline-size: 0;
+}
+
+.xamt-poll-details__option-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.xamt-poll-details__option-text {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--xamt-text);
+}
+
+.xamt-poll-details__option-count {
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: sideways;
+  -webkit-text-orientation: sideways;
+  font-family: var(--xamt-font-ui);
+  font-size: 0.8rem;
+  color: var(--xamt-muted);
+}
+
+.xamt-poll-details__empty {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--xamt-muted);
+}
+
+.xamt-poll-details__voters {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+
+.xamt-poll-details__voter {
+  display: flex;
+  /* vertical-lr: row = top→bottom so avatar + name share one column. */
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.xamt-poll-details__avatar {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.xamt-poll-details__name {
+  font-size: 0.85rem;
+  color: var(--xamt-text);
+}
+
 .xamt-delete-reason__preview {
   color: var(--xamt-muted);
   font-size: 0.9rem;
@@ -1460,7 +1720,8 @@
 
   .xamt-composer-wrap .xamt-composer__field,
   .xamt-composer-wrap .xamt-upload-preview,
-  .xamt-composer-wrap .xamt-reply-bar {
+  .xamt-composer-wrap .xamt-reply-bar,
+  .xamt-composer-wrap .xamt-poll-composer {
     display: none;
   }
 
@@ -1523,6 +1784,25 @@
     pointer-events: auto;
   }
 
+  /* Poll open: same restore, but keep horizontal (block-axis) scroll. */
+  .xamt-composer-wrap.xamt-composer-wrap--poll {
+    position: relative;
+    inset: auto;
+    right: auto;
+    bottom: auto;
+    width: auto;
+    min-width: 0;
+    height: 100%;
+    max-block-size: min(20rem, 70vw);
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.5rem 0.4rem;
+    gap: 0.4rem;
+    border-left: 1px solid var(--xamt-line);
+    background: color-mix(in srgb, var(--xamt-bg-2) 72%, transparent);
+    pointer-events: auto;
+  }
+
   .xamt-composer-wrap:focus-within .xamt-composer__field,
   .xamt-composer-wrap:has(#message-composer.is-open) .xamt-composer__field,
   .xamt-composer-wrap[data-has-uploads="true"] .xamt-composer__field,
@@ -1531,8 +1811,13 @@
     display: flex;
   }
 
+  .xamt-composer-wrap.xamt-composer-wrap--poll .xamt-poll-composer {
+    display: flex;
+  }
+
   .xamt-composer-wrap:focus-within .xamt-composer__peek,
   .xamt-composer-wrap:has(#message-composer.is-open) .xamt-composer__peek,
+  .xamt-composer-wrap.xamt-composer-wrap--poll .xamt-composer__peek,
   .xamt-composer-wrap[data-has-uploads="true"] .xamt-composer__peek,
   .xamt-composer-wrap[data-editing-id] .xamt-composer__peek,
   .xamt-composer-wrap[data-reply-to-id] .xamt-composer__peek {
@@ -1541,11 +1826,13 @@
 
   .xamt-composer-wrap:focus-within .xamt-reply-bar,
   .xamt-composer-wrap:has(#message-composer.is-open) .xamt-reply-bar,
+  .xamt-composer-wrap.xamt-composer-wrap--poll .xamt-reply-bar,
   .xamt-composer-wrap[data-has-uploads="true"] .xamt-reply-bar,
   .xamt-composer-wrap[data-editing-id] .xamt-reply-bar,
   .xamt-composer-wrap[data-reply-to-id] .xamt-reply-bar,
   .xamt-composer-wrap:focus-within .xamt-upload-preview,
   .xamt-composer-wrap:has(#message-composer.is-open) .xamt-upload-preview,
+  .xamt-composer-wrap.xamt-composer-wrap--poll .xamt-upload-preview,
   .xamt-composer-wrap[data-has-uploads="true"] .xamt-upload-preview,
   .xamt-composer-wrap[data-editing-id] .xamt-upload-preview,
   .xamt-composer-wrap[data-reply-to-id] .xamt-upload-preview {

@@ -1,7 +1,7 @@
 defmodule XamtWeb.ServerLive do
   use XamtWeb, :live_view
 
-  alias Xamt.{Channels, Messages, Servers}
+  alias Xamt.{Accounts, Channels, Messages, Servers}
   alias Xamt.Channels.Channel
   alias Xamt.Servers.Permissions
   alias Xamt.Servers.Server
@@ -87,10 +87,14 @@ defmodule XamtWeb.ServerLive do
       |> assign(:editing_message_id, nil)
       |> assign(:replying_to, nil)
       |> assign(:deleting_message, nil)
+      |> assign(:composer_mode, :text)
+      |> assign(:poll_option_count, 2)
+      |> assign(:poll_details, nil)
       |> assign(:channel_form, to_form(Channels.change_channel(%Channel{}), as: :channel))
       |> assign_member_permissions(current_member)
       |> assign(:editing_channel, nil)
       |> assign(:show_server_menu, false)
+      |> assign(:show_status_picker, false)
       |> assign(:mobile_panel, :messages)
       |> assign(:mobile_search?, false)
       |> assign(:unread_channels, MapSet.new(unread_ids))
@@ -242,6 +246,95 @@ defmodule XamtWeb.ServerLive do
           {:noreply, put_flash(socket, :error, gettext("Could not send message"))}
       end
     end
+  end
+
+  def handle_event("open_poll_composer", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:composer_mode, :poll)
+     |> assign(:poll_option_count, 2)
+     |> assign(:editing_message_id, nil)}
+  end
+
+  def handle_event("cancel_poll_composer", _params, socket) do
+    {:noreply, assign(socket, :composer_mode, :text) |> assign(:poll_option_count, 2)}
+  end
+
+  def handle_event("add_poll_option", _params, socket) do
+    count = min(socket.assigns.poll_option_count + 1, 10)
+    {:noreply, assign(socket, :poll_option_count, count)}
+  end
+
+  def handle_event("remove_poll_option", _params, socket) do
+    count = max(socket.assigns.poll_option_count - 1, 2)
+    {:noreply, assign(socket, :poll_option_count, count)}
+  end
+
+  def handle_event("send_poll", %{"poll" => poll_params}, socket) do
+    scope = socket.assigns.current_scope
+    channel = socket.assigns.active_channel
+
+    attrs = %{
+      "question" => poll_params["question"],
+      "options" => List.wrap(poll_params["options"]),
+      "allow_multiple" => poll_params["allow_multiple"],
+      "results_open" => poll_params["results_open"],
+      "reply_to_id" => socket.assigns.replying_to && socket.assigns.replying_to.id
+    }
+
+    case Messages.create_poll_message(scope, channel.id, attrs) do
+      {:ok, _message} ->
+        {:noreply,
+         socket
+         |> assign(:composer_mode, :text)
+         |> assign(:poll_option_count, 2)
+         |> assign(:replying_to, nil)}
+
+      {:error, :rate_limited} ->
+        {:noreply, put_flash(socket, :error, gettext("Messages sent too fast"))}
+
+      {:error, :unauthorized} ->
+        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+
+      {:error, :invalid_poll} ->
+        {:noreply, put_flash(socket, :error, gettext("Poll needs a question and 2–10 options"))}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, gettext("Could not send poll"))}
+    end
+  end
+
+  def handle_event("cast_vote", %{"poll-id" => poll_id, "option-id" => option_id}, socket) do
+    case Messages.toggle_vote(socket.assigns.current_scope, poll_id, option_id) do
+      {:ok, _payload} ->
+        socket =
+          case socket.assigns.poll_details do
+            %{id: ^poll_id} -> refresh_poll_details(socket, poll_id)
+            _ -> socket
+          end
+
+        {:noreply, socket}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, gettext("Could not cast vote"))}
+    end
+  end
+
+  def handle_event("open_poll_details", %{"poll-id" => poll_id}, socket) do
+    case Messages.get_poll_details(socket.assigns.current_scope, poll_id) do
+      {:ok, details} ->
+        {:noreply, assign(socket, :poll_details, details)}
+
+      {:error, :forbidden} ->
+        {:noreply, put_flash(socket, :error, gettext("Only the poll author can see details"))}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, gettext("Could not load poll details"))}
+    end
+  end
+
+  def handle_event("close_poll_details", _params, socket) do
+    {:noreply, assign(socket, :poll_details, nil)}
   end
 
   def handle_event("edit_message", %{"id" => id}, socket) do
@@ -435,6 +528,7 @@ defmodule XamtWeb.ServerLive do
             |> assign(:oldest_message_info, oldest_message_info(grouped))
             |> assign(:has_more_messages, length(msgs) >= @message_page_size)
             |> merge_reactions(msgs)
+            |> merge_polls(msgs)
             |> stream(:messages, items, at: 0)
             |> maybe_done_loading("load_older", length(msgs) >= @message_page_size)
 
@@ -487,6 +581,29 @@ defmodule XamtWeb.ServerLive do
 
   def handle_event("close_server_menu", _params, socket) do
     {:noreply, assign(socket, :show_server_menu, false)}
+  end
+
+  def handle_event("open_status_picker", _params, socket) do
+    {:noreply, assign(socket, :show_status_picker, true)}
+  end
+
+  def handle_event("close_status_picker", _params, socket) do
+    {:noreply, assign(socket, :show_status_picker, false)}
+  end
+
+  def handle_event("set_status", %{"emoji" => emoji, "text" => text}, socket) do
+    apply_custom_status(socket, %{status_emoji: emoji, status_text: text})
+  end
+
+  def handle_event("clear_status", _params, socket) do
+    apply_custom_status(socket, %{status_emoji: nil, status_text: nil})
+  end
+
+  def handle_event("save_custom_status", params, socket) do
+    apply_custom_status(socket, %{
+      status_emoji: Map.get(params, "emoji"),
+      status_text: Map.get(params, "text")
+    })
   end
 
   def handle_event("save_channel", %{"channel" => params}, socket) do
@@ -691,6 +808,7 @@ defmodule XamtWeb.ServerLive do
           socket
           |> maybe_stream_date_divider(message)
           |> stream_insert(:messages, message)
+          |> merge_polls([message])
           |> assign(:last_message_info, last_info)
           |> assign(
             :header_flags,
@@ -739,6 +857,44 @@ defmodule XamtWeb.ServerLive do
     end
   end
 
+  def handle_info({:poll_updated, payload}, socket) do
+    active = socket.assigns.active_channel
+
+    if active && payload.channel_id == active.id do
+      poll = payload.poll
+      options_data = Enum.map(poll.options, &%{id: &1.id, count: &1.votes_count})
+      total_votes = Enum.sum(Enum.map(options_data, & &1.count))
+      mine? = payload.user_id == socket.assigns.current_scope.user.id
+
+      event = %{
+        poll_id: poll.id,
+        total_votes: total_votes,
+        options: options_data
+      }
+
+      event =
+        if mine? do
+          Map.put(event, :selected_option_ids, poll.selected_option_ids)
+        else
+          event
+        end
+
+      socket =
+        socket
+        |> assign(
+          :polls,
+          Map.put(socket.assigns.polls, payload.message_id, %{poll | selected_option_ids: []})
+        )
+        |> maybe_patch_my_poll_votes(payload)
+        |> maybe_refresh_open_poll_details(poll.id)
+        |> push_event("update_poll_chart", event)
+
+      {:noreply, socket}
+    else
+      {:noreply, socket}
+    end
+  end
+
   def handle_info({:deleted_message, message}, socket) do
     if active_channel_message?(socket, message) do
       {:noreply,
@@ -773,6 +929,15 @@ defmodule XamtWeb.ServerLive do
     else
       {:noreply, socket}
     end
+  end
+
+  def handle_info({:custom_status_changed, user_id, emoji, text}, socket) do
+    {:noreply,
+     push_event(socket, "sync_status_badges", %{
+       user_id: to_string(user_id),
+       emoji: emoji,
+       text: text
+     })}
   end
 
   @impl true
@@ -869,7 +1034,63 @@ defmodule XamtWeb.ServerLive do
     |> assign(:has_more_messages, length(messages) >= @message_page_size)
     |> assign(:messages_empty?, messages == [])
     |> assign(:reactions, Messages.reaction_summary(Enum.map(messages, & &1.id)))
+    |> assign_polls(messages)
     |> stream(:messages, items, reset: true)
+  end
+
+  defp assign_polls(socket, messages) do
+    ids = Enum.map(messages, & &1.id)
+    polls = Messages.poll_summary(ids)
+    poll_ids = polls |> Map.values() |> Enum.map(& &1.id)
+    user_id = socket.assigns.current_scope.user.id
+    my_votes = Messages.poll_votes_for_user(user_id, poll_ids)
+
+    socket
+    |> assign(:polls, polls)
+    |> assign(:my_poll_votes, my_votes)
+  end
+
+  defp merge_polls(socket, messages) do
+    ids = Enum.map(messages, & &1.id)
+    summary = Messages.poll_summary(ids)
+
+    if summary == %{} do
+      socket
+    else
+      poll_ids = summary |> Map.values() |> Enum.map(& &1.id)
+      user_id = socket.assigns.current_scope.user.id
+      my_votes = Messages.poll_votes_for_user(user_id, poll_ids)
+
+      socket
+      |> assign(:polls, Map.merge(socket.assigns.polls, summary))
+      |> assign(:my_poll_votes, Map.merge(socket.assigns.my_poll_votes, my_votes))
+    end
+  end
+
+  defp maybe_patch_my_poll_votes(socket, %{user_id: user_id, poll: poll}) do
+    if socket.assigns.current_scope.user.id == user_id do
+      assign(
+        socket,
+        :my_poll_votes,
+        Map.put(socket.assigns.my_poll_votes, poll.id, MapSet.new(poll.selected_option_ids))
+      )
+    else
+      socket
+    end
+  end
+
+  defp maybe_refresh_open_poll_details(socket, poll_id) do
+    case socket.assigns[:poll_details] do
+      %{id: ^poll_id} -> refresh_poll_details(socket, poll_id)
+      _ -> socket
+    end
+  end
+
+  defp refresh_poll_details(socket, poll_id) do
+    case Messages.get_poll_details(socket.assigns.current_scope, poll_id) do
+      {:ok, details} -> assign(socket, :poll_details, details)
+      _ -> socket
+    end
   end
 
   defp tag_incoming_message(socket, message) do
@@ -998,6 +1219,9 @@ defmodule XamtWeb.ServerLive do
     |> assign(:editing_message_id, nil)
     |> assign(:replying_to, nil)
     |> assign(:deleting_message, nil)
+    |> assign(:composer_mode, :text)
+    |> assign(:poll_option_count, 2)
+    |> assign(:poll_details, nil)
     |> assign(:mobile_panel, :messages)
     |> assign(:search_q, "")
     |> assign(:search_results, nil)
@@ -1166,17 +1390,54 @@ defmodule XamtWeb.ServerLive do
   defp channel_topic(%Channel{id: id}), do: "xamt:channel:#{id}"
   defp channel_topic(nil), do: "xamt:channel:none"
 
+  defp apply_custom_status(socket, attrs) do
+    user = socket.assigns.current_scope.user
+
+    case Accounts.update_user_custom_status(user, attrs) do
+      {:ok, updated_user} ->
+        channel = socket.assigns.active_channel
+        topic = channel_topic(channel)
+        emoji = updated_user.status_emoji
+        text = updated_user.status_text
+
+        if connected?(socket) and channel do
+          Presence.update_user_status(self(), topic, updated_user, %{
+            status_emoji: emoji,
+            status_text: text
+          })
+
+          Phoenix.PubSub.broadcast(
+            Xamt.PubSub,
+            topic,
+            {:custom_status_changed, updated_user.id, emoji, text}
+          )
+        end
+
+        {:noreply,
+         socket
+         |> assign(:current_scope, %{socket.assigns.current_scope | user: updated_user})
+         |> assign(:online_users, list_online(channel))
+         |> assign(:show_status_picker, false)}
+
+      {:error, _changeset} ->
+        {:noreply, put_flash(socket, :error, gettext("Could not update status"))}
+    end
+  end
+
   defp list_online(nil), do: []
 
   defp list_online(channel) do
     Presence.list(channel_topic(channel))
-    |> Enum.map(fn {_id, %{metas: metas}} ->
+    |> Enum.map(fn {id, %{metas: metas}} ->
       meta = List.first(metas) || %{}
 
       %{
+        id: id,
         display_name: presence_meta(meta, :display_name) || presence_meta(meta, :username) || "?",
         username: presence_meta(meta, :username),
-        avatar: presence_meta(meta, :avatar)
+        avatar: presence_meta(meta, :avatar),
+        status_emoji: presence_meta(meta, :status_emoji),
+        status_text: presence_meta(meta, :status_text)
       }
     end)
   end

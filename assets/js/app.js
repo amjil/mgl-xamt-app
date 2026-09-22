@@ -90,6 +90,75 @@ window.addEventListener("xamt:highlight", (event) => {
   }
 })
 
+// Channel-scoped custom status badges — patch DOM without re-streaming messages.
+window.addEventListener("phx:sync_status_badges", (event) => {
+  const {user_id: userId, emoji, text} = event.detail || {}
+  if (!userId) return
+
+  document
+    .querySelectorAll(`.status-badge-container[data-user-id="${CSS.escape(String(userId))}"]`)
+    .forEach((container) => {
+      container.replaceChildren()
+
+      if (!emoji) return
+
+      const badge = document.createElement("span")
+      badge.className = "xamt-status-badge is-pop"
+
+      const emojiEl = document.createElement("span")
+      emojiEl.className = "xamt-status-badge__emoji"
+      emojiEl.setAttribute("aria-hidden", "true")
+      emojiEl.textContent = emoji
+      badge.appendChild(emojiEl)
+
+      if (text) {
+        const tip = document.createElement("span")
+        tip.className = "xamt-status-badge__tip mongol-text"
+        tip.textContent = text
+        badge.appendChild(tip)
+      }
+
+      container.appendChild(badge)
+      window.setTimeout(() => badge.classList.remove("is-pop"), 320)
+    })
+})
+
+// Poll bar chart — animate widths without re-streaming the message article.
+window.addEventListener("phx:update_poll_chart", (event) => {
+  const {poll_id: pollId, total_votes: totalVotes, options, selected_option_ids: selected} =
+    event.detail || {}
+  if (!pollId || !Array.isArray(options)) return
+
+  const pollContainer = document.getElementById(`poll-${pollId}`)
+  if (!pollContainer) return
+
+  const card = pollContainer.closest(".xamt-poll")
+  const totalEl = card?.querySelector(".poll-total-count")
+  if (totalEl) totalEl.textContent = String(totalVotes ?? 0)
+
+  const denom = Math.max(Number(totalVotes) || 0, 1)
+
+  options.forEach((opt) => {
+    const percent = Math.round((Number(opt.count) / denom) * 100)
+    const bar = pollContainer.querySelector(`.poll-bar[data-option-id="${CSS.escape(opt.id)}"]`)
+    const text = pollContainer.querySelector(
+      `.poll-percent[data-option-id="${CSS.escape(opt.id)}"]`
+    )
+    if (bar) bar.style.setProperty("--poll-pct", `${percent}%`)
+    if (text) text.textContent = `${percent}%`
+  })
+
+  if (Array.isArray(selected)) {
+    const selectedSet = new Set(selected)
+    pollContainer.querySelectorAll(".xamt-poll__option").forEach((row) => {
+      const btn = row.querySelector("[data-option-id], .poll-percent")
+      const optionId = btn?.getAttribute("data-option-id")
+      if (!optionId) return
+      row.classList.toggle("is-selected", selectedSet.has(optionId))
+    })
+  }
+})
+
 // Native click keeps the user-activation token that clipboard APIs require.
 // Capture phase so a LiveView handler cannot swallow the event before we copy.
 window.addEventListener(

@@ -443,4 +443,51 @@ defmodule Xamt.AccountsTest do
       refute Ecto.Changeset.get_change(changeset, :global_role)
     end
   end
+
+  describe "update_user_custom_status/2" do
+    test "sets emoji and text" do
+      user = user_fixture()
+
+      assert {:ok, updated} =
+               Accounts.update_user_custom_status(user, %{
+                 status_emoji: "🎧",
+                 status_text: "Listening to an audiobook"
+               })
+
+      assert updated.status_emoji == "🎧"
+      assert updated.status_text == "Listening to an audiobook"
+    end
+
+    test "clears blank values to nil" do
+      user = user_fixture()
+
+      {:ok, user} =
+        Accounts.update_user_custom_status(user, %{
+          status_emoji: "🚗",
+          status_text: "On a road trip"
+        })
+
+      assert {:ok, cleared} =
+               Accounts.update_user_custom_status(user, %{
+                 status_emoji: "  ",
+                 status_text: ""
+               })
+
+      assert cleared.status_emoji == nil
+      assert cleared.status_text == nil
+    end
+
+    test "rejects status text longer than 50 characters" do
+      user = user_fixture()
+      long = String.duplicate("a", 51)
+
+      assert {:error, changeset} =
+               Accounts.update_user_custom_status(user, %{
+                 status_emoji: "😀",
+                 status_text: long
+               })
+
+      assert "should be at most 50 character(s)" in errors_on(changeset).status_text
+    end
+  end
 end

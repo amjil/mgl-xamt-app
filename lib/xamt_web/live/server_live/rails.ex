@@ -138,7 +138,12 @@ defmodule XamtWeb.ServerLive.Rails do
           <h3 class="xamt-rail__section-head mongol-text">{gettext("Online")}</h3>
           <ul class="xamt-member-list">
             <li :for={user <- @online_users} class="xamt-member">
-              <.avatar user={user} class="xamt-avatar xamt-avatar--sm" />
+              <.status_avatar
+                user={user}
+                id={"online-avatar-#{user.id}"}
+                class="xamt-avatar xamt-avatar--sm"
+                clickable?={own_presence_user?(user, @current_scope.user)}
+              />
               <span class="xamt-presence is-online"></span>
               <span class="mongol-text">{user.display_name}</span>
             </li>
@@ -147,7 +152,12 @@ defmodule XamtWeb.ServerLive.Rails do
           <h3 class="xamt-rail__section-head mongol-text">{gettext("Members")}</h3>
           <ul id="server-members-list" class="xamt-member-list" phx-update="stream">
             <li :for={{dom_id, member} <- @streams.members} id={dom_id} class="xamt-member">
-              <.avatar user={member.user} class="xamt-avatar xamt-avatar--sm" />
+              <.status_avatar
+                user={member.user}
+                id={"member-avatar-#{member.user_id}"}
+                class="xamt-avatar xamt-avatar--sm"
+                clickable?={member.user_id == @current_scope.user.id}
+              />
               <span class="xamt-presence"></span>
               <span class="mongol-text">{display_name(member.user)}</span>
               <span :if={member.role != "member"} class="xamt-role">

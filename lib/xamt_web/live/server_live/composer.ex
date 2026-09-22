@@ -14,9 +14,13 @@ defmodule XamtWeb.ServerLive.Composer do
 
     <div
       id="message-composer-wrap"
-      class="xamt-composer-wrap"
+      class={[
+        "xamt-composer-wrap",
+        @composer_mode == :poll && "xamt-composer-wrap--poll"
+      ]}
       phx-drop-target={@uploads.media.ref}
       data-has-uploads={to_string(@uploads.media.entries != [])}
+      data-composer-mode={@composer_mode}
       data-submit-event={if @editing_message_id, do: "update_message", else: "send_message"}
       data-editing-id={@editing_message_id}
       data-channel-id={@active_channel && @active_channel.id}
@@ -77,73 +81,187 @@ defmodule XamtWeb.ServerLive.Composer do
         <.live_file_input upload={@uploads.media} />
       </form>
 
-      <div class="xamt-composer__field">
-        <div id="message-composer" phx-hook="MessageComposer" phx-update="ignore">
-          <div class="xamt-composer__editor" id="composer-editor-host"></div>
-        </div>
+      <%= if @composer_mode == :poll do %>
+        <.form
+          for={%{}}
+          as={:poll}
+          id="poll-composer-form"
+          class="xamt-form xamt-form--vertical xamt-poll-composer"
+          phx-submit="send_poll"
+        >
+          <div class="xamt-poll-composer__head">
+            <.icon name="hero-chart-bar" class="size-5 xamt-poll-composer__icon" />
+            <span class="xamt-poll-composer__title mongol-text">{gettext("Create a poll")}</span>
+          </div>
 
-        <div id="composer-toolbar" class="xamt-composer__toolbar">
-          <label
-            for={@uploads.media.ref}
-            class="xamt-btn xamt-btn--soft"
-            title={gettext("Upload Media")}
-            aria-label={gettext("Upload Media")}
-          >
-            <.icon name="hero-photo" class="size-4" />
-          </label>
-          <form
-            id="audio-form"
-            phx-change="validate_audio"
-            phx-submit="send_audio"
-            phx-hook="AudioRecorder"
-            data-mic-error={gettext("Microphone access is required to record")}
-            data-mic-unsupported={gettext("Voice recording is not supported in this browser")}
-            data-mic-insecure={
-              gettext(
-                "Voice recording needs HTTPS. Open https://dev1:4001 on this phone and allow the microphone."
-              )
-            }
-            data-mic-empty={gettext("Recording was empty")}
-            data-mic-upload-error={gettext("Could not upload voice message")}
-          >
-            <.live_file_input upload={@uploads.audio} class="hidden" />
+          <.input
+            id="poll-question"
+            name="poll[question]"
+            type="text"
+            label={gettext("Question")}
+            value=""
+            required
+            maxlength="280"
+            placeholder={gettext("Ask a question…")}
+            phx-hook="MongolianIME"
+            class="xamt-input mongol-input"
+            autocomplete="off"
+          />
+
+          <div class="xamt-poll-composer__options">
+            <p class="xamt-poll-composer__label mongol-text">{gettext("Options")}</p>
+            <div
+              :for={i <- 0..(@poll_option_count - 1)}
+              class="xamt-poll-composer__option-row"
+            >
+              <.input
+                id={"poll-option-#{i}"}
+                name="poll[options][]"
+                type="text"
+                value=""
+                required={i < 2}
+                maxlength="120"
+                placeholder={gettext("Option %{n}", n: i + 1)}
+                phx-hook="MongolianIME"
+                class="xamt-input mongol-input"
+                autocomplete="off"
+              />
+              <button
+                :if={@poll_option_count > 2 and i >= 2}
+                type="button"
+                id={"remove-poll-option-#{i}"}
+                class="xamt-icon-btn"
+                phx-click="remove_poll_option"
+                aria-label={gettext("Remove option")}
+              >
+                <.icon name="hero-x-mark" class="size-4" />
+              </button>
+            </div>
+            <button
+              :if={@poll_option_count < 10}
+              type="button"
+              id="add-poll-option"
+              class="xamt-btn xamt-btn--soft xamt-poll-composer__add mongol-text"
+              phx-click="add_poll_option"
+            >
+              <.icon name="hero-plus" class="size-4" />
+              {gettext("Add option")}
+            </button>
+          </div>
+
+          <.input
+            id="poll-allow-multiple"
+            name="poll[allow_multiple]"
+            type="checkbox"
+            value="true"
+            checked={false}
+            label={gettext("Allow multiple answers")}
+          />
+
+          <.input
+            id="poll-results-open"
+            name="poll[results_open]"
+            type="checkbox"
+            value="true"
+            checked={true}
+            label={gettext("Open results (anyone can see who voted)")}
+          />
+
+          <div class="xamt-poll-composer__actions">
             <button
               type="button"
-              id="btn-record"
-              class="xamt-btn xamt-btn--soft xamt-record-btn"
-              title={gettext("Record voice message")}
-              aria-label={gettext("Record voice message")}
-              aria-pressed="false"
+              id="cancel-poll-composer"
+              class="xamt-btn xamt-btn--soft mongol-text"
+              phx-click="cancel_poll_composer"
             >
-              <.icon name="hero-microphone" class="size-4" />
+              {gettext("Cancel")}
             </button>
-          </form>
-          <button
-            :if={@editing_message_id}
-            type="button"
-            id="composer-cancel-edit"
-            class="xamt-btn xamt-btn--soft"
-            phx-click="cancel_edit"
-            title={gettext("Cancel")}
-            aria-label={gettext("Cancel")}
-          >
-            <.icon name="hero-x-mark" class="size-4" />
-          </button>
-          <button
-            type="button"
-            id="composer-send"
-            class="xamt-btn xamt-btn--primary"
-            data-composer-send
-            title={if @editing_message_id, do: gettext("Save"), else: gettext("Send")}
-            aria-label={if @editing_message_id, do: gettext("Save"), else: gettext("Send")}
-          >
-            <.icon
-              name={if @editing_message_id, do: "hero-check", else: "hero-paper-airplane"}
-              class="size-4"
-            />
-          </button>
+            <button type="submit" id="send-poll" class="xamt-btn xamt-btn--primary mongol-text">
+              <.icon name="hero-paper-airplane" class="size-4" />
+              {gettext("Send poll")}
+            </button>
+          </div>
+        </.form>
+      <% else %>
+        <div class="xamt-composer__field">
+          <div id="message-composer" phx-hook="MessageComposer" phx-update="ignore">
+            <div class="xamt-composer__editor" id="composer-editor-host"></div>
+          </div>
+
+          <div id="composer-toolbar" class="xamt-composer__toolbar">
+            <button
+              type="button"
+              id="composer-poll"
+              class="xamt-btn xamt-btn--soft"
+              phx-click="open_poll_composer"
+              title={gettext("Create a poll")}
+              aria-label={gettext("Create a poll")}
+              disabled={not is_nil(@editing_message_id)}
+            >
+              <.icon name="hero-chart-bar" class="size-4" />
+            </button>
+            <label
+              for={@uploads.media.ref}
+              class="xamt-btn xamt-btn--soft"
+              title={gettext("Upload Media")}
+              aria-label={gettext("Upload Media")}
+            >
+              <.icon name="hero-photo" class="size-4" />
+            </label>
+            <form
+              id="audio-form"
+              phx-change="validate_audio"
+              phx-submit="send_audio"
+              phx-hook="AudioRecorder"
+              data-mic-error={gettext("Microphone access is required to record")}
+              data-mic-unsupported={gettext("Voice recording is not supported in this browser")}
+              data-mic-insecure={
+                gettext(
+                  "Voice recording needs HTTPS. Open https://dev1:4001 on this phone and allow the microphone."
+                )
+              }
+              data-mic-empty={gettext("Recording was empty")}
+              data-mic-upload-error={gettext("Could not upload voice message")}
+            >
+              <.live_file_input upload={@uploads.audio} class="hidden" />
+              <button
+                type="button"
+                id="btn-record"
+                class="xamt-btn xamt-btn--soft xamt-record-btn"
+                title={gettext("Record voice message")}
+                aria-label={gettext("Record voice message")}
+                aria-pressed="false"
+              >
+                <.icon name="hero-microphone" class="size-4" />
+              </button>
+            </form>
+            <button
+              :if={@editing_message_id}
+              type="button"
+              id="composer-cancel-edit"
+              class="xamt-btn xamt-btn--soft"
+              phx-click="cancel_edit"
+              title={gettext("Cancel")}
+              aria-label={gettext("Cancel")}
+            >
+              <.icon name="hero-x-mark" class="size-4" />
+            </button>
+            <button
+              type="button"
+              id="composer-send"
+              class="xamt-btn xamt-btn--primary"
+              data-composer-send
+              title={if @editing_message_id, do: gettext("Save"), else: gettext("Send")}
+              aria-label={if @editing_message_id, do: gettext("Save"), else: gettext("Send")}
+            >
+              <.icon
+                name={if @editing_message_id, do: "hero-check", else: "hero-paper-airplane"}
+                class="size-4"
+              />
+            </button>
+          </div>
         </div>
-      </div>
+      <% end %>
     </div>
     """
   end

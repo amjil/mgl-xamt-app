@@ -73,6 +73,8 @@ defmodule XamtWeb.ServerLive.MessageList do
               editing_message_id={@editing_message_id}
               can_manage_messages?={@can_manage_messages?}
               reactions={@reactions}
+              polls={@polls}
+              my_poll_votes={@my_poll_votes}
               timezone_offset={@timezone_offset}
             />
           <% end %>

@@ -79,6 +79,86 @@ defmodule XamtWeb.ServerLive.Overlays do
     """
   end
 
+  attr :current_user, :map, required: true
+
+  def status_picker_overlay(assigns) do
+    ~H"""
+    <.drawer
+      id="status-picker-drawer"
+      class="xamt-sheet--menu xamt-sheet--status"
+      show
+      on_cancel={JS.push("close_status_picker")}
+    >
+      <div class="xamt-sheet-form xamt-status-picker">
+        <h2 id="status-picker-title" class="xamt-section-title mongol-text">
+          {gettext("Set custom status")}
+        </h2>
+
+        <div class="xamt-status-picker__presets" role="list">
+          <button
+            :for={{preset, idx} <- Enum.with_index(Xamt.Accounts.custom_status_presets())}
+            type="button"
+            id={"status-preset-#{idx}"}
+            class="xamt-status-btn"
+            phx-click="set_status"
+            phx-value-emoji={preset["emoji"]}
+            phx-value-text={preset["text"]}
+          >
+            <span class="xamt-status-btn__emoji xamt-upright" aria-hidden="true">
+              {preset["emoji"]}
+            </span>
+            <span class="xamt-status-btn__text mongol-text">{preset["text"]}</span>
+          </button>
+
+          <button
+            type="button"
+            id="status-clear"
+            class="xamt-status-btn xamt-status-btn--clear mongol-text"
+            phx-click="clear_status"
+          >
+            {gettext("Clear status")}
+          </button>
+        </div>
+
+        <form
+          id="status-custom-form"
+          phx-submit="save_custom_status"
+          class="xamt-form xamt-form--vertical xamt-status-picker__form"
+        >
+          <input
+            type="text"
+            name="emoji"
+            id="status-custom-emoji"
+            value={@current_user.status_emoji}
+            placeholder="😀"
+            maxlength="10"
+            class="xamt-input xamt-status-picker__emoji"
+            autocomplete="off"
+          />
+          <input
+            type="text"
+            name="text"
+            id="status-custom-text"
+            value={@current_user.status_text}
+            placeholder={gettext("Say something...")}
+            maxlength="50"
+            class="xamt-input mongol-input xamt-status-picker__text"
+            phx-hook="MongolianIME"
+            autocomplete="off"
+          />
+          <button
+            type="submit"
+            id="status-custom-save"
+            class="xamt-btn xamt-btn--primary mongol-text"
+          >
+            {gettext("Save")}
+          </button>
+        </form>
+      </div>
+    </.drawer>
+    """
+  end
+
   attr :server, :map, required: true
   attr :active_channel, :map, required: true
   attr :can_manage_channels?, :boolean, default: false
@@ -194,6 +274,70 @@ defmodule XamtWeb.ServerLive.Overlays do
         </div>
       </.form>
     </div>
+    """
+  end
+
+  attr :poll, :map, required: true
+
+  def poll_details_overlay(assigns) do
+    ~H"""
+    <.drawer
+      id="poll-details-drawer"
+      class="xamt-sheet--poll-details"
+      show
+      on_cancel={JS.push("close_poll_details")}
+    >
+      <div class="xamt-sheet-form xamt-poll-details">
+        <h2 id="poll-details-title" class="xamt-section-title mongol-text">
+          {gettext("Poll details")}
+        </h2>
+        <p class="xamt-poll-details__question mongol-text">{@poll.question}</p>
+        <p class="xamt-poll-details__meta">
+          <span class="mongol-text">
+            {if @poll.allow_multiple,
+              do: gettext("Multiple answers"),
+              else: gettext("Single answer")}
+          </span>
+          <span class="xamt-poll-details__total">
+            <span class="mongol-text">{gettext("Total")}</span>
+            <span class="xamt-poll-details__count">{@poll.total_votes}</span>
+          </span>
+        </p>
+
+        <div id="poll-details-body" class="xamt-poll-details__body">
+          <section
+            :for={option <- @poll.options}
+            id={"poll-details-option-#{option.id}"}
+            class="xamt-poll-details__option"
+          >
+            <header class="xamt-poll-details__option-head">
+              <h3 class="xamt-poll-details__option-text mongol-text">{option.text}</h3>
+              <span class="xamt-poll-details__option-count">{option.votes_count}</span>
+            </header>
+
+            <p
+              :if={option.voters == []}
+              class="xamt-poll-details__empty mongol-text"
+            >
+              {gettext("No votes yet")}
+            </p>
+
+            <ul :if={option.voters != []} class="xamt-poll-details__voters">
+              <li
+                :for={voter <- option.voters}
+                id={"poll-voter-#{option.id}-#{voter.id}"}
+                class="xamt-poll-details__voter"
+              >
+                <.status_avatar user={voter} class="xamt-poll-details__avatar" />
+                <span class="xamt-poll-details__name mongol-text">
+                  {voter.display_name || voter.username}
+                </span>
+              </li>
+            </ul>
+          </section>
+        </div>
+      </div>
+    </.drawer>
     """
   end
 end

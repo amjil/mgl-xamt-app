@@ -478,3 +478,84 @@ input[type="tel"] {
   gap: 0.75rem;
 }
 
+
+/* Custom status picker — vertical-lr Mongolian sheet / settings surface */
+.xamt-status-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.xamt-status-picker__presets {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+
+.xamt-status-btn {
+  appearance: none;
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 6.5rem;
+  height: 100%;
+  padding: 0.55rem 0.45rem;
+  border-radius: 0.55rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--xamt-text);
+  cursor: pointer;
+  font: inherit;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.xamt-status-btn:hover {
+  background: var(--xamt-bg-3);
+  border-color: var(--xamt-line);
+}
+
+.xamt-status-btn__emoji {
+  font-size: 1.15rem;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+.xamt-status-btn__text {
+  flex: 0 1 auto;
+  max-block-size: 14rem;
+}
+
+.xamt-status-btn--clear {
+  color: #c45c5c;
+  min-height: 4.5rem;
+}
+
+.xamt-status-picker__form {
+  box-shadow: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+.xamt-status-picker__emoji {
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  font-family: var(--xamt-font-ui);
+  text-align: center;
+  width: 2.75rem;
+  block-size: 2.75rem;
+  inline-size: 2.75rem;
+  flex: 0 0 auto;
+  padding: 0.35rem;
+}

@@ -381,6 +381,121 @@
   color: var(--xamt-accent-2);
 }
 
+.xamt-avatar-wrap {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.xamt-avatar-wrap:hover,
+.xamt-avatar-wrap:has(.xamt-status-badge:hover) {
+  z-index: 5;
+}
+
+.xamt-status-avatar-btn {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+}
+
+.xamt-status-avatar-btn:hover {
+  filter: brightness(1.06);
+}
+
+.xamt-status-avatar-btn:focus-visible {
+  outline: 2px solid var(--xamt-accent-2);
+  outline-offset: 2px;
+}
+
+.status-badge-container {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.xamt-status-badge {
+  position: absolute;
+  bottom: -0.2rem;
+  right: -0.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  font-size: 0.7rem;
+  line-height: 1;
+  background: var(--xamt-bg);
+  border: 2px solid var(--xamt-bg-2);
+  border-radius: 999px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  z-index: 2;
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  pointer-events: auto;
+}
+
+.xamt-status-badge__emoji {
+  line-height: 1;
+}
+
+.xamt-status-badge__tip {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 50%;
+  transform: translateX(-50%);
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  font-family: var(--xamt-font-mongol);
+  font-size: 0.78rem;
+  line-height: 1.65;
+  letter-spacing: 0.04em;
+  max-block-size: 12rem;
+  padding: 0.4rem 0.35rem;
+  border-radius: 0.45rem;
+  background: var(--xamt-text);
+  color: var(--xamt-bg);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 30;
+  transition: opacity 160ms ease;
+}
+
+.xamt-avatar-wrap:hover .xamt-status-badge__tip,
+.xamt-status-badge:hover .xamt-status-badge__tip,
+.xamt-status-badge:focus-within .xamt-status-badge__tip {
+  opacity: 1;
+}
+
+.xamt-status-badge.is-pop {
+  animation: xamt-status-pop 280ms ease-out;
+}
+
+@keyframes xamt-status-pop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 .xamt-message__body {
   display: flex;
   flex-direction: column;
@@ -1103,5 +1218,193 @@ a.xamt-mention:hover {
   color: rgb(255 255 255 / 0.5);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
+}
+
+/* Inline poll — vertical-lr Mongolian card; bar fill uses --poll-pct on inline axis */
+.xamt-poll {
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  font-family: var(--xamt-font-mongol);
+  inline-size: min(16rem, calc(var(--xamt-vh) - 6rem));
+  max-inline-size: 100%;
+  block-size: auto;
+  margin-inline-start: 0.35rem;
+  padding: 0.75rem 0.65rem;
+  border: 1px solid var(--xamt-line);
+  border-radius: 0.85rem;
+  background: var(--xamt-bg-2);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--xamt-shade) 10%, transparent);
+}
+
+.xamt-poll__head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin-block-end: 0.65rem;
+}
+
+.xamt-poll__icon {
+  flex: 0 0 auto;
+  color: var(--xamt-accent);
+}
+
+.xamt-poll__question {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 650;
+  line-height: 1.75;
+  color: var(--xamt-text);
+  max-inline-size: 100%;
+}
+
+.xamt-poll__details {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--xamt-line);
+  border-radius: 0.55rem;
+  background: color-mix(in srgb, var(--xamt-accent) 12%, transparent);
+  color: var(--xamt-accent);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.xamt-poll__details:hover {
+  border-color: var(--xamt-accent);
+  background: color-mix(in srgb, var(--xamt-accent) 22%, transparent);
+  color: var(--xamt-text);
+}
+
+.xamt-poll__options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.xamt-poll__option {
+  position: relative;
+  display: flex;
+  /* Box (text+bar) then percent below in vertical-lr. */
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.35rem;
+  inline-size: auto;
+  max-inline-size: 100%;
+}
+
+.xamt-poll__btn {
+  position: relative;
+  z-index: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  width: auto;
+  height: auto;
+  /* Wider option column so Mongolian text fits. */
+  block-size: 3.25rem;
+  inline-size: auto;
+  min-inline-size: 9rem;
+  max-inline-size: min(16rem, calc(var(--xamt-vh) - 6rem));
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--xamt-line-strong, var(--xamt-line));
+  border-radius: 0.55rem;
+  background: color-mix(in srgb, var(--xamt-bg) 70%, transparent);
+  color: var(--xamt-text);
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.xamt-poll__btn:hover {
+  border-color: var(--xamt-accent);
+}
+
+.xamt-poll__option.is-selected .xamt-poll__btn {
+  border-color: var(--xamt-accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--xamt-accent) 40%, transparent);
+}
+
+.xamt-poll__option-text {
+  position: relative;
+  z-index: 1;
+  font-weight: 600;
+  font-size: 0.9rem;
+  line-height: 1.75;
+  color: var(--xamt-text);
+  max-inline-size: 100%;
+  overflow: visible;
+  white-space: normal;
+  text-align: start;
+}
+
+.xamt-poll__percent {
+  display: block;
+  flex: 0 0 auto;
+  margin-block-start: 0.15rem;
+  font-size: 0.8rem;
+  color: var(--xamt-muted);
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: sideways;
+  -webkit-text-orientation: sideways;
+  font-family: var(--xamt-font-ui);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.xamt-poll__bar {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  inset-block-end: 0;
+  z-index: 0;
+  border-radius: 0.45rem;
+  background: color-mix(in srgb, var(--xamt-accent) 35%, transparent);
+  inline-size: var(--poll-pct, 0%);
+  block-size: 100%;
+  transition: inline-size 0.45s ease-out;
+  pointer-events: none;
+}
+
+.xamt-poll__footer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.55rem;
+  margin-block-start: 0.65rem;
+  font-size: 0.72rem;
+  color: var(--xamt-muted);
+}
+
+.xamt-poll__total {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.xamt-poll__total .poll-total-count {
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: sideways;
+  -webkit-text-orientation: sideways;
+  font-family: var(--xamt-font-ui);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--xamt-text);
 }
 

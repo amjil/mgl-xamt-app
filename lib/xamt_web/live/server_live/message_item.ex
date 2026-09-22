@@ -12,6 +12,8 @@ defmodule XamtWeb.ServerLive.MessageItem do
   attr :editing_message_id, :any, default: nil
   attr :can_manage_messages?, :boolean, default: false
   attr :reactions, :map, default: %{}
+  attr :polls, :map, default: %{}
+  attr :my_poll_votes, :map, default: %{}
   attr :timezone_offset, :integer, default: 0
 
   def message_item(assigns) do
@@ -36,7 +38,7 @@ defmodule XamtWeb.ServerLive.MessageItem do
         ]}
         aria-hidden={not header_visible?(@message)}
       >
-        <.avatar
+        <.status_avatar
           :if={header_visible?(@message)}
           user={@message.user}
           class="xamt-message__avatar"
@@ -157,66 +159,146 @@ defmodule XamtWeb.ServerLive.MessageItem do
                   </button>
                 </div>
               <% else %>
-                <div
-                  id={"msg-body-#{@message.id}"}
-                  class={[
-                    "xamt-text-body",
-                    long_text?(@message) && "xamt-text-collapsed"
-                  ]}
-                >
-                  {raw(safe_html(@message, @current_scope.user.id))}
-                </div>
-                <%= if long_text?(@message) do %>
+                <%= if poll = Map.get(@polls, @message.id) do %>
+                  <% selected = Map.get(@my_poll_votes, poll.id, MapSet.new()) %>
+                  <% total_votes =
+                    max(Enum.sum(Enum.map(poll.options, & &1.votes_count)), 1) %>
                   <div
-                    id={"msg-toggle-#{@message.id}"}
-                    class="xamt-read-more-mask"
+                    id={"poll-card-#{poll.id}"}
+                    class="xamt-poll"
+                    data-poll-id={poll.id}
                   >
-                    <button
-                      type="button"
-                      id={"msg-read-more-#{@message.id}"}
-                      class="xamt-btn-read-more hover:bg-[color-mix(in_srgb,var(--xamt-accent)_85%,black)] transition-colors"
-                      phx-click={
-                        JS.remove_class("xamt-text-collapsed",
-                          to: "#msg-body-#{@message.id}"
-                        )
-                        |> JS.add_class("is-expanded",
-                          to: "#msg-toggle-#{@message.id}"
-                        )
-                        |> JS.set_attribute({"hidden", ""},
-                          to: "#msg-read-more-#{@message.id}"
-                        )
-                        |> JS.remove_attribute("hidden",
-                          to: "#msg-read-less-#{@message.id}"
-                        )
-                      }
-                    >
-                      {gettext("Read more")}
-                      <.icon name="hero-chevron-right" class="w-4 h-4 mt-1" />
-                    </button>
-                    <button
-                      type="button"
-                      id={"msg-read-less-#{@message.id}"}
-                      class="xamt-btn-read-more hover:bg-[color-mix(in_srgb,var(--xamt-accent)_85%,black)] transition-colors"
-                      hidden
-                      phx-click={
-                        JS.add_class("xamt-text-collapsed",
-                          to: "#msg-body-#{@message.id}"
-                        )
-                        |> JS.remove_class("is-expanded",
-                          to: "#msg-toggle-#{@message.id}"
-                        )
-                        |> JS.remove_attribute("hidden",
-                          to: "#msg-read-more-#{@message.id}"
-                        )
-                        |> JS.set_attribute({"hidden", ""},
-                          to: "#msg-read-less-#{@message.id}"
-                        )
-                      }
-                    >
-                      {gettext("Show less")}
-                      <.icon name="hero-chevron-left" class="w-4 h-4 mt-1" />
-                    </button>
+                    <div class="xamt-poll__head">
+                      <.icon name="hero-chart-bar" class="size-5 xamt-poll__icon" />
+                      <h4 class="xamt-poll__question mongol-text">{poll.question}</h4>
+                      <button
+                        :if={
+                          Map.get(poll, :results_open, true) or
+                            @message.user_id == @current_scope.user.id
+                        }
+                        type="button"
+                        id={"poll-details-#{poll.id}"}
+                        class="xamt-poll__details"
+                        phx-click="open_poll_details"
+                        phx-value-poll-id={poll.id}
+                        title={gettext("Details")}
+                        aria-label={gettext("Poll details")}
+                      >
+                        <.icon name="hero-users" class="size-5" />
+                      </button>
+                    </div>
+
+                    <div id={"poll-#{poll.id}"} class="xamt-poll__options">
+                      <div
+                        :for={option <- poll.options}
+                        class={[
+                          "xamt-poll__option",
+                          MapSet.member?(selected, option.id) && "is-selected"
+                        ]}
+                      >
+                        <% percent = round(option.votes_count / total_votes * 100) %>
+                        <button
+                          type="button"
+                          id={"poll-vote-#{option.id}"}
+                          phx-click="cast_vote"
+                          phx-value-poll-id={poll.id}
+                          phx-value-option-id={option.id}
+                          class="xamt-poll__btn"
+                        >
+                          <div
+                            class="xamt-poll__bar poll-bar"
+                            data-option-id={option.id}
+                            style={"--poll-pct: #{percent}%;"}
+                          >
+                          </div>
+                          <span class="xamt-poll__option-text mongol-text">{option.text}</span>
+                        </button>
+                        <span
+                          class="xamt-poll__percent poll-percent"
+                          data-option-id={option.id}
+                        >
+                          {percent}%
+                        </span>
+                      </div>
+                    </div>
+
+                    <div class="xamt-poll__footer">
+                      <%= if poll.allow_multiple do %>
+                        <span class="xamt-poll__meta mongol-text">{gettext("Multiple answers")}</span>
+                      <% else %>
+                        <span class="xamt-poll__meta mongol-text">{gettext("Single answer")}</span>
+                      <% end %>
+                      <span class="xamt-poll__total">
+                        <span class="mongol-text">{gettext("Total")}</span>
+                        <span class="poll-total-count">
+                          {Enum.sum(Enum.map(poll.options, & &1.votes_count))}
+                        </span>
+                        <span class="mongol-text">{gettext("votes")}</span>
+                      </span>
+                    </div>
                   </div>
+                <% else %>
+                  <div
+                    id={"msg-body-#{@message.id}"}
+                    class={[
+                      "xamt-text-body",
+                      long_text?(@message) && "xamt-text-collapsed"
+                    ]}
+                  >
+                    {raw(safe_html(@message, @current_scope.user.id))}
+                  </div>
+                  <%= if long_text?(@message) do %>
+                    <div
+                      id={"msg-toggle-#{@message.id}"}
+                      class="xamt-read-more-mask"
+                    >
+                      <button
+                        type="button"
+                        id={"msg-read-more-#{@message.id}"}
+                        class="xamt-btn-read-more hover:bg-[color-mix(in_srgb,var(--xamt-accent)_85%,black)] transition-colors"
+                        phx-click={
+                          JS.remove_class("xamt-text-collapsed",
+                            to: "#msg-body-#{@message.id}"
+                          )
+                          |> JS.add_class("is-expanded",
+                            to: "#msg-toggle-#{@message.id}"
+                          )
+                          |> JS.set_attribute({"hidden", ""},
+                            to: "#msg-read-more-#{@message.id}"
+                          )
+                          |> JS.remove_attribute("hidden",
+                            to: "#msg-read-less-#{@message.id}"
+                          )
+                        }
+                      >
+                        {gettext("Read more")}
+                        <.icon name="hero-chevron-right" class="w-4 h-4 mt-1" />
+                      </button>
+                      <button
+                        type="button"
+                        id={"msg-read-less-#{@message.id}"}
+                        class="xamt-btn-read-more hover:bg-[color-mix(in_srgb,var(--xamt-accent)_85%,black)] transition-colors"
+                        hidden
+                        phx-click={
+                          JS.add_class("xamt-text-collapsed",
+                            to: "#msg-body-#{@message.id}"
+                          )
+                          |> JS.remove_class("is-expanded",
+                            to: "#msg-toggle-#{@message.id}"
+                          )
+                          |> JS.remove_attribute("hidden",
+                            to: "#msg-read-more-#{@message.id}"
+                          )
+                          |> JS.set_attribute({"hidden", ""},
+                            to: "#msg-read-less-#{@message.id}"
+                          )
+                        }
+                      >
+                        {gettext("Show less")}
+                        <.icon name="hero-chevron-left" class="w-4 h-4 mt-1" />
+                      </button>
+                    </div>
+                  <% end %>
                 <% end %>
               <% end %>
             <% end %>
@@ -285,7 +367,8 @@ defmodule XamtWeb.ServerLive.MessageItem do
                 <button
                   :if={
                     @message.user_id == @current_scope.user.id and
-                      is_nil(audio_src(@message))
+                      is_nil(audio_src(@message)) and
+                      @message.content_type != "poll"
                   }
                   type="button"
                   id={"edit-message-#{@message.id}"}

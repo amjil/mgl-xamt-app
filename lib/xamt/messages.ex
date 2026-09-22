@@ -19,7 +19,7 @@ defmodule Xamt.Messages do
   alias Xamt.Repo
   alias Xamt.Servers.Permissions
   alias Xamt.Servers.ServerMember
-  alias Xamt.Messages.{Mentions, Message, RateLimiter, Reactions, Search}
+  alias Xamt.Messages.{Mentions, Message, Polls, RateLimiter, Reactions, Search}
 
   @default_limit 50
 
@@ -224,6 +224,11 @@ defmodule Xamt.Messages do
     end
   end
 
+  defp index_text(_html, %{"type" => "poll", "question" => question})
+       when is_binary(question) and question != "" do
+    question
+  end
+
   defp index_text(html, _content), do: plain_text(html)
 
   @entities %{
@@ -260,6 +265,188 @@ defmodule Xamt.Messages do
       text
     end
   end
+
+  ## Polls
+
+  @doc """
+  Creates a poll message with question and options in one transaction.
+
+  Broadcasts `:new_message` like other creates. Options must be 2..10 non-empty
+  strings. Poll content is immutable after create.
+  """
+  def create_poll_message(%Scope{user: user}, channel_id, attrs) when is_map(attrs) do
+    question =
+      (Map.get(attrs, "question") || Map.get(attrs, :question) || "")
+      |> to_string()
+      |> String.trim()
+
+    options =
+      (Map.get(attrs, "options") || Map.get(attrs, :options) || [])
+      |> List.wrap()
+      |> Enum.map(&(to_string(&1) |> String.trim()))
+      |> Enum.reject(&(&1 == ""))
+
+    allow_multiple =
+      truthy_flag?(Map.get(attrs, "allow_multiple") || Map.get(attrs, :allow_multiple))
+
+    # Default open; only explicit false / "false" closes voter details.
+    # Do not use `||` — `false` is falsy in Elixir and would be dropped.
+    results_open = open_results_flag?(attrs)
+
+    {min_opts, max_opts} = Polls.option_limits()
+    reply_to_id = normalize_reply_to_id(attrs)
+
+    cond do
+      question == "" ->
+        {:error, :invalid_poll}
+
+      length(options) < min_opts or length(options) > max_opts ->
+        {:error, :invalid_poll}
+
+      true ->
+        content_html = poll_question_html(question)
+        content = %{"type" => "poll", "question" => question}
+
+        with :ok <- RateLimiter.check_rate(user.id),
+             :ok <- authorize_channel_perm(user.id, channel_id, :send_messages),
+             :ok <- validate_reply_to(reply_to_id, channel_id),
+             {:ok, message} <-
+               Repo.transact(fn ->
+                 with {:ok, message} <-
+                        %Message{}
+                        |> Message.changeset(%{
+                          channel_id: channel_id,
+                          user_id: user.id,
+                          content: content,
+                          content_type: "poll",
+                          content_html: content_html,
+                          search_text: Search.normalize(question),
+                          reply_to_id: reply_to_id
+                        })
+                        |> Repo.insert() do
+                   _poll =
+                     Polls.insert_for_message!(
+                       message.id,
+                       question,
+                       options,
+                       allow_multiple,
+                       results_open
+                     )
+
+                   {:ok, message}
+                 end
+               end) do
+          message = preload_message!(message)
+          LastMessageCache.put(channel_id, message.id, message.inserted_at)
+          broadcast(channel_id, :new_message, strip_for_broadcast(message))
+          {:ok, message}
+        end
+    end
+  end
+
+  defp poll_question_html(question) do
+    escaped =
+      question
+      |> String.replace("&", "&amp;")
+      |> String.replace("<", "&lt;")
+      |> String.replace(">", "&gt;")
+      |> String.replace("\"", "&quot;")
+
+    "<p>#{escaped}</p>"
+  end
+
+  defp open_results_flag?(attrs) do
+    value =
+      case Map.fetch(attrs, "results_open") do
+        {:ok, v} ->
+          v
+
+        :error ->
+          case Map.fetch(attrs, :results_open) do
+            {:ok, v} -> v
+            :error -> true
+          end
+      end
+
+    value not in [false, "false"]
+  end
+
+  defp truthy_flag?(true), do: true
+  defp truthy_flag?("true"), do: true
+  defp truthy_flag?("on"), do: true
+  defp truthy_flag?(_), do: false
+
+  @doc """
+  Toggles the user's vote on a poll option.
+
+  Broadcasts `{:poll_updated, payload}` so LiveViews can animate bars without
+  re-streaming the message.
+  """
+  def toggle_vote(%Scope{user: user}, poll_id, option_id) do
+    with {:ok, poll} <- fetch_poll(poll_id),
+         {:ok, message} <- fetch_message(poll.message_id),
+         :ok <- authorize_channel_perm(user.id, message.channel_id, :view_channel) do
+      if match?(%DateTime{}, message.deleted_at) do
+        {:error, :deleted}
+      else
+        case Polls.toggle_vote(user.id, poll_id, option_id) do
+          {:ok, poll_summary} ->
+            payload = %{
+              channel_id: message.channel_id,
+              message_id: message.id,
+              user_id: user.id,
+              poll: poll_summary
+            }
+
+            Phoenix.PubSub.broadcast(
+              Xamt.PubSub,
+              channel_topic(message.channel_id),
+              {:poll_updated, payload}
+            )
+
+            {:ok, payload}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+      end
+    end
+  end
+
+  @doc """
+  Returns who voted for each option.
+
+  Open polls: any channel member. Closed polls: only the message author.
+  """
+  def get_poll_details(%Scope{user: user}, poll_id) do
+    with {:ok, poll} <- fetch_poll(poll_id),
+         {:ok, message} <- fetch_message(poll.message_id),
+         :ok <- authorize_channel_perm(user.id, message.channel_id, :view_channel),
+         :ok <- authorize_poll_details(poll, message, user) do
+      case Polls.details(poll_id) do
+        nil -> {:error, :not_found}
+        details -> {:ok, Map.put(details, :author_id, message.user_id)}
+      end
+    end
+  end
+
+  defp authorize_poll_details(%{results_open: true}, _message, _user), do: :ok
+
+  defp authorize_poll_details(%{results_open: false}, %{user_id: author_id}, %{id: user_id})
+       when author_id == user_id,
+       do: :ok
+
+  defp authorize_poll_details(_poll, _message, _user), do: {:error, :forbidden}
+
+  defp fetch_poll(id) do
+    case Polls.get_poll_with_options(id) do
+      nil -> {:error, :not_found}
+      poll -> {:ok, poll}
+    end
+  end
+
+  defdelegate poll_summary(message_ids), to: Polls, as: :summary
+  defdelegate poll_votes_for_user(user_id, poll_ids), to: Polls, as: :votes_for_user
 
   ## Reactions
 
@@ -467,6 +654,9 @@ defmodule Xamt.Messages do
 
   defp broadcast_content(%{"type" => "gallery"} = content),
     do: Map.take(content, ["type", "images"])
+
+  defp broadcast_content(%{"type" => "poll"} = content),
+    do: Map.take(content, ["type", "question"])
 
   defp broadcast_content(_), do: %{}
 

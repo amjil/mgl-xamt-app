@@ -19,6 +19,7 @@ defmodule Xamt.Messages.Message do
     belongs_to :user, Xamt.Accounts.User
     belongs_to :reply_to, Xamt.Messages.Message, foreign_key: :reply_to_id
     has_many :mentions, Xamt.Messages.Mention
+    has_one :poll, Xamt.Messages.Poll
 
     timestamps(type: :utc_datetime)
   end
@@ -36,7 +37,7 @@ defmodule Xamt.Messages.Message do
       :reply_to_id
     ])
     |> validate_required([:channel_id, :user_id, :content])
-    |> validate_inclusion(:content_type, ~w(plain_text rich_text audio gallery))
+    |> validate_inclusion(:content_type, ~w(plain_text rich_text audio gallery poll))
     |> touch_edited_at()
   end
 

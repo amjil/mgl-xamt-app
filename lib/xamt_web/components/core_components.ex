@@ -582,7 +582,7 @@ defmodule XamtWeb.CoreComponents do
   User avatar image, falling back to the first letter of the display name.
   """
   attr :user, :map, required: true
-  attr :class, :string, default: "xamt-avatar"
+  attr :class, :any, default: "xamt-avatar"
   attr :id, :string, default: nil
 
   def avatar(assigns) do
@@ -600,8 +600,59 @@ defmodule XamtWeb.CoreComponents do
     """
   end
 
+  @doc """
+  Avatar with an optional custom-status emoji badge mount point.
+  When `clickable?` is true, clicking opens the status picker (`open_status_picker`).
+  """
+  attr :user, :map, required: true
+  attr :class, :any, default: "xamt-avatar"
+  attr :id, :string, default: nil
+  attr :clickable?, :boolean, default: false
+
+  def status_avatar(assigns) do
+    ~H"""
+    <div class={["xamt-avatar-wrap", @clickable? && "is-clickable"]}>
+      <%= if @clickable? do %>
+        <button
+          type="button"
+          id={@id && "#{@id}-trigger"}
+          class="xamt-status-avatar-btn"
+          phx-click="open_status_picker"
+          aria-label={gettext("Set custom status")}
+        >
+          <.avatar user={@user} class={@class} id={@id} />
+        </button>
+      <% else %>
+        <.avatar user={@user} class={@class} id={@id} />
+      <% end %>
+      <div class="status-badge-container" data-user-id={status_user_id(@user)}>
+        <span :if={status_emoji(@user)} class="xamt-status-badge">
+          <span class="xamt-status-badge__emoji" aria-hidden="true">
+            {status_emoji(@user)}
+          </span>
+          <span
+            :if={status_text(@user)}
+            class="xamt-status-badge__tip mongol-text"
+          >
+            {status_text(@user)}
+          </span>
+        </span>
+      </div>
+    </div>
+    """
+  end
+
   defp avatar_url(%{avatar: url}) when is_binary(url) and url != "", do: url
   defp avatar_url(_), do: nil
+
+  defp status_user_id(%{id: id}) when not is_nil(id), do: to_string(id)
+  defp status_user_id(_), do: ""
+
+  defp status_emoji(%{status_emoji: emoji}) when is_binary(emoji) and emoji != "", do: emoji
+  defp status_emoji(_), do: nil
+
+  defp status_text(%{status_text: text}) when is_binary(text), do: text
+  defp status_text(_), do: nil
 
   defp user_initial(user) do
     name =

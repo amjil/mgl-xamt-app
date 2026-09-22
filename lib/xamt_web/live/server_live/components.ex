@@ -79,6 +79,13 @@ defmodule XamtWeb.ServerLive.Components do
         form={@delete_reason_form}
       />
 
+      <.status_picker_overlay
+        :if={@show_status_picker}
+        current_user={@current_scope.user}
+      />
+
+      <.poll_details_overlay :if={@poll_details} poll={@poll_details} />
+
       <.server_menu_overlay
         :if={@show_server_menu && @active_channel}
         server={@server}

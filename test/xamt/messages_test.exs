@@ -187,6 +187,166 @@ defmodule Xamt.MessagesTest do
              Messages.toggle_reaction(Scope.for_user(outsider), message.id, hd(Reaction.emojis()))
   end
 
+  test "creates a poll message with options", %{scope: scope, channel: channel} do
+    Phoenix.PubSub.subscribe(Xamt.PubSub, Messages.channel_topic(channel.id))
+
+    {:ok, message} =
+      Messages.create_poll_message(scope, channel.id, %{
+        "question" => "Where this weekend?",
+        "options" => ["North", "South", "Stay home"],
+        "allow_multiple" => false
+      })
+
+    assert message.content_type == "poll"
+    assert message.content["question"] == "Where this weekend?"
+    assert message.search_text =~ "Where this weekend?"
+    assert Messages.excerpt(message) =~ "Where this weekend?"
+
+    summary = Messages.poll_summary([message.id])
+    poll = summary[message.id]
+    assert poll.question == "Where this weekend?"
+    assert length(poll.options) == 3
+    assert Enum.all?(poll.options, &(&1.votes_count == 0))
+
+    assert_receive {:new_message, broadcasted}
+    assert broadcasted.content_type == "poll"
+    assert broadcasted.content == %{"type" => "poll", "question" => "Where this weekend?"}
+  end
+
+  test "rejects invalid poll option counts", %{scope: scope, channel: channel} do
+    assert {:error, :invalid_poll} =
+             Messages.create_poll_message(scope, channel.id, %{
+               "question" => "Only one?",
+               "options" => ["A"]
+             })
+
+    assert {:error, :invalid_poll} =
+             Messages.create_poll_message(scope, channel.id, %{
+               "question" => "",
+               "options" => ["A", "B"]
+             })
+  end
+
+  test "single-select vote switches options and updates counts", %{
+    scope: scope,
+    channel: channel,
+    owner: owner
+  } do
+    Phoenix.PubSub.subscribe(Xamt.PubSub, Messages.channel_topic(channel.id))
+
+    {:ok, message} =
+      Messages.create_poll_message(scope, channel.id, %{
+        "question" => "Pick one",
+        "options" => ["A", "B"],
+        "allow_multiple" => false
+      })
+
+    poll = Messages.poll_summary([message.id])[message.id]
+    [opt_a, opt_b] = poll.options
+
+    assert {:ok, payload} = Messages.toggle_vote(scope, poll.id, opt_a.id)
+    assert opt_a.id in payload.poll.selected_option_ids
+    assert Enum.find(payload.poll.options, &(&1.id == opt_a.id)).votes_count == 1
+
+    assert_receive {:poll_updated, %{poll: updated}}
+    assert Enum.find(updated.options, &(&1.id == opt_a.id)).votes_count == 1
+
+    assert {:ok, payload2} = Messages.toggle_vote(scope, poll.id, opt_b.id)
+    assert payload2.poll.selected_option_ids == [opt_b.id]
+    assert Enum.find(payload2.poll.options, &(&1.id == opt_a.id)).votes_count == 0
+    assert Enum.find(payload2.poll.options, &(&1.id == opt_b.id)).votes_count == 1
+
+    my = Messages.poll_votes_for_user(owner.id, [poll.id])
+    assert MapSet.member?(my[poll.id], opt_b.id)
+    refute MapSet.member?(my[poll.id], opt_a.id)
+  end
+
+  test "multi-select toggles options independently", %{scope: scope, channel: channel} do
+    {:ok, message} =
+      Messages.create_poll_message(scope, channel.id, %{
+        "question" => "Pick many",
+        "options" => ["A", "B", "C"],
+        "allow_multiple" => true
+      })
+
+    poll = Messages.poll_summary([message.id])[message.id]
+    [opt_a, opt_b, _opt_c] = poll.options
+
+    assert {:ok, _} = Messages.toggle_vote(scope, poll.id, opt_a.id)
+    assert {:ok, payload} = Messages.toggle_vote(scope, poll.id, opt_b.id)
+    assert MapSet.new(payload.poll.selected_option_ids) == MapSet.new([opt_a.id, opt_b.id])
+
+    assert {:ok, payload2} = Messages.toggle_vote(scope, poll.id, opt_a.id)
+    assert payload2.poll.selected_option_ids == [opt_b.id]
+    assert Enum.find(payload2.poll.options, &(&1.id == opt_a.id)).votes_count == 0
+    assert Enum.find(payload2.poll.options, &(&1.id == opt_b.id)).votes_count == 1
+  end
+
+  test "rejects votes on deleted messages and from outsiders", %{
+    scope: scope,
+    channel: channel
+  } do
+    {:ok, message} =
+      Messages.create_poll_message(scope, channel.id, %{
+        "question" => "Gone?",
+        "options" => ["Yes", "No"]
+      })
+
+    poll = Messages.poll_summary([message.id])[message.id]
+    option_id = hd(poll.options).id
+
+    outsider = Xamt.AccountsFixtures.user_fixture()
+
+    assert {:error, :unauthorized} =
+             Messages.toggle_vote(Scope.for_user(outsider), poll.id, option_id)
+
+    {:ok, _} = Messages.delete_message(scope, message.id)
+
+    assert {:error, :deleted} = Messages.toggle_vote(scope, poll.id, option_id)
+  end
+
+  test "open poll details list voters; closed polls are author-only", %{
+    scope: scope,
+    channel: channel,
+    server: server,
+    owner: owner
+  } do
+    member =
+      Xamt.AccountsFixtures.user_fixture(%{
+        username: "voter#{System.unique_integer() |> abs()}"
+      })
+
+    {:ok, _} = Servers.join_server(Scope.for_user(member), server.id)
+    member_scope = Scope.for_user(member)
+
+    {:ok, open_msg} =
+      Messages.create_poll_message(scope, channel.id, %{
+        "question" => "Open poll",
+        "options" => ["Yes", "No"],
+        "results_open" => true
+      })
+
+    open_poll = Messages.poll_summary([open_msg.id])[open_msg.id]
+    yes = hd(open_poll.options)
+
+    assert {:ok, _} = Messages.toggle_vote(member_scope, open_poll.id, yes.id)
+    assert {:ok, details} = Messages.get_poll_details(member_scope, open_poll.id)
+    assert hd(Enum.find(details.options, &(&1.id == yes.id)).voters).id == member.id
+
+    {:ok, closed_msg} =
+      Messages.create_poll_message(scope, channel.id, %{
+        "question" => "Closed poll",
+        "options" => ["A", "B"],
+        "results_open" => false
+      })
+
+    closed_poll = Messages.poll_summary([closed_msg.id])[closed_msg.id]
+    assert closed_poll.results_open == false
+
+    assert {:error, :forbidden} = Messages.get_poll_details(member_scope, closed_poll.id)
+    assert {:ok, _} = Messages.get_poll_details(Scope.for_user(owner), closed_poll.id)
+  end
+
   test "sanitizes dangerous HTML before persist", %{scope: scope, channel: channel} do
     {:ok, message} =
       Messages.create_message(scope, channel.id, %{

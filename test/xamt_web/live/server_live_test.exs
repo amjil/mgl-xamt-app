@@ -1199,6 +1199,195 @@ defmodule XamtWeb.ServerLiveTest do
     assert has_element?(view, "audio.xamt-audio-player")
   end
 
+  test "opens status picker from own avatar and applies a preset", %{
+    conn: conn,
+    user: user,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>hello</p>",
+        "content" => %{"type" => "rich_text", "html" => "<p>hello</p>"}
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    assert has_element?(view, ".status-badge-container[data-user-id='#{user.id}']")
+    assert has_element?(view, "#messages-#{message.id} .status-badge-container")
+    refute has_element?(view, "#status-picker-drawer")
+
+    view
+    |> element("#member-avatar-#{user.id}-trigger")
+    |> render_click()
+
+    assert has_element?(view, "#status-picker-drawer")
+    assert has_element?(view, "#status-preset-0")
+
+    view
+    |> element("#status-preset-0")
+    |> render_click()
+
+    refute has_element?(view, "#status-picker-drawer")
+
+    updated = Accounts.get_user!(user.id)
+    assert updated.status_emoji == "🏍️"
+    assert updated.status_text == "Out on a motorcycle ride"
+
+    html = render(view)
+    assert html =~ "🏍️"
+  end
+
+  test "clears custom status from the picker", %{
+    conn: conn,
+    user: user,
+    server: server,
+    channel: channel
+  } do
+    {:ok, _} =
+      Accounts.update_user_custom_status(user, %{
+        status_emoji: "🎧",
+        status_text: "Listening to an audiobook"
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    view
+    |> element("#member-avatar-#{user.id}-trigger")
+    |> render_click()
+
+    view
+    |> element("#status-clear")
+    |> render_click()
+
+    updated = Accounts.get_user!(user.id)
+    assert updated.status_emoji == nil
+    assert updated.status_text == nil
+  end
+
+  test "composer opens poll form and sends a poll", %{
+    conn: conn,
+    server: server,
+    channel: channel
+  } do
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    assert has_element?(view, "#composer-poll")
+    refute has_element?(view, "#poll-composer-form")
+
+    view |> element("#composer-poll") |> render_click()
+    assert has_element?(view, "#poll-composer-form")
+    assert has_element?(view, "#poll-question")
+
+    view
+    |> form("#poll-composer-form",
+      poll: %{
+        question: "Weekend route?",
+        options: ["East loop", "West loop"],
+        allow_multiple: "false"
+      }
+    )
+    |> render_submit()
+
+    html = render(view)
+    assert html =~ "Weekend route?"
+    assert html =~ "East loop"
+    assert html =~ "West loop"
+    assert has_element?(view, ".xamt-poll")
+    refute has_element?(view, "#poll-composer-form")
+  end
+
+  test "casting a poll vote updates the poll card", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope,
+    user: user
+  } do
+    {:ok, message} =
+      Messages.create_poll_message(scope, channel.id, %{
+        "question" => "Vote me",
+        "options" => ["Alpha", "Beta"]
+      })
+
+    poll = Messages.poll_summary([message.id])[message.id]
+    option = hd(poll.options)
+    poll_id = poll.id
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    assert has_element?(view, "#poll-#{poll_id}")
+    assert has_element?(view, "#poll-vote-#{option.id}")
+
+    view |> element("#poll-vote-#{option.id}") |> render_click()
+
+    assert_push_event(view, "update_poll_chart", %{
+      poll_id: ^poll_id,
+      total_votes: 1
+    })
+
+    my = Messages.poll_votes_for_user(user.id, [poll_id])
+    assert MapSet.member?(my[poll_id], option.id)
+  end
+
+  test "poll details drawer lists voters", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope,
+    user: user
+  } do
+    {:ok, message} =
+      Messages.create_poll_message(scope, channel.id, %{
+        "question" => "Who?",
+        "options" => ["Me", "You"],
+        "results_open" => true
+      })
+
+    poll = Messages.poll_summary([message.id])[message.id]
+    option = hd(poll.options)
+    assert {:ok, _} = Messages.toggle_vote(scope, poll.id, option.id)
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    assert has_element?(view, "#poll-details-#{poll.id}")
+
+    view |> element("#poll-details-#{poll.id}") |> render_click()
+
+    assert has_element?(view, "#poll-details-drawer")
+    assert has_element?(view, "#poll-details-option-#{option.id}")
+    assert has_element?(view, "#poll-voter-#{option.id}-#{user.id}")
+  end
+
+  test "closed poll hides details for non-authors", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    member =
+      Xamt.AccountsFixtures.user_fixture(%{
+        username: "peek#{System.unique_integer() |> abs()}"
+      })
+
+    {:ok, _} = Servers.join_server(Xamt.Accounts.Scope.for_user(member), server.id)
+
+    {:ok, message} =
+      Messages.create_poll_message(scope, channel.id, %{
+        "question" => "Secret",
+        "options" => ["A", "B"],
+        "results_open" => false
+      })
+
+    poll = Messages.poll_summary([message.id])[message.id]
+
+    {:ok, author_view, _} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    assert has_element?(author_view, "#poll-details-#{poll.id}")
+
+    member_conn = log_in_user(build_conn(), member)
+    {:ok, member_view, _} = live(member_conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    refute has_element?(member_view, "#poll-details-#{poll.id}")
+  end
+
   defp post_html(scope, channel_id, text) do
     Messages.create_message(scope, channel_id, %{
       "content_html" => "<p>#{text}</p>",

@@ -104,6 +104,13 @@ defmodule XamtWeb.ServerLive.Helpers do
   def display_name(%{email: email}), do: email
   def display_name(_), do: "?"
 
+  def own_presence_user?(%{id: id}, %{id: current_id})
+      when not is_nil(id) and not is_nil(current_id) do
+    to_string(id) == to_string(current_id)
+  end
+
+  def own_presence_user?(_, _), do: false
+
   def format_time(nil, _offset), do: ""
 
   def format_time(%DateTime{} = dt, offset) when is_integer(offset) do
@@ -279,7 +286,8 @@ defmodule XamtWeb.ServerLive.Helpers do
   def caption_html?(_), do: false
 
   def collapsible_text?(message) do
-    is_nil(audio_src(message)) and is_nil(gallery_images(message)) and long_text?(message)
+    is_nil(audio_src(message)) and is_nil(gallery_images(message)) and
+      message.content_type != "poll" and long_text?(message)
   end
 
   def long_text?(message) do
