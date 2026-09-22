@@ -97,6 +97,49 @@ defmodule XamtWeb.ServerLiveTest do
     refute has_element?(view, "time.xamt-message__time", "07:13")
   end
 
+  test "renders sticky date dividers for each local day", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    {:ok, day1} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>day one</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    {:ok, day2} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>day two</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    day1
+    |> Ecto.Changeset.change(
+      inserted_at: ~U[2026-09-18 12:00:00Z],
+      updated_at: ~U[2026-09-18 12:00:00Z]
+    )
+    |> Xamt.Repo.update!()
+
+    day2
+    |> Ecto.Changeset.change(
+      inserted_at: ~U[2026-09-19 12:00:00Z],
+      updated_at: ~U[2026-09-19 12:00:00Z]
+    )
+    |> Xamt.Repo.update!()
+
+    {:ok, view, _html} =
+      conn
+      |> put_connect_params(%{"timezone_offset" => -480})
+      |> live(~p"/servers/#{server.slug}/#{channel.slug}")
+
+    assert has_element?(view, "#messages-date-2026-09-18")
+    assert has_element?(view, "#messages-date-2026-09-19")
+    assert has_element?(view, ".xamt-date-divider__text", "-- 2026-09-18 --")
+    assert has_element?(view, ".xamt-date-divider__text", "-- 2026-09-19 --")
+  end
+
   test "strangers cannot open a private server", %{server: server} do
     stranger = user_fixture()
     conn = log_in_user(build_conn(), stranger)

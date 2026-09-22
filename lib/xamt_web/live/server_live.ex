@@ -370,11 +370,13 @@ defmodule XamtWeb.ServerLive do
       socket =
         case messages do
           [first | _] = msgs ->
+            items = with_date_dividers(msgs, socket.assigns.timezone_offset)
+
             socket
             |> assign(:oldest_message_id, first.id)
             |> assign(:has_more_messages, length(msgs) >= @message_page_size)
             |> merge_reactions(msgs)
-            |> stream(:messages, msgs, at: 0)
+            |> stream(:messages, items, at: 0)
             |> maybe_done_loading("load_older", length(msgs) >= @message_page_size)
 
           [] ->
@@ -626,7 +628,9 @@ defmodule XamtWeb.ServerLive do
           # Stay in the stream; IntersectionObserver advances the watermark
           # only when the message actually enters the viewport.
           socket
+          |> maybe_stream_date_divider(message)
           |> stream_insert(:messages, message)
+          |> assign(:last_message_at, message.inserted_at)
           |> assign(:messages_empty?, false)
           |> assign(:oldest_message_id, socket.assigns[:oldest_message_id] || message.id)
           |> push_event("messages:scroll_bottom", %{})
@@ -1078,226 +1082,235 @@ defmodule XamtWeb.ServerLive do
                 >
                 </div>
 
-                <article
-                  :for={{dom_id, message} <- @streams.messages}
-                  id={dom_id}
-                  class={[
-                    "xamt-message group",
-                    mentioned?(message, @current_scope.user) && "xamt-message--mentioned",
-                    @editing_message_id == message.id && "xamt-message--editing",
-                    deleted?(message) && "xamt-message--deleted"
-                  ]}
-                  data-message-id={message.id}
-                  data-inserted-at={DateTime.to_iso8601(message.inserted_at)}
-                >
-                  <.avatar user={message.user} class="xamt-message__avatar" />
-                  <%= if deleted?(message) do %>
-                    <div class="xamt-message__body">
-                      <header class="xamt-message__meta">
-                        <strong class="mongol-text">{display_name(message.user)}</strong>
-                        <time
-                          class="xamt-message__time"
-                          datetime={DateTime.to_iso8601(message.inserted_at)}
-                        >
-                          {format_time(message.inserted_at, @timezone_offset)}
-                        </time>
-                      </header>
-                      <div
-                        id={"msg-tombstone-#{message.id}"}
-                        class="xamt-message__tombstone mongol-text"
-                      >
-                        <.icon name="hero-trash" class="size-4" />
-                        {gettext("This message was deleted")}
-                      </div>
+                <%= for {dom_id, message} <- @streams.messages do %>
+                  <%= if date_divider?(message) do %>
+                    <div id={dom_id} class="xamt-date-divider" role="separator">
+                      <span class="xamt-date-divider__text">-- {message.date} --</span>
                     </div>
                   <% else %>
-                    <div class="xamt-message__body">
-                      <button
-                        :if={message.reply_to}
-                        type="button"
-                        class="xamt-quote"
-                        phx-click={
-                          JS.dispatch("xamt:highlight",
-                            detail: %{target_id: "messages-#{message.reply_to_id}"}
-                          )
-                        }
-                        title={gettext("Jump to the quoted message")}
-                      >
-                        <span class="xamt-quote__mark" aria-hidden="true">↳</span>
-                        <span class="xamt-quote__author mongol-text">
-                          {display_name(message.reply_to.user)}
-                        </span>
-                        <span class="xamt-quote__text mongol-text">
-                          <%= if deleted?(message.reply_to) do %>
-                            {gettext("This message was deleted")}
-                          <% else %>
-                            {Messages.excerpt(message.reply_to)}
-                          <% end %>
-                        </span>
-                      </button>
-                      <header class="xamt-message__meta">
-                        <strong class="mongol-text">{display_name(message.user)}</strong>
-                        <span :if={edited?(message)} class="xamt-message__edited">
-                          {gettext("edited")}
-                        </span>
-                        <time
-                          class="xamt-message__time"
-                          datetime={DateTime.to_iso8601(message.inserted_at)}
-                        >
-                          {format_time(message.inserted_at, @timezone_offset)}
-                        </time>
-                      </header>
-                      <div
-                        id={"msg-content-#{message.id}"}
-                        class="xamt-message__content mongol-text"
-                      >
-                        <%= if url = audio_src(message) do %>
-                          <div class="xamt-message__audio">
-                            <audio
-                              id={"msg-audio-#{message.id}"}
-                              class="xamt-audio-player"
-                              controls
-                              preload="metadata"
-                              src={url}
+                    <article
+                      id={dom_id}
+                      class={[
+                        "xamt-message group",
+                        mentioned?(message, @current_scope.user) && "xamt-message--mentioned",
+                        @editing_message_id == message.id && "xamt-message--editing",
+                        deleted?(message) && "xamt-message--deleted"
+                      ]}
+                      data-message-id={message.id}
+                      data-inserted-at={DateTime.to_iso8601(message.inserted_at)}
+                    >
+                      <.avatar user={message.user} class="xamt-message__avatar" />
+                      <%= if deleted?(message) do %>
+                        <div class="xamt-message__body">
+                          <header class="xamt-message__meta">
+                            <strong class="mongol-text">{display_name(message.user)}</strong>
+                            <time
+                              class="xamt-message__time"
+                              datetime={DateTime.to_iso8601(message.inserted_at)}
                             >
-                              {gettext("Voice message")}
-                            </audio>
-                          </div>
-                        <% else %>
-                          {raw(safe_html(message, @current_scope.user.id))}
-                        <% end %>
-                        <%= if preview = link_preview(message) do %>
-                          <a
-                            id={"msg-preview-#{message.id}"}
-                            href={preview["url"]}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="xamt-link-preview"
-                          >
-                            <img
-                              :if={preview["image"]}
-                              src={preview["image"]}
-                              alt={preview["title"] || ""}
-                              class="xamt-link-preview__img"
-                              loading="lazy"
-                              referrerpolicy="no-referrer"
-                            />
-                            <div class="xamt-link-preview__body">
-                              <strong
-                                :if={preview["title"]}
-                                class="xamt-link-preview__title mongol-text"
-                              >
-                                {preview["title"]}
-                              </strong>
-                              <p
-                                :if={preview["description"]}
-                                class="xamt-link-preview__desc mongol-text"
-                              >
-                                {preview["description"]}
-                              </p>
-                            </div>
-                          </a>
-                        <% end %>
-                      </div>
-                      <div class="xamt-reactions">
-                        <details
-                          id={"msg-menu-#{message.id}"}
-                          class="xamt-message__menu"
-                          phx-click-away={JS.remove_attribute("open")}
-                        >
-                          <summary
-                            class="xamt-message__menu-toggle"
-                            title={gettext("Message actions")}
-                            aria-label={gettext("Message actions")}
-                          >
-                            <.icon name="hero-ellipsis-vertical" class="size-4" />
-                          </summary>
+                              {format_time(message.inserted_at, @timezone_offset)}
+                            </time>
+                          </header>
                           <div
-                            class="xamt-message__actions"
-                            role="toolbar"
-                            aria-label={gettext("Message actions")}
+                            id={"msg-tombstone-#{message.id}"}
+                            class="xamt-message__tombstone mongol-text"
                           >
-                            <button
-                              type="button"
-                              id={"reply-message-#{message.id}"}
-                              class="xamt-message__action"
-                              phx-click="reply_message"
-                              phx-value-id={message.id}
-                              title={gettext("Reply")}
-                              aria-label={gettext("Reply")}
-                            >
-                              <.icon name="hero-arrow-uturn-left" class="size-4" />
-                            </button>
-                            <button
-                              :if={
-                                message.user_id == @current_scope.user.id and
-                                  is_nil(audio_src(message))
-                              }
-                              type="button"
-                              id={"edit-message-#{message.id}"}
-                              class="xamt-message__action"
-                              phx-click="edit_message"
-                              phx-value-id={message.id}
-                              title={gettext("Edit")}
-                              aria-label={gettext("Edit")}
-                            >
-                              <.icon name="hero-pencil" class="size-4" />
-                            </button>
-                            <button
-                              :if={message.user_id == @current_scope.user.id or @can_manage_messages?}
-                              type="button"
-                              id={"delete-message-#{message.id}"}
-                              class="xamt-message__action xamt-message__action--danger"
-                              phx-click="delete_message"
-                              phx-value-id={message.id}
-                              title={gettext("Delete")}
-                              aria-label={gettext("Delete")}
-                              data-confirm={
-                                message.user_id == @current_scope.user.id &&
-                                  gettext("Delete this message?")
-                              }
-                            >
-                              <.icon name="hero-trash" class="size-4" />
-                            </button>
+                            <.icon name="hero-trash" class="size-4" />
+                            {gettext("This message was deleted")}
                           </div>
-                        </details>
-
-                        <button
-                          :for={{emoji, user_ids} <- reactions_for(@reactions, message.id)}
-                          type="button"
-                          class={[
-                            "xamt-reaction",
-                            @current_scope.user.id in user_ids && "is-mine"
-                          ]}
-                          data-digits={reaction_digits(user_ids)}
-                          phx-click="toggle_reaction"
-                          phx-value-id={message.id}
-                          phx-value-emoji={emoji}
-                        >
-                          <span class="xamt-reaction__emoji">{emoji}</span>
-                          <span class="xamt-reaction__count">{length(user_ids)}</span>
-                        </button>
-
-                        <div
-                          :if={picker_emojis(@reactions, message.id) != []}
-                          class="xamt-reaction-picker"
-                        >
-                          <button
-                            :for={emoji <- picker_emojis(@reactions, message.id)}
-                            type="button"
-                            class="xamt-reaction xamt-reaction--add"
-                            phx-click="toggle_reaction"
-                            phx-value-id={message.id}
-                            phx-value-emoji={emoji}
-                            aria-label={emoji}
-                          >
-                            <span class="xamt-reaction__emoji">{emoji}</span>
-                          </button>
                         </div>
-                      </div>
-                    </div>
+                      <% else %>
+                        <div class="xamt-message__body">
+                          <button
+                            :if={message.reply_to}
+                            type="button"
+                            class="xamt-quote"
+                            phx-click={
+                              JS.dispatch("xamt:highlight",
+                                detail: %{target_id: "messages-#{message.reply_to_id}"}
+                              )
+                            }
+                            title={gettext("Jump to the quoted message")}
+                          >
+                            <span class="xamt-quote__mark" aria-hidden="true">↳</span>
+                            <span class="xamt-quote__author mongol-text">
+                              {display_name(message.reply_to.user)}
+                            </span>
+                            <span class="xamt-quote__text mongol-text">
+                              <%= if deleted?(message.reply_to) do %>
+                                {gettext("This message was deleted")}
+                              <% else %>
+                                {Messages.excerpt(message.reply_to)}
+                              <% end %>
+                            </span>
+                          </button>
+                          <header class="xamt-message__meta">
+                            <strong class="mongol-text">{display_name(message.user)}</strong>
+                            <span :if={edited?(message)} class="xamt-message__edited">
+                              {gettext("edited")}
+                            </span>
+                            <time
+                              class="xamt-message__time"
+                              datetime={DateTime.to_iso8601(message.inserted_at)}
+                            >
+                              {format_time(message.inserted_at, @timezone_offset)}
+                            </time>
+                          </header>
+                          <div
+                            id={"msg-content-#{message.id}"}
+                            class="xamt-message__content mongol-text"
+                          >
+                            <%= if url = audio_src(message) do %>
+                              <div class="xamt-message__audio">
+                                <audio
+                                  id={"msg-audio-#{message.id}"}
+                                  class="xamt-audio-player"
+                                  controls
+                                  preload="metadata"
+                                  src={url}
+                                >
+                                  {gettext("Voice message")}
+                                </audio>
+                              </div>
+                            <% else %>
+                              {raw(safe_html(message, @current_scope.user.id))}
+                            <% end %>
+                            <%= if preview = link_preview(message) do %>
+                              <a
+                                id={"msg-preview-#{message.id}"}
+                                href={preview["url"]}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="xamt-link-preview"
+                              >
+                                <img
+                                  :if={preview["image"]}
+                                  src={preview["image"]}
+                                  alt={preview["title"] || ""}
+                                  class="xamt-link-preview__img"
+                                  loading="lazy"
+                                  referrerpolicy="no-referrer"
+                                />
+                                <div class="xamt-link-preview__body">
+                                  <strong
+                                    :if={preview["title"]}
+                                    class="xamt-link-preview__title mongol-text"
+                                  >
+                                    {preview["title"]}
+                                  </strong>
+                                  <p
+                                    :if={preview["description"]}
+                                    class="xamt-link-preview__desc mongol-text"
+                                  >
+                                    {preview["description"]}
+                                  </p>
+                                </div>
+                              </a>
+                            <% end %>
+                          </div>
+                          <div class="xamt-reactions">
+                            <details
+                              id={"msg-menu-#{message.id}"}
+                              class="xamt-message__menu"
+                              phx-click-away={JS.remove_attribute("open")}
+                            >
+                              <summary
+                                class="xamt-message__menu-toggle"
+                                title={gettext("Message actions")}
+                                aria-label={gettext("Message actions")}
+                              >
+                                <.icon name="hero-ellipsis-vertical" class="size-4" />
+                              </summary>
+                              <div
+                                class="xamt-message__actions"
+                                role="toolbar"
+                                aria-label={gettext("Message actions")}
+                              >
+                                <button
+                                  type="button"
+                                  id={"reply-message-#{message.id}"}
+                                  class="xamt-message__action"
+                                  phx-click="reply_message"
+                                  phx-value-id={message.id}
+                                  title={gettext("Reply")}
+                                  aria-label={gettext("Reply")}
+                                >
+                                  <.icon name="hero-arrow-uturn-left" class="size-4" />
+                                </button>
+                                <button
+                                  :if={
+                                    message.user_id == @current_scope.user.id and
+                                      is_nil(audio_src(message))
+                                  }
+                                  type="button"
+                                  id={"edit-message-#{message.id}"}
+                                  class="xamt-message__action"
+                                  phx-click="edit_message"
+                                  phx-value-id={message.id}
+                                  title={gettext("Edit")}
+                                  aria-label={gettext("Edit")}
+                                >
+                                  <.icon name="hero-pencil" class="size-4" />
+                                </button>
+                                <button
+                                  :if={
+                                    message.user_id == @current_scope.user.id or @can_manage_messages?
+                                  }
+                                  type="button"
+                                  id={"delete-message-#{message.id}"}
+                                  class="xamt-message__action xamt-message__action--danger"
+                                  phx-click="delete_message"
+                                  phx-value-id={message.id}
+                                  title={gettext("Delete")}
+                                  aria-label={gettext("Delete")}
+                                  data-confirm={
+                                    message.user_id == @current_scope.user.id &&
+                                      gettext("Delete this message?")
+                                  }
+                                >
+                                  <.icon name="hero-trash" class="size-4" />
+                                </button>
+                              </div>
+                            </details>
+
+                            <button
+                              :for={{emoji, user_ids} <- reactions_for(@reactions, message.id)}
+                              type="button"
+                              class={[
+                                "xamt-reaction",
+                                @current_scope.user.id in user_ids && "is-mine"
+                              ]}
+                              data-digits={reaction_digits(user_ids)}
+                              phx-click="toggle_reaction"
+                              phx-value-id={message.id}
+                              phx-value-emoji={emoji}
+                            >
+                              <span class="xamt-reaction__emoji">{emoji}</span>
+                              <span class="xamt-reaction__count">{length(user_ids)}</span>
+                            </button>
+
+                            <div
+                              :if={picker_emojis(@reactions, message.id) != []}
+                              class="xamt-reaction-picker"
+                            >
+                              <button
+                                :for={emoji <- picker_emojis(@reactions, message.id)}
+                                type="button"
+                                class="xamt-reaction xamt-reaction--add"
+                                phx-click="toggle_reaction"
+                                phx-value-id={message.id}
+                                phx-value-emoji={emoji}
+                                aria-label={emoji}
+                              >
+                                <span class="xamt-reaction__emoji">{emoji}</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      <% end %>
+                    </article>
                   <% end %>
-                </article>
+                <% end %>
               </div>
 
               <%!-- Edge indicator: MessageList toggles .is-visible + unread count --%>
@@ -1550,12 +1563,75 @@ defmodule XamtWeb.ServerLive do
         _ -> nil
       end
 
+    last_at =
+      case List.last(messages) do
+        %{inserted_at: at} -> at
+        _ -> nil
+      end
+
+    items = with_date_dividers(messages, socket.assigns.timezone_offset)
+
     socket
     |> assign(:oldest_message_id, oldest_id)
+    |> assign(:last_message_at, last_at)
     |> assign(:has_more_messages, length(messages) >= @message_page_size)
     |> assign(:messages_empty?, messages == [])
     |> assign(:reactions, Messages.reaction_summary(Enum.map(messages, & &1.id)))
-    |> stream(:messages, messages, reset: true)
+    |> stream(:messages, items, reset: true)
+  end
+
+  # Flatten virtual date dividers into the message stream so sticky CSS can
+  # push prior day labels when a newer divider scrolls into view (vertical-lr).
+  defp with_date_dividers(messages, timezone_offset) do
+    {items, _prev_date} =
+      Enum.reduce(messages, {[], nil}, fn msg, {acc, prev_date} ->
+        date = local_date(msg.inserted_at, timezone_offset)
+
+        acc =
+          if is_nil(prev_date) or prev_date != date do
+            [msg, date_divider(date) | acc]
+          else
+            [msg | acc]
+          end
+
+        {acc, date}
+      end)
+
+    Enum.reverse(items)
+  end
+
+  defp maybe_stream_date_divider(socket, message) do
+    offset = socket.assigns.timezone_offset
+    last_at = socket.assigns[:last_message_at]
+
+    if needs_date_divider?(last_at, message.inserted_at, offset) do
+      stream_insert(socket, :messages, date_divider(local_date(message.inserted_at, offset)))
+    else
+      socket
+    end
+  end
+
+  defp needs_date_divider?(nil, _new_at, _offset), do: true
+
+  defp needs_date_divider?(prev_at, new_at, offset) do
+    local_date(prev_at, offset) != local_date(new_at, offset)
+  end
+
+  defp date_divider(%Date{} = date) do
+    %{
+      id: "date-#{Date.to_iso8601(date)}",
+      type: :date_divider,
+      date: Date.to_iso8601(date)
+    }
+  end
+
+  defp date_divider?(%{type: :date_divider}), do: true
+  defp date_divider?(_), do: false
+
+  defp local_date(%DateTime{} = dt, offset) when is_integer(offset) do
+    dt
+    |> DateTime.add(-offset, :minute)
+    |> DateTime.to_date()
   end
 
   defp merge_reactions(socket, messages) do

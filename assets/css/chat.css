@@ -679,8 +679,18 @@
 .xamt-message__content .editor-image img {
   max-width: 12rem;
   max-height: 12rem;
+  width: auto;
+  height: auto;
   border-radius: 0.5rem;
   object-fit: contain;
+  /* Prefer reserved paint work over late scrollWidth jumps after decode */
+  content-visibility: auto;
+}
+
+.xamt-message__content img {
+  max-height: 200px;
+  width: auto;
+  content-visibility: auto;
 }
 
 .xamt-mention-picker {

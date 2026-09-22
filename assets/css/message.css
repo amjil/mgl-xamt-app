@@ -219,6 +219,37 @@
   font-size: 0.85rem;
 }
 
+/* Sticky day label: peer dividers overlap via DOM order + sticky left.
+   Stretch to the pane height so the label sits vertically centered. */
+.xamt-date-divider {
+  position: sticky;
+  left: 1rem; /* match .xamt-messages padding */
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  flex: 0 0 auto;
+  contain: layout paint;
+  pointer-events: none;
+}
+
+.xamt-date-divider__text {
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  background-color: var(--xamt-bg);
+  color: var(--xamt-muted);
+  border: 1px solid var(--xamt-line-strong);
+  border-radius: 9999px;
+  padding: 1.25rem 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  font-variant-numeric: tabular-nums;
+  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.06);
+}
+
 .xamt-message {
   position: relative;
   display: flex;

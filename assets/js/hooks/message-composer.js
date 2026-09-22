@@ -484,8 +484,12 @@ export const MessageComposer = {
   },
 }
 
-// vertical-lr: newest message is the right-most column
-const NEAR_LATEST_PX = 50
+// vertical-lr: newest message is the right-most column.
+// Mobile Mongolian layout often leaves a few dozen px of subpixel slack.
+const NEAR_LATEST_PX = 80
+
+/** Wait for mobile layout engines to finish measuring scrollWidth after a stream swap. */
+const SCROLL_SETTLE_MS = 50
 
 /**
  * Horizontal message list + new-message edge indicator.
@@ -494,6 +498,9 @@ const NEAR_LATEST_PX = 50
  * infinite-scroll prepends / reaction re-inserts do not inflate the unread
  * count. When the user has scrolled left into history, auto-scroll is blocked
  * and `#jump-latest` slides in on the right edge with a running count.
+ *
+ * Channel switches (`data-channel-id`) pin to latest and defer scrollTo until
+ * after rAF + a short settle so mobile browsers finish text layout first.
  */
 export const MessageList = {
   mounted() {
@@ -501,13 +508,15 @@ export const MessageList = {
     this.countSpan = document.getElementById("jump-latest-count")
     this.unreadCount = 0
     this._channelId = this.el.dataset.channelId
+    this._atLatest = true
+    this._scrollTimer = null
 
     this._onJump = () => this.scrollToLatest(true)
     this.jumpBtn?.addEventListener("click", this._onJump)
 
     this._onScroll = () => {
-      // Distance to the right edge (latest). Within tolerance → hide badge.
-      if (this.nearLatest()) this.hideJump()
+      this._atLatest = this.nearLatestEdge()
+      if (this._atLatest) this.hideJump()
     }
     this.el.addEventListener("scroll", this._onScroll, {passive: true})
 
@@ -536,6 +545,8 @@ export const MessageList = {
     const channelId = this.el.dataset.channelId
     if (channelId !== this._channelId) {
       this._channelId = channelId
+      // Treat switch as "at latest" while layout settles; avoids false unread.
+      this._atLatest = true
       this.hideJump()
       this.scrollToLatest(false)
     }
@@ -545,24 +556,40 @@ export const MessageList = {
   },
 
   destroyed() {
+    if (this._scrollTimer != null) clearTimeout(this._scrollTimer)
     this.jumpBtn?.removeEventListener("click", this._onJump)
     this.el.removeEventListener("scroll", this._onScroll)
     this._detachScrollLock?.()
     this._receipt?.destroyed()
   },
 
-  nearLatest() {
+  nearLatestEdge() {
     const scrollRight =
       this.el.scrollWidth - this.el.scrollLeft - this.el.clientWidth
     return scrollRight <= NEAR_LATEST_PX
   },
 
+  nearLatest() {
+    return this._atLatest || this.nearLatestEdge()
+  },
+
   scrollToLatest(smooth) {
-    this.el.scrollTo({
-      left: this.el.scrollWidth,
-      behavior: smooth ? "smooth" : "auto",
-    })
     this.hideJump()
+    this._atLatest = true
+
+    if (this._scrollTimer != null) clearTimeout(this._scrollTimer)
+
+    // rAF: wait for LiveView's DOM patch to paint; then give mobile engines
+    // a beat to finish measuring the final scrollWidth before scrolling.
+    requestAnimationFrame(() => {
+      this._scrollTimer = setTimeout(() => {
+        this._scrollTimer = null
+        this.el.scrollTo({
+          left: this.el.scrollWidth,
+          behavior: smooth ? "smooth" : "auto",
+        })
+      }, SCROLL_SETTLE_MS)
+    })
   },
 
   showJump() {
