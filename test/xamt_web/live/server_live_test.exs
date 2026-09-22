@@ -46,6 +46,89 @@ defmodule XamtWeb.ServerLiveTest do
     assert html =~ message.id or true
   end
 
+  test "renders gallery grid and opens lightbox originals", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    images = [
+      %{"thumb" => "/uploads/thumb_1.jpg", "original" => "/uploads/orig_1.jpg"},
+      %{"thumb" => "/uploads/thumb_2.jpg", "original" => "/uploads/orig_2.jpg"},
+      %{"thumb" => "/uploads/thumb_3.jpg", "original" => "/uploads/orig_3.jpg"},
+      %{"thumb" => "/uploads/thumb_4.jpg", "original" => "/uploads/orig_4.jpg"}
+    ]
+
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>trip</p>",
+        "content" => %{"type" => "gallery", "images" => images},
+        "content_type" => "gallery"
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    assert has_element?(view, "#gallery-#{message.id}[data-count='4']")
+    assert has_element?(view, "#gallery-#{message.id}-0 img[src='/uploads/thumb_1.jpg']")
+    refute has_element?(view, "#media-lightbox")
+
+    view
+    |> element("#gallery-#{message.id}-1")
+    |> render_click()
+
+    assert has_element?(view, "#media-lightbox")
+    assert has_element?(view, "#lightbox-image[src='/uploads/orig_2.jpg']")
+    assert has_element?(view, "#lightbox-counter", "2 / 4")
+    assert has_element?(view, "#lightbox-prev")
+    assert has_element?(view, "#lightbox-next")
+
+    view |> element("#lightbox-next") |> render_click()
+    assert has_element?(view, "#lightbox-image[src='/uploads/orig_3.jpg']")
+    assert has_element?(view, "#lightbox-counter", "3 / 4")
+
+    view |> element("#lightbox-close") |> render_click()
+    refute has_element?(view, "#media-lightbox")
+  end
+
+  test "gallery overflow shows +N and lightbox still has all originals", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    images =
+      for n <- 1..10 do
+        %{
+          "thumb" => "/uploads/thumb_#{n}.jpg",
+          "original" => "/uploads/orig_#{n}.jpg"
+        }
+      end
+
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "",
+        "content" => %{"type" => "gallery", "images" => images},
+        "content_type" => "gallery"
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    assert has_element?(view, "#gallery-#{message.id}[data-count='overflow']")
+    assert has_element?(view, "#gallery-#{message.id}-7", "+2")
+    refute has_element?(view, "#gallery-#{message.id}-8")
+
+    view
+    |> element("#gallery-#{message.id}-7")
+    |> render_click()
+
+    assert has_element?(view, "#lightbox-image[src='/uploads/orig_8.jpg']")
+    assert has_element?(view, "#lightbox-counter", "8 / 10")
+
+    view |> element("#lightbox-next") |> render_click()
+    assert has_element?(view, "#lightbox-image[src='/uploads/orig_9.jpg']")
+    assert has_element?(view, "#lightbox-counter", "9 / 10")
+  end
+
   test "chat drawer has close and home, not server switcher", %{
     conn: conn,
     server: server,
@@ -138,6 +221,128 @@ defmodule XamtWeb.ServerLiveTest do
     assert has_element?(view, "#messages-date-2026-09-19")
     assert has_element?(view, ".xamt-date-divider__text", "-- 2026-09-18 --")
     assert has_element?(view, ".xamt-date-divider__text", "-- 2026-09-19 --")
+  end
+
+  test "consecutive messages from the same author hide the later header", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope,
+    user: user
+  } do
+    {:ok, first} = post_html(scope, channel.id, "first")
+    {:ok, second} = post_html(scope, channel.id, "second")
+
+    stamp(first, ~U[2026-09-22 10:00:00Z])
+    stamp(second, ~U[2026-09-22 10:02:00Z])
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    assert has_element?(
+             view,
+             "[data-message-id='#{first.id}'] .xamt-message__username",
+             user.username
+           )
+
+    assert has_element?(view, "#msg-header-#{first.id}")
+    refute has_element?(view, "#msg-header-#{first.id}.xamt-message__header--spacer")
+    assert has_element?(view, "#msg-header-#{second.id}.xamt-message__header--spacer")
+    refute has_element?(view, "[data-message-id='#{second.id}'] .xamt-message__username")
+    assert has_element?(view, "article.xamt-message--grouped[data-message-id='#{second.id}']")
+    assert has_element?(view, "[data-message-id='#{second.id}'] time.xamt-message__time")
+  end
+
+  test "a new author or a 5-minute gap starts a new header", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    other = user_fixture()
+    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(other), server.id)
+    other_scope = Accounts.Scope.for_user(other)
+
+    {:ok, first} = post_html(scope, channel.id, "mine")
+    {:ok, later} = post_html(scope, channel.id, "much later")
+    {:ok, other_msg} = post_html(other_scope, channel.id, "theirs")
+
+    stamp(first, ~U[2026-09-22 10:00:00Z])
+    stamp(later, ~U[2026-09-22 10:06:00Z])
+    stamp(other_msg, ~U[2026-09-22 10:06:30Z])
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    refute has_element?(view, "#msg-header-#{first.id}.xamt-message__header--spacer")
+    refute has_element?(view, "#msg-header-#{later.id}.xamt-message__header--spacer")
+    refute has_element?(view, "#msg-header-#{other_msg.id}.xamt-message__header--spacer")
+  end
+
+  test "a local date change starts a new header even within 5 minutes", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    {:ok, before_midnight} = post_html(scope, channel.id, "before")
+    {:ok, after_midnight} = post_html(scope, channel.id, "after")
+
+    stamp(before_midnight, ~U[2026-09-21 15:58:00Z])
+    stamp(after_midnight, ~U[2026-09-21 16:01:00Z])
+
+    {:ok, view, _html} =
+      conn
+      |> put_connect_params(%{"timezone_offset" => -480})
+      |> live(~p"/servers/#{server.slug}/#{channel.slug}")
+
+    refute has_element?(view, "#msg-header-#{before_midnight.id}.xamt-message__header--spacer")
+    refute has_element?(view, "#msg-header-#{after_midnight.id}.xamt-message__header--spacer")
+    assert has_element?(view, "#messages-date-2026-09-21")
+    assert has_element?(view, "#messages-date-2026-09-22")
+  end
+
+  test "a live incoming message continues the current group", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    {:ok, first} = post_html(scope, channel.id, "live-first")
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    refute has_element?(view, "#msg-header-#{first.id}.xamt-message__header--spacer")
+
+    {:ok, second} = post_html(scope, channel.id, "live-second")
+    html = render(view)
+
+    assert html =~ "live-second"
+    assert has_element?(view, "#msg-header-#{second.id}.xamt-message__header--spacer")
+  end
+
+  test "editing a grouped message keeps the header collapsed", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    {:ok, first} = post_html(scope, channel.id, "keep header")
+    {:ok, second} = post_html(scope, channel.id, "grouped body")
+    stamp(first, ~U[2026-09-22 11:00:00Z])
+    stamp(second, ~U[2026-09-22 11:01:00Z])
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    assert has_element?(view, "#msg-header-#{second.id}.xamt-message__header--spacer")
+
+    view |> element("#edit-message-#{second.id}") |> render_click()
+
+    render_hook(view, "update_message", %{
+      "content_html" => "<p>grouped body edited</p>",
+      "content_json" => ~s({"type":"rich_text","blocks":[]}),
+      "content_type" => "rich_text"
+    })
+
+    assert render(view) =~ "grouped body edited"
+    assert has_element?(view, "#msg-header-#{second.id}.xamt-message__header--spacer")
+    assert has_element?(view, ".xamt-message__edited")
   end
 
   test "strangers cannot open a private server", %{server: server} do
@@ -960,5 +1165,18 @@ defmodule XamtWeb.ServerLiveTest do
     |> render_submit()
 
     assert has_element?(view, "audio.xamt-audio-player")
+  end
+
+  defp post_html(scope, channel_id, text) do
+    Messages.create_message(scope, channel_id, %{
+      "content_html" => "<p>#{text}</p>",
+      "content" => %{"type" => "rich_text"}
+    })
+  end
+
+  defp stamp(message, inserted_at) do
+    message
+    |> Ecto.Changeset.change(inserted_at: inserted_at, updated_at: inserted_at)
+    |> Xamt.Repo.update!()
   end
 end

@@ -45,7 +45,7 @@ defmodule Xamt.Messages do
                       content: content,
                       content_type: content_type(attrs, content),
                       content_html: content_html,
-                      search_text: search_normalize(plain_text(content_html)),
+                      search_text: search_normalize(index_text(content_html, content)),
                       reply_to_id: reply_to_id
                     })
                     |> Repo.insert(),
@@ -82,7 +82,7 @@ defmodule Xamt.Messages do
                         content: content,
                         content_type: content_type(attrs, content),
                         content_html: content_html,
-                        search_text: search_normalize(plain_text(content_html))
+                        search_text: search_normalize(index_text(content_html, content))
                       })
                       |> Repo.update(),
                     :ok <- replace_mentions(message.id, mention_ids) do
@@ -190,12 +190,19 @@ defmodule Xamt.Messages do
     end
   end
 
+  @gallery_placeholder "🖼"
+
   @doc """
   Plain text of a message, used for reply previews and search indexing.
 
   Messages are stored as editor HTML, so tags have to come off before the text
-  is shown out of context or fed to a tsvector.
+  is shown out of context or fed to a tsvector. Gallery-only messages (no
+  caption) fall back to a short placeholder so replies stay readable.
   """
+  def plain_text(%Message{content_html: html, content: content}) do
+    index_text(html, content)
+  end
+
   def plain_text(%Message{content_html: html}), do: plain_text(html)
   def plain_text(nil), do: ""
 
@@ -210,6 +217,16 @@ defmodule Xamt.Messages do
     |> String.replace(~r/\n{2,}/, "\n")
     |> String.trim()
   end
+
+  defp index_text(html, %{"type" => "gallery", "images" => images} = _content)
+       when is_list(images) and images != [] do
+    case plain_text(html) do
+      "" -> @gallery_placeholder
+      text -> text
+    end
+  end
+
+  defp index_text(html, _content), do: plain_text(html)
 
   @entities %{
     "&amp;" => "&",
@@ -536,13 +553,14 @@ defmodule Xamt.Messages do
 
   # Strip nested payload we do not need on the wire.
   # LiveView rendering only depends on `content_html` and `user`, except
-  # audio messages which need `type` + `url` to mount a player.
+  # audio (`type` + `url`) and gallery (`type` + `images`) which need structured
+  # content to mount players / photo grids without refetching.
   # Clear the editor AST so PubSub does not copy it into every subscriber heap.
   # Large `content_html` binaries are refcounted and shared by the BEAM with no copy cost.
   defp strip_for_broadcast(%Message{} = message) do
     reply_to =
       case message.reply_to do
-        %Message{} = parent -> %{parent | content: %{}}
+        %Message{} = parent -> %{parent | content: broadcast_content(parent.content)}
         other -> other
       end
 
@@ -552,6 +570,10 @@ defmodule Xamt.Messages do
   end
 
   defp broadcast_content(%{"type" => "audio"} = content), do: Map.take(content, ["type", "url"])
+
+  defp broadcast_content(%{"type" => "gallery"} = content),
+    do: Map.take(content, ["type", "images"])
+
   defp broadcast_content(_), do: %{}
 
   defp attach_mention_ids(%Message{} = message) do

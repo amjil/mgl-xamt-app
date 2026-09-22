@@ -33,6 +33,47 @@ defmodule Xamt.MessagesTest do
     assert broadcasted.content == %{"type" => "audio", "url" => "/uploads/voice.webm"}
   end
 
+  test "stores gallery messages and keeps images on broadcast", %{
+    scope: scope,
+    channel: channel
+  } do
+    Phoenix.PubSub.subscribe(Xamt.PubSub, Messages.channel_topic(channel.id))
+
+    images = [
+      %{"thumb" => "/uploads/thumb_a.jpg", "original" => "/uploads/a.jpg"},
+      %{"thumb" => "/uploads/thumb_b.jpg", "original" => "/uploads/b.jpg"}
+    ]
+
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "",
+        "content" => %{"type" => "gallery", "images" => images},
+        "content_type" => "gallery"
+      })
+
+    assert message.content_type == "gallery"
+    assert message.content["images"] == images
+    assert message.search_text == "🖼"
+    assert Messages.excerpt(message) == "🖼"
+
+    assert_receive {:new_message, broadcasted}
+    assert broadcasted.content == %{"type" => "gallery", "images" => images}
+  end
+
+  test "gallery caption is used for search and excerpt", %{scope: scope, channel: channel} do
+    images = [%{"thumb" => "/uploads/thumb_a.jpg", "original" => "/uploads/a.jpg"}]
+
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>road trip</p>",
+        "content" => %{"type" => "gallery", "images" => images},
+        "content_type" => "gallery"
+      })
+
+    assert message.search_text =~ "road trip"
+    assert Messages.excerpt(message) =~ "road trip"
+  end
+
   test "stores a reply_to_id and preloads the parent", %{scope: scope, channel: channel} do
     {:ok, parent} =
       Messages.create_message(scope, channel.id, %{

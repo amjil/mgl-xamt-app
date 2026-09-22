@@ -68,7 +68,8 @@ defmodule Xamt.MixProject do
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
-      {:web_push_ex, "~> 0.2"}
+      {:web_push_ex, "~> 0.2"},
+      {:image, "~> 0.54"}
     ]
   end
 

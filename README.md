@@ -6,6 +6,8 @@ Traditional Mongolian community & realtime chat.
 
 ## Setup
 
+Requires [libvips](https://www.libvips.org) for gallery thumbnails (`brew install vips` or your distro package). If libvips is missing, uploads still succeed and thumb URLs fall back to the original.
+
 ```bash
 mix setup
 mix phx.server

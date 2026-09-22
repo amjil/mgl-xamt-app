@@ -12,6 +12,8 @@ defmodule XamtWeb.ServerLive do
   @message_page_size 50
   @member_page_size 50
   @mobile_panels ~w(servers channels messages members)
+  # Consecutive messages from the same author within this window share one header.
+  @grouping_threshold_seconds 300
 
   @impl true
   def mount(%{"server_slug" => server_slug} = params, _session, socket) do
@@ -94,10 +96,12 @@ defmodule XamtWeb.ServerLive do
       |> assign(:search_q, "")
       |> assign(:search_results, nil)
       |> assign(:highlight_id, Map.get(params, "highlight"))
+      |> assign(:lightbox_images, nil)
+      |> assign(:lightbox_index, 0)
       |> assign_messages(messages)
       |> allow_upload(:media,
         accept: ~w(.jpg .jpeg .png .gif .webp),
-        max_entries: 4,
+        max_entries: 10,
         max_file_size: 10_000_000,
         auto_upload: true
       )
@@ -213,14 +217,8 @@ defmodule XamtWeb.ServerLive do
     if Enum.any?(socket.assigns.uploads.media.entries, &(not &1.done?)) do
       {:noreply, put_flash(socket, :error, gettext("Please wait for uploads to finish"))}
     else
-      media_html = consume_media_html(socket)
-
-      attrs = %{
-        "content" => decode_json(params["content_json"]),
-        "content_html" => (params["content_html"] || "") <> media_html,
-        "content_type" => params["content_type"] || "rich_text",
-        "reply_to_id" => socket.assigns.replying_to && socket.assigns.replying_to.id
-      }
+      images = XamtWeb.Uploads.consume_gallery_images(socket, :media)
+      attrs = build_message_attrs(params, images, socket.assigns.replying_to)
 
       case Messages.create_message(scope, channel.id, attrs) do
         {:ok, _message} ->
@@ -257,7 +255,7 @@ defmodule XamtWeb.ServerLive do
        |> assign(:editing_message_id, id)
        |> assign(:replying_to, nil)
        |> restream_message(previous_id)
-       |> stream_insert(:messages, message)
+       |> stream_message(message)
        |> push_event("populate_composer", %{html: html})}
     else
       _ ->
@@ -303,13 +301,16 @@ defmodule XamtWeb.ServerLive do
         {:noreply, put_flash(socket, :error, gettext("Please wait for uploads to finish"))}
 
       true ->
-        media_html = consume_media_html(socket)
+        new_images = XamtWeb.Uploads.consume_gallery_images(socket, :media)
 
-        attrs = %{
-          "content" => decode_json(params["content_json"]),
-          "content_html" => (params["content_html"] || "") <> media_html,
-          "content_type" => params["content_type"] || "rich_text"
-        }
+        existing_images =
+          case Messages.get_message_for_user(scope, id) do
+            {:ok, message} -> gallery_images(message) || []
+            _ -> []
+          end
+
+        images = Enum.take(existing_images ++ new_images, 10)
+        attrs = build_message_attrs(params, images, nil)
 
         case Messages.update_message(scope, id, attrs) do
           {:ok, _message} ->
@@ -323,6 +324,55 @@ defmodule XamtWeb.ServerLive do
         end
     end
   end
+
+  def handle_event("open_lightbox", %{"msg-id" => msg_id, "index" => index_str}, socket) do
+    with {:ok, message} <- Messages.get_message_for_user(socket.assigns.current_scope, msg_id),
+         images when is_list(images) and images != [] <- gallery_images(message) do
+      index =
+        case Integer.parse(to_string(index_str)) do
+          {n, _} -> max(0, min(n, length(images) - 1))
+          :error -> 0
+        end
+
+      {:noreply,
+       socket
+       |> assign(:lightbox_images, images)
+       |> assign(:lightbox_index, index)}
+    else
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("close_lightbox", _, socket) do
+    {:noreply, assign(socket, lightbox_images: nil, lightbox_index: 0)}
+  end
+
+  def handle_event("lightbox_prev", _, socket) do
+    new_index = max(0, socket.assigns.lightbox_index - 1)
+    {:noreply, assign(socket, lightbox_index: new_index)}
+  end
+
+  def handle_event("lightbox_next", _, socket) do
+    images = socket.assigns.lightbox_images || []
+    max_index = max(0, length(images) - 1)
+    new_index = min(max_index, socket.assigns.lightbox_index + 1)
+    {:noreply, assign(socket, lightbox_index: new_index)}
+  end
+
+  def handle_event("lightbox_keydown", %{"key" => "Escape"}, socket) do
+    handle_event("close_lightbox", %{}, socket)
+  end
+
+  def handle_event("lightbox_keydown", %{"key" => "ArrowLeft"}, socket) do
+    handle_event("lightbox_prev", %{}, socket)
+  end
+
+  def handle_event("lightbox_keydown", %{"key" => "ArrowRight"}, socket) do
+    handle_event("lightbox_next", %{}, socket)
+  end
+
+  def handle_event("lightbox_keydown", _, socket), do: {:noreply, socket}
 
   def handle_event("cancel_edit", _params, socket) do
     previous_id = socket.assigns.editing_message_id
@@ -370,10 +420,18 @@ defmodule XamtWeb.ServerLive do
       socket =
         case messages do
           [first | _] = msgs ->
-            items = with_date_dividers(msgs, socket.assigns.timezone_offset)
+            offset = socket.assigns.timezone_offset
+            {grouped, page_last, page_flags} = process_message_grouping(msgs, offset)
+            items = with_date_dividers(grouped, offset)
 
             socket
+            |> assign(
+              :header_flags,
+              Map.merge(socket.assigns.header_flags, page_flags)
+            )
+            |> maybe_hide_continuation_header(page_last)
             |> assign(:oldest_message_id, first.id)
+            |> assign(:oldest_message_info, oldest_message_info(grouped))
             |> assign(:has_more_messages, length(msgs) >= @message_page_size)
             |> merge_reactions(msgs)
             |> stream(:messages, items, at: 0)
@@ -627,12 +685,23 @@ defmodule XamtWeb.ServerLive do
         active_channel && message.channel_id == active_channel.id ->
           # Stay in the stream; IntersectionObserver advances the watermark
           # only when the message actually enters the viewport.
+          {message, last_info} = tag_incoming_message(socket, message)
+
           socket
           |> maybe_stream_date_divider(message)
           |> stream_insert(:messages, message)
+          |> assign(:last_message_info, last_info)
+          |> assign(
+            :header_flags,
+            Map.put(socket.assigns.header_flags, message.id, message.show_header)
+          )
           |> assign(:last_message_at, message.inserted_at)
           |> assign(:messages_empty?, false)
           |> assign(:oldest_message_id, socket.assigns[:oldest_message_id] || message.id)
+          |> assign(
+            :oldest_message_info,
+            socket.assigns[:oldest_message_info] || oldest_message_info([message])
+          )
           |> push_event("messages:scroll_bottom", %{})
 
         message.user_id != user_id and server_channel?(socket, message.channel_id) ->
@@ -651,7 +720,7 @@ defmodule XamtWeb.ServerLive do
 
   def handle_info({:updated_message, message}, socket) do
     if active_channel_message?(socket, message) do
-      {:noreply, stream_insert(socket, :messages, message)}
+      {:noreply, stream_message(socket, message)}
     else
       {:noreply, socket}
     end
@@ -663,7 +732,7 @@ defmodule XamtWeb.ServerLive do
       {:noreply,
        socket
        |> assign(:reactions, Map.put(socket.assigns.reactions, message.id, summary))
-       |> stream_insert(:messages, message)}
+       |> stream_message(message)}
     else
       {:noreply, socket}
     end
@@ -674,7 +743,7 @@ defmodule XamtWeb.ServerLive do
       {:noreply,
        socket
        |> maybe_cancel_edit(message.id)
-       |> stream_insert(:messages, message)}
+       |> stream_message(message)}
     else
       {:noreply, socket}
     end
@@ -1094,22 +1163,38 @@ defmodule XamtWeb.ServerLive do
                         "xamt-message group",
                         mentioned?(message, @current_scope.user) && "xamt-message--mentioned",
                         @editing_message_id == message.id && "xamt-message--editing",
-                        deleted?(message) && "xamt-message--deleted"
+                        deleted?(message) && "xamt-message--deleted",
+                        not header_visible?(message) && "xamt-message--grouped"
                       ]}
                       data-message-id={message.id}
                       data-inserted-at={DateTime.to_iso8601(message.inserted_at)}
                     >
-                      <.avatar user={message.user} class="xamt-message__avatar" />
+                      <div
+                        id={"msg-header-#{message.id}"}
+                        class={[
+                          "xamt-message__header",
+                          not header_visible?(message) && "xamt-message__header--spacer"
+                        ]}
+                        aria-hidden={not header_visible?(message)}
+                      >
+                        <.avatar
+                          :if={header_visible?(message)}
+                          user={message.user}
+                          class="xamt-message__avatar"
+                        />
+                      </div>
+                      <time
+                        class="xamt-message__time"
+                        datetime={DateTime.to_iso8601(message.inserted_at)}
+                      >
+                        {format_time(message.inserted_at, @timezone_offset)}
+                      </time>
                       <%= if deleted?(message) do %>
                         <div class="xamt-message__body">
-                          <header class="xamt-message__meta">
-                            <strong class="mongol-text">{display_name(message.user)}</strong>
-                            <time
-                              class="xamt-message__time"
-                              datetime={DateTime.to_iso8601(message.inserted_at)}
-                            >
-                              {format_time(message.inserted_at, @timezone_offset)}
-                            </time>
+                          <header :if={header_visible?(message)} class="xamt-message__meta">
+                            <strong class="xamt-message__username mongol-text">
+                              {display_name(message.user)}
+                            </strong>
                           </header>
                           <div
                             id={"msg-tombstone-#{message.id}"}
@@ -1144,17 +1229,19 @@ defmodule XamtWeb.ServerLive do
                               <% end %>
                             </span>
                           </button>
-                          <header class="xamt-message__meta">
-                            <strong class="mongol-text">{display_name(message.user)}</strong>
+                          <header
+                            :if={header_visible?(message) or edited?(message)}
+                            class="xamt-message__meta"
+                          >
+                            <strong
+                              :if={header_visible?(message)}
+                              class="xamt-message__username mongol-text"
+                            >
+                              {display_name(message.user)}
+                            </strong>
                             <span :if={edited?(message)} class="xamt-message__edited">
                               {gettext("edited")}
                             </span>
-                            <time
-                              class="xamt-message__time"
-                              datetime={DateTime.to_iso8601(message.inserted_at)}
-                            >
-                              {format_time(message.inserted_at, @timezone_offset)}
-                            </time>
                           </header>
                           <div
                             id={"msg-content-#{message.id}"}
@@ -1173,7 +1260,43 @@ defmodule XamtWeb.ServerLive do
                                 </audio>
                               </div>
                             <% else %>
-                              {raw(safe_html(message, @current_scope.user.id))}
+                              <%= if images = gallery_images(message) do %>
+                                <%= if caption_html?(message) do %>
+                                  {raw(safe_html(message, @current_scope.user.id))}
+                                <% end %>
+                                <% total = length(images) %>
+                                <% visible = Enum.take(images, 8) %>
+                                <% overflow? = total > 8 %>
+                                <div
+                                  id={"gallery-#{message.id}"}
+                                  class="xamt-media-grid"
+                                  data-count={gallery_count_attr(total)}
+                                >
+                                  <button
+                                    :for={{img, index} <- Enum.with_index(visible)}
+                                    type="button"
+                                    id={"gallery-#{message.id}-#{index}"}
+                                    class="xamt-media-grid__cell"
+                                    phx-click="open_lightbox"
+                                    phx-value-msg-id={message.id}
+                                    phx-value-index={index}
+                                  >
+                                    <img
+                                      src={img["thumb"]}
+                                      alt={gettext("User uploaded media")}
+                                      loading="lazy"
+                                    />
+                                    <span
+                                      :if={overflow? and index == 7}
+                                      class="xamt-media-grid__more"
+                                    >
+                                      +{total - 8}
+                                    </span>
+                                  </button>
+                                </div>
+                              <% else %>
+                                {raw(safe_html(message, @current_scope.user.id))}
+                              <% end %>
                             <% end %>
                             <%= if preview = link_preview(message) do %>
                               <a
@@ -1490,6 +1613,62 @@ defmodule XamtWeb.ServerLive do
         channel_form={@channel_form}
         editing_channel={@editing_channel}
       />
+
+      <%= if @lightbox_images do %>
+        <% current_image = Enum.at(@lightbox_images, @lightbox_index) %>
+        <div
+          id="media-lightbox"
+          class="xamt-lightbox"
+          phx-window-keydown="lightbox_keydown"
+          phx-hook="LightboxSwipe"
+          role="dialog"
+          aria-modal="true"
+          aria-label={gettext("Image gallery")}
+        >
+          <button
+            id="lightbox-close"
+            type="button"
+            phx-click="close_lightbox"
+            class="xamt-lightbox__close"
+            aria-label={gettext("Close")}
+          >
+            <.icon name="hero-x-mark" class="w-10 h-10" />
+          </button>
+
+          <img
+            id="lightbox-image"
+            src={current_image["original"]}
+            alt={gettext("Full size image")}
+            class="xamt-lightbox__image"
+          />
+
+          <button
+            :if={@lightbox_index > 0}
+            id="lightbox-prev"
+            type="button"
+            phx-click="lightbox_prev"
+            class="xamt-lightbox__nav xamt-lightbox__nav--prev"
+            aria-label={gettext("Previous image")}
+          >
+            <.icon name="hero-chevron-left" class="w-12 h-12" />
+          </button>
+
+          <button
+            :if={@lightbox_index < length(@lightbox_images) - 1}
+            id="lightbox-next"
+            type="button"
+            phx-click="lightbox_next"
+            class="xamt-lightbox__nav xamt-lightbox__nav--next"
+            aria-label={gettext("Next image")}
+          >
+            <.icon name="hero-chevron-right" class="w-12 h-12" />
+          </button>
+
+          <div id="lightbox-counter" class="xamt-lightbox__counter">
+            {@lightbox_index + 1} / {length(@lightbox_images)}
+          </div>
+        </div>
+      <% end %>
     </div>
     """
   end
@@ -1557,28 +1736,98 @@ defmodule XamtWeb.ServerLive do
   end
 
   defp assign_messages(socket, messages) do
+    offset = socket.assigns.timezone_offset
+    {grouped, last_info, flags} = process_message_grouping(messages, offset)
+
     oldest_id =
-      case messages do
+      case grouped do
         [first | _] -> first.id
         _ -> nil
       end
 
     last_at =
-      case List.last(messages) do
+      case List.last(grouped) do
         %{inserted_at: at} -> at
         _ -> nil
       end
 
-    items = with_date_dividers(messages, socket.assigns.timezone_offset)
+    items = with_date_dividers(grouped, offset)
 
     socket
     |> assign(:oldest_message_id, oldest_id)
+    |> assign(:oldest_message_info, oldest_message_info(grouped))
     |> assign(:last_message_at, last_at)
+    |> assign(:last_message_info, last_info)
+    |> assign(:header_flags, flags)
     |> assign(:has_more_messages, length(messages) >= @message_page_size)
     |> assign(:messages_empty?, messages == [])
     |> assign(:reactions, Messages.reaction_summary(Enum.map(messages, & &1.id)))
     |> stream(:messages, items, reset: true)
   end
+
+  # `list_messages/2` already returns chronological (oldest first) after reversing
+  # the desc query. Walk that order so each message is compared to its predecessor.
+  defp process_message_grouping(messages, timezone_offset) do
+    empty_info = %{user_id: nil, time: nil}
+
+    {acc, last_info, flags} =
+      Enum.reduce(messages, {[], empty_info, %{}}, fn msg, {acc, prev_info, flags} ->
+        show_header? = start_of_group?(prev_info, msg, timezone_offset)
+        msg = %{msg | show_header: show_header?}
+        info = %{user_id: msg.user_id, time: msg.inserted_at}
+
+        {[msg | acc], info, Map.put(flags, msg.id, show_header?)}
+      end)
+
+    {Enum.reverse(acc), last_info, flags}
+  end
+
+  defp start_of_group?(%{user_id: prev_user, time: prev_time}, message, offset) do
+    is_nil(prev_user) or is_nil(prev_time) or prev_user != message.user_id or
+      needs_date_divider?(prev_time, message.inserted_at, offset) or
+      DateTime.diff(message.inserted_at, prev_time) > @grouping_threshold_seconds
+  end
+
+  defp tag_incoming_message(socket, message) do
+    last_info = socket.assigns.last_message_info
+    offset = socket.assigns.timezone_offset
+    message = %{message | show_header: start_of_group?(last_info, message, offset)}
+    {message, %{user_id: message.user_id, time: message.inserted_at}}
+  end
+
+  defp oldest_message_info([first | _]) do
+    %{id: first.id, user_id: first.user_id, time: first.inserted_at}
+  end
+
+  defp oldest_message_info(_), do: %{id: nil, user_id: nil, time: nil}
+
+  # When older history is prepended, the previous oldest may now continue a group.
+  defp maybe_hide_continuation_header(socket, page_last) do
+    oldest = socket.assigns[:oldest_message_info] || oldest_message_info([])
+    offset = socket.assigns.timezone_offset
+
+    cond do
+      is_nil(oldest.id) ->
+        socket
+
+      start_of_group?(page_last, %{user_id: oldest.user_id, inserted_at: oldest.time}, offset) ->
+        socket
+
+      true ->
+        case Messages.get_message_for_user(socket.assigns.current_scope, oldest.id) do
+          {:ok, message} ->
+            socket
+            |> assign(:header_flags, Map.put(socket.assigns.header_flags, message.id, false))
+            |> stream_insert(:messages, %{message | show_header: false})
+
+          {:error, _} ->
+            socket
+        end
+    end
+  end
+
+  defp header_visible?(%{show_header: false}), do: false
+  defp header_visible?(_), do: true
 
   # Flatten virtual date dividers into the message stream so sticky CSS can
   # push prior day labels when a newer divider scrolls into view (vertical-lr).
@@ -2066,12 +2315,17 @@ defmodule XamtWeb.ServerLive do
 
   defp restream_message(socket, id) when is_binary(id) do
     case Messages.get_message_for_user(socket.assigns.current_scope, id) do
-      {:ok, message} -> stream_insert(socket, :messages, message)
+      {:ok, message} -> stream_message(socket, message)
       {:error, _} -> socket
     end
   end
 
   defp restream_message(socket, _), do: socket
+
+  defp stream_message(socket, message) do
+    show_header = Map.get(socket.assigns.header_flags, message.id, true)
+    stream_insert(socket, :messages, %{message | show_header: show_header})
+  end
 
   defp maybe_cancel_edit(socket, message_id) do
     if socket.assigns.editing_message_id == message_id do
@@ -2262,12 +2516,82 @@ defmodule XamtWeb.ServerLive do
 
   defp decode_json(data) when is_map(data), do: data
 
-  defp consume_media_html(socket) do
-    socket
-    |> XamtWeb.Uploads.consume_images(:media)
-    |> Enum.map(fn url -> ~s(<div class="editor-image"><img src="#{url}" /></div>) end)
-    |> Enum.join()
+  defp build_message_attrs(params, images, replying_to) when is_list(images) and images != [] do
+    caption = params["content_html"] || ""
+    content_json = decode_json(params["content_json"])
+    images = Enum.take(images, 10)
+
+    content =
+      content_json
+      |> Map.take(["blocks", "html", "json"])
+      |> Map.merge(%{"type" => "gallery", "images" => images})
+
+    attrs = %{
+      "content" => content,
+      "content_html" => caption,
+      "content_type" => "gallery"
+    }
+
+    if replying_to do
+      Map.put(attrs, "reply_to_id", replying_to.id)
+    else
+      attrs
+    end
   end
+
+  defp build_message_attrs(params, _images, replying_to) do
+    attrs = %{
+      "content" => decode_json(params["content_json"]),
+      "content_html" => params["content_html"] || "",
+      "content_type" => params["content_type"] || "rich_text"
+    }
+
+    if replying_to do
+      Map.put(attrs, "reply_to_id", replying_to.id)
+    else
+      attrs
+    end
+  end
+
+  defp gallery_images(%{content: %{"type" => "gallery", "images" => images}})
+       when is_list(images) and images != [] do
+    images
+    |> Enum.map(&normalize_gallery_image/1)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.take(10)
+    |> case do
+      [] -> nil
+      list -> list
+    end
+  end
+
+  defp gallery_images(_), do: nil
+
+  defp normalize_gallery_image(%{"thumb" => thumb, "original" => original})
+       when is_binary(thumb) and is_binary(original) do
+    if safe_upload_url?(thumb) and safe_upload_url?(original) do
+      %{"thumb" => thumb, "original" => original}
+    end
+  end
+
+  defp normalize_gallery_image(_), do: nil
+
+  defp safe_upload_url?(url) when is_binary(url) do
+    (String.starts_with?(url, "/uploads/") and not String.contains?(url, "..")) or
+      String.starts_with?(url, "https://")
+  end
+
+  defp safe_upload_url?(_), do: false
+
+  defp gallery_count_attr(total) when total > 8, do: "overflow"
+  defp gallery_count_attr(total) when total in 1..8, do: to_string(total)
+  defp gallery_count_attr(_), do: "1"
+
+  defp caption_html?(%{content_html: html}) when is_binary(html) do
+    String.trim(html) != ""
+  end
+
+  defp caption_html?(_), do: false
 
   defp send_audio_message(socket, channel) do
     {done, in_progress} = Phoenix.LiveView.uploaded_entries(socket, :audio)

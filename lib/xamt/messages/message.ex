@@ -12,6 +12,8 @@ defmodule Xamt.Messages.Message do
     field :link_preview, :map
     field :deleted_at, :utc_datetime
     field :mentioned_user_ids, {:array, :binary_id}, virtual: true, default: []
+    # In-memory grouping flag: consecutive same-author messages hide the header.
+    field :show_header, :boolean, virtual: true, default: true
 
     belongs_to :channel, Xamt.Channels.Channel
     belongs_to :user, Xamt.Accounts.User
@@ -34,7 +36,7 @@ defmodule Xamt.Messages.Message do
       :reply_to_id
     ])
     |> validate_required([:channel_id, :user_id, :content])
-    |> validate_inclusion(:content_type, ~w(plain_text rich_text audio))
+    |> validate_inclusion(:content_type, ~w(plain_text rich_text audio gallery))
     |> touch_edited_at()
   end
 
