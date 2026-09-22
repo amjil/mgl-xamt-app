@@ -847,10 +847,100 @@ defmodule XamtWeb.ServerLiveTest do
 
     assert has_element?(view, "#msg-preview-#{message.id}")
     assert has_element?(view, "#msg-preview-#{message.id}[href='https://example.com/story']")
+    assert has_element?(view, "#msg-embed-#{message.id}.xamt-embed-island")
     html = render(view)
     assert html =~ "Example Story"
     assert html =~ "A short summary"
     assert html =~ ~s(src="https://example.com/og.png")
+  end
+
+  test "renders video and audiobook cards as horizontal islands", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    {:ok, video} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>https://www.youtube.com/watch?v=dQw4w9WgXcQ</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    {:ok, book} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>https://audio-app-domain.com/books/jangar</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    {:ok, _} =
+      Messages.put_link_preview(video, %{
+        "type" => "video",
+        "provider" => "YouTube",
+        "video_id" => "dQw4w9WgXcQ",
+        "url" => "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        "title" => "Jangar episode",
+        "iframe_url" => "javascript:alert(1)"
+      })
+
+    assert has_element?(
+             view,
+             "#msg-embed-frame-#{video.id}[sandbox='allow-scripts allow-same-origin allow-presentation']"
+           )
+
+    html = render(view)
+    assert html =~ "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"
+    assert html =~ "xamt-embed-island"
+    refute html =~ "javascript:"
+
+    {:ok, _} =
+      Messages.put_link_preview(video, %{
+        "type" => "video",
+        "provider" => "YouTube",
+        "video_id" => "not a video",
+        "url" => "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        "iframe_url" => "https://evil.example/embed"
+      })
+
+    html = render(view)
+    refute html =~ "evil.example"
+    refute html =~ "msg-embed-frame-#{video.id}"
+
+    {:ok, _} =
+      Messages.put_link_preview(book, %{
+        "type" => "audio_book",
+        "provider" => "MyAudioApp",
+        "url" => "https://audio-app-domain.com/books/jangar",
+        "title" => "江格尔",
+        "cover_url" => "https://cdn.example/cover.jpg",
+        "audio_sample_url" => "https://cdn.example/sample.m4a"
+      })
+
+    assert has_element?(
+             view,
+             "#msg-embed-sample-#{book.id}[src='https://cdn.example/sample.m4a']"
+           )
+
+    html = render(view)
+    assert html =~ "江格尔"
+    assert html =~ "xamt-embed-audio"
+    assert html =~ ~s(src="https://cdn.example/cover.jpg")
+
+    {:ok, _} =
+      Messages.put_link_preview(book, %{
+        "type" => "audio_book",
+        "provider" => "MyAudioApp",
+        "url" => "https://audio-app-domain.com/books/jangar",
+        "title" => "江格尔",
+        "audio_sample_url" => "javascript:alert(1)",
+        "cover_url" => "https://127.0.0.1/cover.jpg"
+      })
+
+    html = render(view)
+    refute html =~ "javascript:"
+    refute html =~ "127.0.0.1"
+    refute has_element?(view, "#msg-embed-sample-#{book.id}")
   end
 
   test "saves a web push subscription from the LiveView hook", %{

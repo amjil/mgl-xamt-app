@@ -25,7 +25,9 @@
 }
 
 .xamt-messages audio,
-.xamt-messages .xamt-audio-player {
+.xamt-messages iframe,
+.xamt-messages .xamt-audio-player,
+.xamt-messages .xamt-embed-island {
   touch-action: auto;
 }
 
@@ -926,16 +928,119 @@ a.xamt-mention:hover {
   }
 }
 
+/* Horizontal-tb island inside a vertical-lr column.
+   Native <audio> and <iframe> controls collapse if they inherit vertical-lr.
+   max-height caps the island's physical height, which is the space a
+   vertical-lr column spends extending to the right. */
+.xamt-embed-island {
+  display: inline-block;
+  max-height: 100%;
+  max-width: min(20rem, 70vh);
+  margin-block-start: 0.65rem;
+  flex-shrink: 0;
+  vertical-align: top;
+  unicode-bidi: isolate;
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  font-family: var(--xamt-font-ui), system-ui, -apple-system, sans-serif;
+  line-height: 1.4;
+  letter-spacing: normal;
+}
+
+.xamt-embed-island,
+.xamt-embed-island * {
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  text-orientation: mixed;
+}
+
+.xamt-embed-video {
+  width: min(20rem, 70vh);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 1px solid var(--xamt-line);
+  background: #000;
+  box-shadow: var(--xamt-shadow);
+}
+
+.xamt-embed-island iframe {
+  display: block;
+  width: 100%;
+  height: 11.25rem;
+  max-width: 100%;
+  border: 0;
+  background: #000;
+}
+
+.xamt-embed-audio {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.85rem;
+  width: min(20rem, 70vh);
+  padding: 0.75rem;
+  border: 1px solid var(--xamt-line);
+  border-radius: 0.75rem;
+  background: var(--xamt-bg-2);
+}
+
+.xamt-embed-audio__cover {
+  width: 4rem;
+  height: 4rem;
+  flex: 0 0 auto;
+  object-fit: cover;
+  border-radius: 0.45rem;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
+}
+
+.xamt-embed-audio__body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.xamt-embed-audio__title {
+  display: block;
+  overflow: hidden;
+  color: var(--xamt-accent-2);
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-decoration: none;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.xamt-embed-audio__title:hover {
+  color: var(--xamt-accent);
+}
+
+.xamt-embed-audio__meta {
+  margin: 0.2rem 0 0;
+  color: var(--xamt-muted);
+  font-size: 0.75rem;
+}
+
+.xamt-embed-island audio {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 2rem;
+  margin-top: 0.45rem;
+  outline: none;
+  accent-color: var(--xamt-accent);
+}
+
 .xamt-link-preview {
   display: flex;
   flex-direction: column;
-  margin-block-start: 0.5rem;
   border: 1px solid var(--xamt-line);
-  border-radius: 0.6rem;
+  border-radius: 0.75rem;
   background: var(--xamt-bg-2);
   text-decoration: none;
   overflow: hidden;
-  max-width: min(9.5rem, 100%);
+  width: min(18rem, 70vh);
+  max-width: 100%;
   flex-shrink: 0;
   writing-mode: horizontal-tb;
   -webkit-writing-mode: horizontal-tb;
@@ -946,50 +1051,49 @@ a.xamt-mention:hover {
 
 .xamt-link-preview:hover {
   background: var(--xamt-bg-3);
-  border-color: var(--xamt-line-strong);
+  border-color: var(--xamt-accent);
 }
 
 .xamt-link-preview__img {
   width: 100%;
-  height: 5rem;
+  height: 8rem;
   object-fit: cover;
   border-bottom: 1px solid var(--xamt-line);
 }
 
 .xamt-link-preview__body {
-  padding: 0.45rem 0.5rem 0.55rem;
+  padding: 0.75rem;
   display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 0.45rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
 }
 
 .xamt-link-preview__title,
 .xamt-link-preview__desc {
-  writing-mode: vertical-lr;
-  -webkit-writing-mode: vertical-lr;
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
   text-orientation: mixed;
-  font-family: var(--xamt-font-mongol);
-  line-height: 1.75;
-  letter-spacing: 0.06em;
-  height: 7.25rem;
+  font-family: var(--xamt-font-ui), system-ui, -apple-system, sans-serif;
+  letter-spacing: normal;
+  line-height: 1.4;
   overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
 }
 
 .xamt-link-preview__title {
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 0.875rem;
+  font-weight: 700;
   color: var(--xamt-accent-2);
-  max-width: 2.2em;
+  -webkit-line-clamp: 2;
 }
 
 .xamt-link-preview__desc {
   font-size: 0.75rem;
   color: var(--xamt-muted);
   margin: 0;
-  flex: 1;
-  min-width: 0;
-  max-width: 3.4em;
+  -webkit-line-clamp: 3;
 }
 
 .xamt-typing {

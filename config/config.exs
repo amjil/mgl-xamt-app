@@ -31,6 +31,12 @@ config :xamt, :ime_base_url, nil
 # Message send rate limit (ETS sliding window). Tests override limit.
 config :xamt, Xamt.Messages.RateLimiter, limit: 5, window_seconds: 3
 
+# Audiobook shares on these hosts unfurl as a player card. Replace the
+# placeholder host when the audiobook app domain is real.
+config :xamt, Xamt.Messages.LinkPreview,
+  audio_book_hosts: ["audio-app-domain.com"],
+  audio_book_provider: "MyAudioApp"
+
 # Warm ETS community caches from Postgres on boot (disabled under SQL sandbox).
 config :xamt, :ets_cache_warmup, true
 

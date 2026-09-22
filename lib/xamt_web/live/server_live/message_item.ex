@@ -5,6 +5,7 @@ defmodule XamtWeb.ServerLive.MessageItem do
 
   import XamtWeb.ServerLive.Helpers
   alias Xamt.Messages
+  alias Xamt.Messages.LinkPreview
 
   attr :message, :map, required: true
   attr :dom_id, :string, required: true
@@ -17,6 +18,17 @@ defmodule XamtWeb.ServerLive.MessageItem do
   attr :timezone_offset, :integer, default: 0
 
   def message_item(assigns) do
+    preview = link_preview(assigns.message)
+
+    assigns =
+      assign(assigns,
+        preview: preview,
+        embed_src: preview && LinkPreview.iframe_src(preview),
+        embed_audio: preview && LinkPreview.audio_sample_url(preview),
+        embed_image: preview && LinkPreview.preview_image(preview),
+        embed_href: preview && LinkPreview.page_url(preview)
+      )
+
     ~H"""
     <article
       id={@dom_id}
@@ -302,37 +314,86 @@ defmodule XamtWeb.ServerLive.MessageItem do
                 <% end %>
               <% end %>
             <% end %>
-            <%= if preview = link_preview(@message) do %>
-              <a
-                id={"msg-preview-#{@message.id}"}
-                href={preview["url"]}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="xamt-link-preview"
-              >
-                <img
-                  :if={preview["image"]}
-                  src={preview["image"]}
-                  alt={preview["title"] || ""}
-                  class="xamt-link-preview__img"
-                  loading="lazy"
-                  referrerpolicy="no-referrer"
-                />
-                <div class="xamt-link-preview__body">
-                  <strong
-                    :if={preview["title"]}
-                    class="xamt-link-preview__title mongol-text"
-                  >
-                    {preview["title"]}
-                  </strong>
-                  <p
-                    :if={preview["description"]}
-                    class="xamt-link-preview__desc mongol-text"
-                  >
-                    {preview["description"]}
-                  </p>
-                </div>
-              </a>
+            <%= if @preview do %>
+              <div id={"msg-embed-#{@message.id}"} class="xamt-embed-island">
+                <%= if @embed_src do %>
+                  <div class="xamt-embed-video">
+                    <iframe
+                      id={"msg-embed-frame-#{@message.id}"}
+                      src={@embed_src}
+                      title={@preview["title"] || gettext("Embedded video")}
+                      sandbox={LinkPreview.iframe_sandbox()}
+                      allow={LinkPreview.iframe_allow()}
+                      allowfullscreen
+                      referrerpolicy="no-referrer"
+                      loading="lazy"
+                    >
+                    </iframe>
+                  </div>
+                <% else %>
+                  <%= if @preview["type"] == "audio_book" do %>
+                    <div id={"msg-embed-audio-#{@message.id}"} class="xamt-embed-audio">
+                      <img
+                        :if={@embed_image}
+                        src={@embed_image}
+                        alt=""
+                        class="xamt-embed-audio__cover"
+                        loading="lazy"
+                        referrerpolicy="no-referrer"
+                      />
+                      <div class="xamt-embed-audio__body">
+                        <a
+                          :if={@preview["title"] && @embed_href}
+                          href={@embed_href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="xamt-embed-audio__title"
+                        >
+                          {@preview["title"]}
+                        </a>
+                        <p class="xamt-embed-audio__meta">
+                          {gettext("From the audiobook library")}
+                        </p>
+                        <audio
+                          :if={@embed_audio}
+                          id={"msg-embed-sample-#{@message.id}"}
+                          controls
+                          preload="none"
+                          src={@embed_audio}
+                        >
+                          {gettext("Audio sample")}
+                        </audio>
+                      </div>
+                    </div>
+                  <% else %>
+                    <a
+                      :if={@embed_href}
+                      id={"msg-preview-#{@message.id}"}
+                      href={@embed_href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="xamt-link-preview"
+                    >
+                      <img
+                        :if={@embed_image}
+                        src={@embed_image}
+                        alt={@preview["title"] || ""}
+                        class="xamt-link-preview__img"
+                        loading="lazy"
+                        referrerpolicy="no-referrer"
+                      />
+                      <div class="xamt-link-preview__body">
+                        <strong :if={@preview["title"]} class="xamt-link-preview__title">
+                          {@preview["title"]}
+                        </strong>
+                        <p :if={@preview["description"]} class="xamt-link-preview__desc">
+                          {@preview["description"]}
+                        </p>
+                      </div>
+                    </a>
+                  <% end %>
+                <% end %>
+              </div>
             <% end %>
           </div>
           <div class="xamt-reactions">

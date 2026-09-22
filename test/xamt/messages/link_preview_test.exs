@@ -72,6 +72,8 @@ defmodule Xamt.Messages.LinkPreviewTest do
     preview = Messages.get_message!(message.id).link_preview
     assert preview["title"] == "Page Title"
     assert preview["description"] == "From twitter"
+    assert preview["type"] == "article"
+    assert preview["provider"] == "OpenGraph"
   end
 
   test "silently ignores fetch failures and private URLs", %{scope: scope, channel: channel} do
@@ -136,6 +138,226 @@ defmodule Xamt.Messages.LinkPreviewTest do
 
     assert updated.link_preview["title"] == "Card"
     assert DateTime.compare(updated.updated_at, message.updated_at) == :eq
+  end
+
+  test "builds iframe urls only for allowlisted video ids" do
+    youtube = %{
+      "type" => "video",
+      "provider" => "YouTube",
+      "video_id" => "dQw4w9WgXcQ",
+      "iframe_url" => "javascript:alert(1)"
+    }
+
+    assert LinkPreview.iframe_src(youtube) ==
+             "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"
+
+    assert LinkPreview.iframe_src(%{youtube | "video_id" => "short"}) == nil
+    assert LinkPreview.iframe_src(%{youtube | "video_id" => "dQw4w9WgXcQ/evil"}) == nil
+
+    assert LinkPreview.iframe_src(%{
+             "type" => "video",
+             "provider" => "Bilibili",
+             "video_id" => "BV1xx411c7mD"
+           }) ==
+             "https://player.bilibili.com/player.html?bvid=BV1xx411c7mD&high_quality=1&danmaku=0&autoplay=0"
+
+    assert LinkPreview.iframe_src(%{
+             "type" => "video",
+             "provider" => "Bilibili",
+             "video_id" => "av170001"
+           }) =~ "aid=170001"
+
+    assert LinkPreview.audio_sample_url(%{
+             "type" => "audio_book",
+             "audio_sample_url" => "javascript:alert(1)"
+           }) == nil
+
+    assert LinkPreview.audio_sample_url(%{
+             "type" => "audio_book",
+             "audio_sample_url" => "https://127.0.0.1/sample.m4a"
+           }) == nil
+
+    assert LinkPreview.preview_image(%{"image" => "javascript:alert(1)"}) == nil
+
+    assert LinkPreview.page_url(%{"url" => "javascript:alert(1)"}) == nil
+
+    assert LinkPreview.page_url(%{"url" => "https://example.com/story"}) ==
+             "https://example.com/story"
+  end
+
+  test "routes YouTube links to a video card and ignores lookalike hosts", %{
+    scope: scope,
+    channel: channel
+  } do
+    enable_provider_preview!()
+
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => ~s(<p>https://www.youtube.com/watch?v=dQw4w9WgXcQ</p>),
+        "content" => %{"type" => "rich_text"}
+      })
+
+    preview = Messages.get_message!(message.id).link_preview
+    assert preview["type"] == "video"
+    assert preview["provider"] == "YouTube"
+    assert preview["video_id"] == "dQw4w9WgXcQ"
+    assert preview["title"] == "Jangar episode"
+    assert preview["image"] == "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+    refute Map.has_key?(preview, "iframe_url")
+
+    {:ok, short} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => ~s(<p>https://youtu.be/abcdefghijk</p>),
+        "content" => %{"type" => "rich_text"}
+      })
+
+    assert Messages.get_message!(short.id).link_preview["video_id"] == "abcdefghijk"
+
+    {:ok, lookalike} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => ~s(<p>https://notyoutube.com/watch?v=dQw4w9WgXcQ</p>),
+        "content" => %{"type" => "rich_text"}
+      })
+
+    lookalike = Messages.get_message!(lookalike.id).link_preview
+    assert lookalike["type"] == "article"
+    refute Map.has_key?(lookalike, "video_id")
+  end
+
+  test "routes Bilibili pages and b23 short links to a video card", %{
+    scope: scope,
+    channel: channel
+  } do
+    enable_provider_preview!()
+
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => ~s(<p>https://www.bilibili.com/video/BV1xx411c7mD</p>),
+        "content" => %{"type" => "rich_text"}
+      })
+
+    preview = Messages.get_message!(message.id).link_preview
+    assert preview["type"] == "video"
+    assert preview["provider"] == "Bilibili"
+    assert preview["video_id"] == "BV1xx411c7mD"
+    assert preview["title"] == "Bilibili Title"
+
+    {:ok, legacy} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => ~s(<p>https://www.bilibili.com/video/av170001</p>),
+        "content" => %{"type" => "rich_text"}
+      })
+
+    assert Messages.get_message!(legacy.id).link_preview["video_id"] == "av170001"
+
+    {:ok, short} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => ~s(<p>https://b23.tv/abcd</p>),
+        "content" => %{"type" => "rich_text"}
+      })
+
+    short = Messages.get_message!(short.id).link_preview
+    assert short["type"] == "video"
+    assert short["video_id"] == "BV1xx411c7mD"
+    assert short["url"] == "https://b23.tv/abcd"
+  end
+
+  test "unfurls a configured audiobook URL and drops private media", %{
+    scope: scope,
+    channel: channel
+  } do
+    enable_provider_preview!()
+
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => ~s(<p>https://audio-app-domain.com/books/jangar</p>),
+        "content" => %{"type" => "rich_text"}
+      })
+
+    preview = Messages.get_message!(message.id).link_preview
+    assert preview["type"] == "audio_book"
+    assert preview["provider"] == "MyAudioApp"
+    assert preview["title"] == "江格尔"
+    assert preview["cover_url"] == "https://audio-app-domain.com/cover.jpg"
+    assert preview["audio_sample_url"] == "https://cdn.example/sample.m4a"
+
+    {:ok, poisoned} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => ~s(<p>https://audio-app-domain.com/books/secret</p>),
+        "content" => %{"type" => "rich_text"}
+      })
+
+    poisoned = Messages.get_message!(poisoned.id).link_preview
+    assert poisoned["title"] == "Secret"
+    refute Map.has_key?(poisoned, "audio_sample_url")
+  end
+
+  defp enable_provider_preview! do
+    plug = fn conn ->
+      cond do
+        String.contains?(conn.request_path, "/oembed") ->
+          body =
+            Jason.encode!(%{
+              "title" => "Jangar episode",
+              "thumbnail_url" => "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+            })
+
+          conn
+          |> Plug.Conn.put_resp_content_type("application/json")
+          |> Plug.Conn.send_resp(200, body)
+
+        conn.host == "b23.tv" ->
+          conn
+          |> Plug.Conn.put_resp_header(
+            "location",
+            "https://www.bilibili.com/video/BV1xx411c7mD"
+          )
+          |> Plug.Conn.send_resp(302, "")
+
+        conn.host == "audio-app-domain.com" and conn.request_path == "/books/secret" ->
+          body =
+            Jason.encode!(%{
+              "title" => "Secret",
+              "audio_sample_url" => "http://127.0.0.1/sample.m4a",
+              "cover_url" => "https://127.0.0.1/cover.jpg"
+            })
+
+          conn
+          |> Plug.Conn.put_resp_content_type("application/json")
+          |> Plug.Conn.send_resp(200, body)
+
+        conn.host == "audio-app-domain.com" ->
+          body =
+            Jason.encode!(%{
+              "title" => "江格尔",
+              "cover_url" => "/cover.jpg",
+              "audio_sample_url" => "https://cdn.example/sample.m4a"
+            })
+
+          conn
+          |> Plug.Conn.put_resp_content_type("application/json")
+          |> Plug.Conn.send_resp(200, body)
+
+        true ->
+          conn
+          |> Plug.Conn.put_resp_content_type("text/html")
+          |> Plug.Conn.send_resp(200, """
+          <html>
+            <head>
+              <meta property="og:title" content="Bilibili Title">
+              <meta property="og:description" content="A video page">
+              <meta property="og:image" content="https://i0.hdslb.com/cover.jpg">
+            </head>
+          </html>
+          """)
+      end
+    end
+
+    Application.put_env(:xamt, LinkPreview,
+      enabled: true,
+      async: false,
+      req_options: [plug: plug]
+    )
   end
 
   defp enable_preview!(body, opts \\ []) do
