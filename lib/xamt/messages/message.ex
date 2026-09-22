@@ -10,6 +10,7 @@ defmodule Xamt.Messages.Message do
     field :content_html, :string
     field :search_text, :string
     field :link_preview, :map
+    field :is_pinned, :boolean, default: false
     field :deleted_at, :utc_datetime
     field :mentioned_user_ids, {:array, :binary_id}, virtual: true, default: []
     # In-memory grouping flag: consecutive same-author messages hide the header.
@@ -66,5 +67,12 @@ defmodule Xamt.Messages.Message do
   @doc false
   def delete_changeset(message) do
     change(message, deleted_at: DateTime.utc_now(:second))
+  end
+
+  @doc false
+  def pin_changeset(message, attrs) do
+    message
+    |> cast(attrs, [:is_pinned])
+    |> validate_required([:is_pinned])
   end
 end

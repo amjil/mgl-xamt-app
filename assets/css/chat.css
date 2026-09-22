@@ -1238,6 +1238,202 @@
   }
 }
 
+/* Pinned announcements: same vertical-lr sheet body as poll details.
+   Cards advance left→right; each card is a Mongolian column. */
+.xamt-sheet--pinned .xamt-sheet__frame {
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
+  padding: 0;
+}
+
+.xamt-sheet--pinned .xamt-sheet__panel {
+  width: min(26rem, 92vw);
+  height: 100%;
+  max-height: none;
+  border-radius: 0;
+  border-left: 1px solid var(--xamt-line);
+  transform: translateX(100%);
+  opacity: 1;
+}
+
+.xamt-sheet--pinned.is-open .xamt-sheet__panel {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+@media (min-width: 960px) {
+  .xamt-sheet--pinned .xamt-sheet__panel {
+    width: min(28rem, 40vw);
+  }
+}
+
+.xamt-sheet--pinned .xamt-sheet-form.xamt-pinned-drawer {
+  height: 100%;
+  align-items: stretch;
+}
+
+.xamt-pinned-drawer {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.85rem;
+  height: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+  padding-block-end: 0.5rem;
+}
+
+.xamt-pinned-drawer__title {
+  display: flex;
+  /* vertical-lr: row = top→bottom (icon above title glyphs). */
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.xamt-pinned-drawer__empty {
+  margin: 0;
+  color: var(--xamt-muted);
+  font-size: 0.9rem;
+  max-inline-size: var(--xamt-field-extent);
+}
+
+.xamt-pinned-drawer__list {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  align-self: stretch;
+}
+
+.xamt-pinned-card {
+  position: relative;
+  display: flex;
+  /*
+   * Match .xamt-message: vertical-lr flex row = top→bottom.
+   * Avatar on top (left-aligned); name + content sit below it.
+   */
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.55rem 2.15rem 0.55rem 0.5rem;
+  border: 1px solid var(--xamt-line);
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, var(--xamt-bg) 80%, transparent);
+  inline-size: 100%;
+  max-inline-size: none;
+  min-inline-size: 0;
+  box-sizing: border-box;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.xamt-pinned-card:hover {
+  border-color: color-mix(in srgb, var(--xamt-accent) 35%, var(--xamt-line));
+  background: color-mix(in srgb, var(--xamt-bg) 92%, transparent);
+}
+
+.xamt-pinned-card__header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  flex: 0 0 auto;
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.xamt-pinned-card__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-inline-size: 0;
+  max-inline-size: calc(100% - 2.5rem - 0.75rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.xamt-pinned-card__meta {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  font-size: 0.85rem;
+  color: var(--xamt-muted);
+}
+
+.xamt-pinned-card__name {
+  color: var(--xamt-text);
+  font-weight: 650;
+  flex: 0 0 auto;
+}
+
+.xamt-pinned-card__time {
+  flex: 0 0 auto;
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: sideways;
+  -webkit-text-orientation: sideways;
+  font-family: var(--xamt-font-ui);
+  font-variant-numeric: lining-nums tabular-nums;
+  font-size: 0.75rem;
+  color: var(--xamt-muted);
+  line-height: 1;
+}
+
+.xamt-pinned-card__content {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  line-height: 1.75;
+  letter-spacing: 0.06em;
+}
+
+.xamt-pinned-card__unpin {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  z-index: 1;
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  margin: 0;
+  border: 1px solid var(--xamt-line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--xamt-bg-2) 88%, transparent);
+  color: color-mix(in srgb, #c44 85%, var(--xamt-text));
+  cursor: pointer;
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--xamt-shade) 18%, transparent);
+  transition:
+    color 150ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.xamt-pinned-card__unpin:hover {
+  color: #fff;
+  background: color-mix(in srgb, #c44 88%, var(--xamt-bg));
+  border-color: transparent;
+}
+
+.xamt-pinned-entry.is-active {
+  color: var(--xamt-accent);
+  border-color: color-mix(in srgb, var(--xamt-accent) 40%, var(--xamt-line));
+}
+
 .xamt-poll-details {
   gap: 0.85rem;
   min-block-size: max-content;

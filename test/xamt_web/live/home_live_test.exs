@@ -63,6 +63,7 @@ defmodule XamtWeb.HomeLiveTest do
 
     {:ok, view, _html} = live(log_in_user(conn, user), ~p"/")
     assert has_element?(view, "#edit-server-#{server.id}")
+    assert has_element?(view, ".xamt-server-card__desc", "old")
     refute has_element?(view, "#edit-server-drawer")
 
     view |> element("#edit-server-#{server.id}") |> render_click()
@@ -77,6 +78,7 @@ defmodule XamtWeb.HomeLiveTest do
 
     refute has_element?(view, "#edit-server-drawer")
     assert has_element?(view, ".xamt-server-card__name", "Renamed Hall")
+    assert has_element?(view, ".xamt-server-card__desc", "updated hall")
     assert Repo.get!(Server, server.id).description == "updated hall"
   end
 

@@ -232,6 +232,22 @@ defmodule XamtWeb.ServerLive.Rails do
         <span class="xamt-channel-hash">#</span>
         <span class="mongol-text">{@active_channel && @active_channel.name}</span>
       </h2>
+      <button
+        :if={@active_channel}
+        type="button"
+        id="toggle-pinned-drawer"
+        class={[
+          "xamt-icon-btn xamt-pinned-entry",
+          @show_pinned_drawer && "is-active"
+        ]}
+        phx-click="toggle_pinned_drawer"
+        aria-label={gettext("Pinned messages")}
+        aria-expanded={@show_pinned_drawer}
+        aria-haspopup="dialog"
+        title={gettext("Pinned messages")}
+      >
+        <.icon name="hero-bookmark-square" class="size-5" />
+      </button>
       <form
         id="channel-search"
         phx-change="search"

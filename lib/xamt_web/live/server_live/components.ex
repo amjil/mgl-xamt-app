@@ -86,6 +86,13 @@ defmodule XamtWeb.ServerLive.Components do
 
       <.poll_details_overlay :if={@poll_details} poll={@poll_details} />
 
+      <.pinned_drawer
+        :if={@show_pinned_drawer}
+        messages={@pinned_messages}
+        can_manage_messages?={@can_manage_messages?}
+        current_scope={@current_scope}
+      />
+
       <.server_menu_overlay
         :if={@show_server_menu && @active_channel}
         server={@server}

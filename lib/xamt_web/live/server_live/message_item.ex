@@ -103,7 +103,7 @@ defmodule XamtWeb.ServerLive.MessageItem do
             </span>
           </button>
           <header
-            :if={header_visible?(@message) or edited?(@message)}
+            :if={header_visible?(@message) or edited?(@message) or @message.is_pinned}
             class="xamt-message__meta"
           >
             <strong
@@ -114,6 +114,14 @@ defmodule XamtWeb.ServerLive.MessageItem do
             </strong>
             <span :if={edited?(@message)} class="xamt-message__edited">
               {gettext("edited")}
+            </span>
+            <span
+              :if={@message.is_pinned}
+              class="xamt-message__pinned"
+              title={gettext("Pinned")}
+              aria-label={gettext("Pinned")}
+            >
+              <.icon name="hero-bookmark" class="size-3.5" />
             </span>
           </header>
           <div
@@ -451,6 +459,29 @@ defmodule XamtWeb.ServerLive.MessageItem do
                   aria-label={gettext("Edit")}
                 >
                   <.icon name="hero-pencil" class="size-4" />
+                </button>
+                <button
+                  :if={@can_manage_messages?}
+                  type="button"
+                  id={"pin-message-#{@message.id}"}
+                  class="xamt-message__action"
+                  phx-click="toggle_pin"
+                  phx-value-id={@message.id}
+                  title={
+                    if @message.is_pinned,
+                      do: gettext("Unpin"),
+                      else: gettext("Pin")
+                  }
+                  aria-label={
+                    if @message.is_pinned,
+                      do: gettext("Unpin"),
+                      else: gettext("Pin")
+                  }
+                >
+                  <.icon
+                    name={if @message.is_pinned, do: "hero-bookmark-slash", else: "hero-bookmark"}
+                    class="size-4"
+                  />
                 </button>
                 <button
                   :if={@message.user_id == @current_scope.user.id or @can_manage_messages?}

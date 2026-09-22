@@ -478,7 +478,7 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
   border-radius: 999px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
   color: var(--xamt-muted);
-  opacity: 0.88;
+  opacity: 0;
   transition:
     opacity 160ms ease,
     background-color 160ms ease,
@@ -486,12 +486,23 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
     border-color 160ms ease;
 }
 
-.xamt-server-card__settings:hover,
+.xamt-server-list__item:hover .xamt-server-card__settings,
+.xamt-server-list__item:focus-within .xamt-server-card__settings,
 .xamt-server-card__settings:focus-visible {
   opacity: 1;
+}
+
+.xamt-server-card__settings:hover,
+.xamt-server-card__settings:focus-visible {
   color: var(--xamt-accent-2);
   background: var(--xamt-bg-3);
   border-color: color-mix(in srgb, var(--xamt-accent-2) 48%, var(--xamt-line));
+}
+
+@media (hover: none) {
+  .xamt-server-card__settings {
+    opacity: 0.88;
+  }
 }
 
 .xamt-server-card {
@@ -542,6 +553,13 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
 
 .xamt-server-card__name {
   max-inline-size: none;
+}
+
+.xamt-server-card__desc {
+  color: var(--xamt-muted);
+  font-size: 0.85rem;
+  max-inline-size: 12rem;
+  overflow: hidden;
 }
 
 .xamt-server-card__slug {

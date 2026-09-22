@@ -4,6 +4,7 @@ defmodule XamtWeb.ServerLive.Overlays do
   use XamtWeb, :html
 
   alias Xamt.Messages
+  import XamtWeb.ServerLive.Helpers, only: [display_name: 1, safe_html: 2]
 
   attr :id, :string, required: true
   attr :label, :string, required: true
@@ -335,6 +336,79 @@ defmodule XamtWeb.ServerLive.Overlays do
               </li>
             </ul>
           </section>
+        </div>
+      </div>
+    </.drawer>
+    """
+  end
+
+  attr :messages, :list, required: true
+  attr :can_manage_messages?, :boolean, default: false
+  attr :current_scope, :map, required: true
+
+  def pinned_drawer(assigns) do
+    ~H"""
+    <.drawer
+      id="pinned-messages-drawer"
+      class="xamt-sheet--pinned"
+      show
+      on_cancel={JS.push("close_pinned_drawer")}
+    >
+      <div class="xamt-sheet-form xamt-pinned-drawer">
+        <h2 id="pinned-messages-title" class="xamt-pinned-drawer__title">
+          <.icon name="hero-bookmark-square" class="size-5 text-[var(--xamt-accent)]" />
+          <span class="xamt-section-title mongol-text">{gettext("Pinned messages")}</span>
+        </h2>
+
+        <p
+          :if={@messages == []}
+          id="pinned-messages-empty"
+          class="xamt-pinned-drawer__empty mongol-text"
+        >
+          {gettext("No pinned messages yet")}
+        </p>
+
+        <div id="pinned-messages-list" class="xamt-pinned-drawer__list">
+          <article
+            :for={msg <- @messages}
+            id={"pinned-msg-#{msg.id}"}
+            class="xamt-pinned-card"
+          >
+            <button
+              :if={@can_manage_messages?}
+              type="button"
+              id={"unpin-message-#{msg.id}"}
+              class="xamt-pinned-card__unpin"
+              phx-click="toggle_pin"
+              phx-value-id={msg.id}
+              title={gettext("Unpin")}
+              aria-label={gettext("Unpin")}
+            >
+              <.icon name="hero-minus" class="size-4" />
+            </button>
+
+            <div class="xamt-pinned-card__header">
+              <.status_avatar user={msg.user} class="xamt-message__avatar" />
+            </div>
+
+            <div class="xamt-pinned-card__body">
+              <header class="xamt-pinned-card__meta">
+                <strong class="xamt-pinned-card__name mongol-text">
+                  {display_name(msg.user)}
+                </strong>
+                <time
+                  class="xamt-pinned-card__time"
+                  datetime={DateTime.to_iso8601(msg.inserted_at)}
+                >
+                  {Calendar.strftime(msg.inserted_at, "%m/%d")}
+                </time>
+              </header>
+
+              <div class="xamt-pinned-card__content mongol-text">
+                {raw(safe_html(msg, @current_scope.user.id))}
+              </div>
+            </div>
+          </article>
         </div>
       </div>
     </.drawer>

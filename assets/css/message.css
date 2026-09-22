@@ -531,6 +531,14 @@
   font-size: 0.75rem;
 }
 
+.xamt-message__pinned {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  color: var(--xamt-accent);
+  opacity: 0.9;
+}
+
 /* Rotate the whole timestamp as one run and pin it to the card foot. */
 .xamt-message__time {
   position: absolute;

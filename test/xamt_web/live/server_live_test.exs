@@ -1494,6 +1494,38 @@ defmodule XamtWeb.ServerLiveTest do
     refute has_element?(member_view, "#poll-details-#{poll.id}")
   end
 
+  test "pinned drawer lazy-loads and pin toggles update the board", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>announcement</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    assert has_element?(view, "#toggle-pinned-drawer")
+    refute has_element?(view, "#pinned-messages-drawer")
+
+    view |> element("#toggle-pinned-drawer") |> render_click()
+    assert has_element?(view, "#pinned-messages-drawer")
+    assert has_element?(view, "#pinned-messages-empty")
+
+    view |> element("#pin-message-#{message.id}") |> render_click()
+    assert has_element?(view, "#pinned-msg-#{message.id}")
+    refute has_element?(view, "#pinned-messages-empty")
+    assert has_element?(view, "#msg-content-#{message.id}")
+    assert has_element?(view, ".xamt-message__pinned")
+
+    view |> element("#unpin-message-#{message.id}") |> render_click()
+    assert has_element?(view, "#pinned-messages-empty")
+    refute has_element?(view, "#pinned-msg-#{message.id}")
+  end
+
   defp post_html(scope, channel_id, text) do
     Messages.create_message(scope, channel_id, %{
       "content_html" => "<p>#{text}</p>",

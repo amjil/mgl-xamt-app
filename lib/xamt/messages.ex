@@ -132,6 +132,40 @@ defmodule Xamt.Messages do
     delete_message(scope, message_id, reason)
   end
 
+  @doc """
+  Toggles `is_pinned` when the actor has `:manage_messages` on the channel.
+
+  Broadcasts `{:message_pinned_toggled, message}` so LiveViews can refresh the
+  pin badge in the main stream and the pinned drawer when it is open.
+  """
+  def toggle_pin_message(%Scope{user: user}, message_id) do
+    with {:ok, message} <- fetch_message(message_id),
+         :ok <- pinable?(message, user) do
+      message
+      |> Message.pin_changeset(%{is_pinned: not message.is_pinned})
+      |> Repo.update()
+      |> case do
+        {:ok, updated} ->
+          updated = preload_message!(updated)
+          broadcast(updated.channel_id, :message_pinned_toggled, strip_for_broadcast(updated))
+          {:ok, updated}
+
+        error ->
+          error
+      end
+    end
+  end
+
+  @doc "Pinned, non-deleted messages for a channel, newest first."
+  def list_pinned_messages(channel_id) do
+    from(m in Message,
+      where: m.channel_id == ^channel_id and m.is_pinned == true and is_nil(m.deleted_at),
+      order_by: [desc: m.inserted_at, desc: m.id],
+      preload: [:user]
+    )
+    |> Repo.all()
+  end
+
   def list_messages(channel_id, opts \\ []) do
     limit = Keyword.get(opts, :limit, @default_limit)
     before_id = Keyword.get(opts, :before_id)
@@ -485,6 +519,12 @@ defmodule Xamt.Messages do
   defp deletable?(%Message{user_id: user_id}, %{id: user_id}), do: :ok
 
   defp deletable?(%Message{} = message, user) do
+    authorize_channel_perm(user.id, message.channel_id, :manage_messages)
+  end
+
+  defp pinable?(%Message{deleted_at: %DateTime{}}, _user), do: {:error, :deleted}
+
+  defp pinable?(%Message{} = message, user) do
     authorize_channel_perm(user.id, message.channel_id, :manage_messages)
   end
 

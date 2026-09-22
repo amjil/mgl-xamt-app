@@ -232,7 +232,12 @@ defmodule XamtWeb.HomeLive do
                   <span class="xamt-server-card__icon">{server_initial(server.name)}</span>
                   <span class="xamt-server-card__meta">
                     <span class="xamt-server-card__name mongol-text">{server.name}</span>
-                    <span class="xamt-server-card__slug">/{server.slug}</span>
+                    <span
+                      :if={present_text?(server.description)}
+                      class="xamt-server-card__desc mongol-text"
+                    >
+                      {server.description}
+                    </span>
                   </span>
                 </.link>
                 <button
@@ -411,6 +416,9 @@ defmodule XamtWeb.HomeLive do
   end
 
   defp server_initial(_), do: "?"
+
+  defp present_text?(text) when is_binary(text), do: String.trim(text) != ""
+  defp present_text?(_), do: false
 
   defp can_create_server?(%{user: %User{} = user}), do: User.can_create_server?(user)
   defp can_create_server?(_), do: false

@@ -95,6 +95,8 @@ defmodule XamtWeb.ServerLive do
       |> assign(:editing_channel, nil)
       |> assign(:show_server_menu, false)
       |> assign(:show_status_picker, false)
+      |> assign(:show_pinned_drawer, false)
+      |> assign(:pinned_messages, [])
       |> assign(:mobile_panel, :messages)
       |> assign(:mobile_search?, false)
       |> assign(:unread_channels, MapSet.new(unread_ids))
@@ -502,6 +504,42 @@ defmodule XamtWeb.ServerLive do
     {:noreply, assign(socket, :deleting_message, nil)}
   end
 
+  def handle_event("toggle_pinned_drawer", _params, socket) do
+    case socket.assigns.active_channel do
+      nil ->
+        {:noreply, socket}
+
+      channel ->
+        if socket.assigns.show_pinned_drawer do
+          {:noreply, assign(socket, show_pinned_drawer: false)}
+        else
+          messages = Messages.list_pinned_messages(channel.id)
+
+          {:noreply, assign(socket, show_pinned_drawer: true, pinned_messages: messages)}
+        end
+    end
+  end
+
+  def handle_event("close_pinned_drawer", _params, socket) do
+    {:noreply, assign(socket, show_pinned_drawer: false)}
+  end
+
+  def handle_event("toggle_pin", %{"id" => id}, socket) do
+    case Messages.toggle_pin_message(socket.assigns.current_scope, id) do
+      {:ok, _} ->
+        {:noreply, socket}
+
+      {:error, :unauthorized} ->
+        {:noreply, put_flash(socket, :error, gettext("Permission denied"))}
+
+      {:error, :deleted} ->
+        {:noreply, put_flash(socket, :error, gettext("Message was deleted"))}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, gettext("Could not update pin"))}
+    end
+  end
+
   def handle_event("load_older", _params, socket) do
     channel = socket.assigns.active_channel
     oldest_id = socket.assigns[:oldest_message_id]
@@ -900,7 +938,21 @@ defmodule XamtWeb.ServerLive do
       {:noreply,
        socket
        |> maybe_cancel_edit(message.id)
+       |> maybe_refresh_pinned_drawer(message)
        |> stream_message(message)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_info({:message_pinned_toggled, message}, socket) do
+    if active_channel_message?(socket, message) do
+      socket =
+        socket
+        |> stream_message(message)
+        |> maybe_refresh_pinned_list()
+
+      {:noreply, socket}
     else
       {:noreply, socket}
     end
@@ -1222,6 +1274,8 @@ defmodule XamtWeb.ServerLive do
     |> assign(:composer_mode, :text)
     |> assign(:poll_option_count, 2)
     |> assign(:poll_details, nil)
+    |> assign(:show_pinned_drawer, false)
+    |> assign(:pinned_messages, [])
     |> assign(:mobile_panel, :messages)
     |> assign(:search_q, "")
     |> assign(:search_results, nil)
@@ -1375,6 +1429,23 @@ defmodule XamtWeb.ServerLive do
   defp stream_message(socket, message) do
     show_header = Map.get(socket.assigns.header_flags, message.id, true)
     stream_insert(socket, :messages, %{message | show_header: show_header})
+  end
+
+  defp maybe_refresh_pinned_list(socket) do
+    if socket.assigns.show_pinned_drawer and socket.assigns.active_channel do
+      messages = Messages.list_pinned_messages(socket.assigns.active_channel.id)
+      assign(socket, :pinned_messages, messages)
+    else
+      socket
+    end
+  end
+
+  defp maybe_refresh_pinned_drawer(socket, message) do
+    if socket.assigns.show_pinned_drawer and message.is_pinned do
+      maybe_refresh_pinned_list(socket)
+    else
+      socket
+    end
   end
 
   defp maybe_cancel_edit(socket, message_id) do

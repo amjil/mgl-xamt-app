@@ -713,6 +713,57 @@ defmodule Xamt.MessagesTest do
     assert log.metadata["target_username"] == author.username
   end
 
+  test "toggle_pin_message requires manage_messages and broadcasts", %{
+    scope: scope,
+    channel: channel,
+    server: server
+  } do
+    Phoenix.PubSub.subscribe(Xamt.PubSub, Messages.channel_topic(channel.id))
+
+    author = Xamt.AccountsFixtures.user_fixture()
+    author_scope = Scope.for_user(author)
+    {:ok, _} = Servers.join_server(author_scope, server.id)
+
+    {:ok, message} =
+      Messages.create_message(author_scope, channel.id, %{
+        "content_html" => "<p>pin me</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    assert {:error, :unauthorized} = Messages.toggle_pin_message(author_scope, message.id)
+
+    assert {:ok, pinned} = Messages.toggle_pin_message(scope, message.id)
+    assert pinned.is_pinned
+    assert_receive {:message_pinned_toggled, %{id: id, is_pinned: true}} when id == message.id
+
+    assert [listed] = Messages.list_pinned_messages(channel.id)
+    assert listed.id == message.id
+
+    assert {:ok, unpinned} = Messages.toggle_pin_message(scope, message.id)
+    refute unpinned.is_pinned
+    assert_receive {:message_pinned_toggled, %{id: ^id, is_pinned: false}}
+    assert Messages.list_pinned_messages(channel.id) == []
+  end
+
+  test "deleted messages cannot be pinned and leave the board", %{
+    scope: scope,
+    channel: channel
+  } do
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>gone</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    assert {:ok, pinned} = Messages.toggle_pin_message(scope, message.id)
+    assert pinned.is_pinned
+    assert length(Messages.list_pinned_messages(channel.id)) == 1
+
+    assert {:ok, _} = Messages.delete_message(scope, message.id)
+    assert Messages.list_pinned_messages(channel.id) == []
+    assert {:error, :deleted} = Messages.toggle_pin_message(scope, message.id)
+  end
+
   test "moderator delete without a reason still writes an audit log", %{
     scope: scope,
     channel: channel,
