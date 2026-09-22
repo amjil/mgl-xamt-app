@@ -392,10 +392,18 @@ defmodule XamtWeb.ServerLive.Overlays do
             </div>
 
             <div class="xamt-pinned-card__body">
+              <% pin_role = RoleHelper.get_role_ui_config(msg.user) %>
               <header class="xamt-pinned-card__meta">
-                <strong class="xamt-pinned-card__name mongol-text">
+                <strong class={["xamt-pinned-card__name mongol-text", pin_role.color_class]}>
                   {display_name(msg.user)}
                 </strong>
+                <div
+                  :if={pin_role.label}
+                  class={["xamt-role-badge", pin_role.bg_class]}
+                >
+                  <.icon name={pin_role.icon} class="w-3 h-3 shrink-0" />
+                  <span>{pin_role.label}</span>
+                </div>
                 <time
                   class="xamt-pinned-card__time"
                   datetime={DateTime.to_iso8601(msg.inserted_at)}

@@ -178,7 +178,8 @@
   inline-size: max-content;
 }
 
-.xamt-member > .mongol-text {
+.xamt-member > .mongol-text,
+.xamt-member > .xamt-member__name {
   flex: 0 0 auto;
   inline-size: max-content;
 }

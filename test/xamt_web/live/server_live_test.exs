@@ -284,6 +284,61 @@ defmodule XamtWeb.ServerLiveTest do
     assert has_element?(view, "[data-message-id='#{second.id}'] time.xamt-message__time")
   end
 
+  test "global roles tint the nickname and show a badge", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope,
+    user: creator
+  } do
+    admin = admin_fixture()
+    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(admin), server.id)
+    admin_scope = Accounts.Scope.for_user(admin)
+    regular = user_fixture()
+    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(regular), server.id)
+    regular_scope = Accounts.Scope.for_user(regular)
+
+    {:ok, creator_msg} = post_html(scope, channel.id, "from creator")
+    {:ok, admin_msg} = post_html(admin_scope, channel.id, "from admin")
+    {:ok, regular_msg} = post_html(regular_scope, channel.id, "from user")
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    assert has_element?(
+             view,
+             "[data-message-id='#{creator_msg.id}'] .xamt-message__username.xamt-role--creator",
+             creator.username
+           )
+
+    assert has_element?(
+             view,
+             "[data-message-id='#{creator_msg.id}'] .xamt-role-badge.xamt-role-badge--creator",
+             "Creator"
+           )
+
+    assert has_element?(
+             view,
+             "[data-message-id='#{admin_msg.id}'] .xamt-message__username.xamt-role--admin"
+           )
+
+    assert has_element?(
+             view,
+             "[data-message-id='#{admin_msg.id}'] .xamt-role-badge.xamt-role-badge--admin",
+             "Admin"
+           )
+
+    assert has_element?(
+             view,
+             "[data-message-id='#{regular_msg.id}'] .xamt-message__username",
+             regular.username
+           )
+
+    refute has_element?(
+             view,
+             "[data-message-id='#{regular_msg.id}'] .xamt-role-badge"
+           )
+  end
+
   test "a new author or a 5-minute gap starts a new header", %{
     conn: conn,
     server: server,

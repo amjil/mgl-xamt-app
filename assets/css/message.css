@@ -526,6 +526,57 @@
   flex: 0 0 auto;
 }
 
+/* Role-colored nicknames — specificity beats the default username color */
+.xamt-message__username.xamt-role--admin,
+.xamt-pinned-card__name.xamt-role--admin,
+.xamt-member__name.xamt-role--admin,
+.xamt-role--admin {
+  color: var(--xamt-role-admin);
+}
+
+.xamt-message__username.xamt-role--creator,
+.xamt-pinned-card__name.xamt-role--creator,
+.xamt-member__name.xamt-role--creator,
+.xamt-role--creator {
+  color: var(--xamt-role-creator);
+}
+
+/* Vertical-lr role badge (capsule along the column) */
+.xamt-role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  /* In vertical-lr, block padding stretches the capsule along the text flow */
+  padding: 0.4rem 0.15rem;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+.xamt-role-badge--admin {
+  color: var(--xamt-role-admin);
+  background: var(--xamt-role-admin-soft);
+  border-color: var(--xamt-role-admin-line);
+}
+
+.xamt-role-badge--creator {
+  color: var(--xamt-role-creator);
+  background: var(--xamt-role-creator-soft);
+  border-color: var(--xamt-role-creator-line);
+}
+
+/* Horizontal chrome (member rail, etc.) flips padding back to row capsules */
+.xamt-rail .xamt-role-badge,
+.xamt-sidebar .xamt-role-badge {
+  padding: 0.15rem 0.4rem;
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+}
+
 .xamt-message__edited {
   flex: 0 0 auto;
   font-size: 0.75rem;

@@ -87,6 +87,9 @@ defmodule XamtWeb do
       # Core UI components
       import XamtWeb.CoreComponents
 
+      # Role → CSS class mapping (nickname colors / badges)
+      alias XamtWeb.RoleHelper
+
       # Common modules used in templates
       alias Phoenix.LiveView.JS
       alias XamtWeb.Layouts

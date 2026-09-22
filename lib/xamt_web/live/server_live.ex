@@ -1508,7 +1508,8 @@ defmodule XamtWeb.ServerLive do
         username: presence_meta(meta, :username),
         avatar: presence_meta(meta, :avatar),
         status_emoji: presence_meta(meta, :status_emoji),
-        status_text: presence_meta(meta, :status_text)
+        status_text: presence_meta(meta, :status_text),
+        global_role: presence_meta(meta, :global_role) || "user"
       }
     end)
   end

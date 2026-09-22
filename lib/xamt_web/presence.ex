@@ -16,6 +16,7 @@ defmodule XamtWeb.Presence do
       avatar: user.avatar,
       status_emoji: user.status_emoji,
       status_text: user.status_text,
+      global_role: user.global_role,
       online_at: System.system_time(:second)
     })
   end

@@ -138,6 +138,7 @@ defmodule XamtWeb.ServerLive.Rails do
           <h3 class="xamt-rail__section-head mongol-text">{gettext("Online")}</h3>
           <ul class="xamt-member-list">
             <li :for={user <- @online_users} class="xamt-member">
+              <% online_role = RoleHelper.get_role_ui_config(user) %>
               <.status_avatar
                 user={user}
                 id={"online-avatar-#{user.id}"}
@@ -145,13 +146,23 @@ defmodule XamtWeb.ServerLive.Rails do
                 clickable?={own_presence_user?(user, @current_scope.user)}
               />
               <span class="xamt-presence is-online"></span>
-              <span class="mongol-text">{user.display_name}</span>
+              <span class={["xamt-member__name mongol-text", online_role.color_class]}>
+                {user.display_name}
+              </span>
+              <div
+                :if={online_role.label}
+                class={["xamt-role-badge", online_role.bg_class]}
+              >
+                <.icon name={online_role.icon} class="w-3 h-3 shrink-0" />
+                <span>{online_role.label}</span>
+              </div>
             </li>
           </ul>
 
           <h3 class="xamt-rail__section-head mongol-text">{gettext("Members")}</h3>
           <ul id="server-members-list" class="xamt-member-list" phx-update="stream">
             <li :for={{dom_id, member} <- @streams.members} id={dom_id} class="xamt-member">
+              <% member_role = RoleHelper.get_role_ui_config(member.user) %>
               <.status_avatar
                 user={member.user}
                 id={"member-avatar-#{member.user_id}"}
@@ -159,7 +170,16 @@ defmodule XamtWeb.ServerLive.Rails do
                 clickable?={member.user_id == @current_scope.user.id}
               />
               <span class="xamt-presence"></span>
-              <span class="mongol-text">{display_name(member.user)}</span>
+              <span class={["xamt-member__name mongol-text", member_role.color_class]}>
+                {display_name(member.user)}
+              </span>
+              <div
+                :if={member_role.label}
+                class={["xamt-role-badge", member_role.bg_class]}
+              >
+                <.icon name={member_role.icon} class="w-3 h-3 shrink-0" />
+                <span>{member_role.label}</span>
+              </div>
               <span :if={member.role != "member"} class="xamt-role">
                 {member.role}
               </span>

@@ -654,6 +654,30 @@ img.xamt-message__avatar {
 .xamt-profile.xamt-surface {
   padding: 1.35rem 1.2rem;
   max-inline-size: none;
+  border-block-start: 4px solid transparent;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.xamt-profile--role-admin {
+  border-block-start-color: var(--xamt-role-admin);
+  box-shadow:
+    var(--xamt-shadow),
+    0 0 0 1px color-mix(in srgb, var(--xamt-role-admin) 28%, transparent);
+}
+
+.xamt-profile--role-creator {
+  border-block-start-color: var(--xamt-role-creator);
+  box-shadow:
+    var(--xamt-shadow),
+    0 0 0 1px color-mix(in srgb, var(--xamt-role-creator) 28%, transparent);
+}
+
+.xamt-profile__display-name.xamt-role--admin {
+  color: var(--xamt-role-admin);
+}
+
+.xamt-profile__display-name.xamt-role--creator {
+  color: var(--xamt-role-creator);
 }
 
 .xamt-profile__col {

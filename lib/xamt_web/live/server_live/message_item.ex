@@ -19,10 +19,12 @@ defmodule XamtWeb.ServerLive.MessageItem do
 
   def message_item(assigns) do
     preview = link_preview(assigns.message)
+    role_ui = RoleHelper.get_role_ui_config(assigns.message.user)
 
     assigns =
       assign(assigns,
         preview: preview,
+        role_ui: role_ui,
         embed_src: preview && LinkPreview.iframe_src(preview),
         embed_audio: preview && LinkPreview.audio_sample_url(preview),
         embed_image: preview && LinkPreview.preview_image(preview),
@@ -65,9 +67,16 @@ defmodule XamtWeb.ServerLive.MessageItem do
       <%= if deleted?(@message) do %>
         <div class="xamt-message__body">
           <header :if={header_visible?(@message)} class="xamt-message__meta">
-            <strong class="xamt-message__username mongol-text">
+            <strong class={["xamt-message__username mongol-text", @role_ui.color_class]}>
               {display_name(@message.user)}
             </strong>
+            <div
+              :if={@role_ui.label}
+              class={["xamt-role-badge", @role_ui.bg_class]}
+            >
+              <.icon name={@role_ui.icon} class="w-3 h-3 shrink-0" />
+              <span>{@role_ui.label}</span>
+            </div>
           </header>
           <div
             id={"msg-tombstone-#{@message.id}"}
@@ -108,10 +117,17 @@ defmodule XamtWeb.ServerLive.MessageItem do
           >
             <strong
               :if={header_visible?(@message)}
-              class="xamt-message__username mongol-text"
+              class={["xamt-message__username mongol-text", @role_ui.color_class]}
             >
               {display_name(@message.user)}
             </strong>
+            <div
+              :if={header_visible?(@message) and @role_ui.label}
+              class={["xamt-role-badge", @role_ui.bg_class]}
+            >
+              <.icon name={@role_ui.icon} class="w-3 h-3 shrink-0" />
+              <span>{@role_ui.label}</span>
+            </div>
             <span :if={edited?(@message)} class="xamt-message__edited">
               {gettext("edited")}
             </span>

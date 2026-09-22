@@ -11,7 +11,8 @@ defmodule XamtWeb.ProfileLive do
       {:ok,
        socket
        |> assign(:page_title, user.display_name || user.username)
-       |> assign(:profile_user, user)}
+       |> assign(:profile_user, user)
+       |> assign(:role_ui, RoleHelper.get_role_ui_config(user))}
     else
       {:ok,
        socket
@@ -31,16 +32,26 @@ defmodule XamtWeb.ProfileLive do
         </div>
 
         <.header>
-          {display_name(@profile_user)}
+          <span class={["xamt-profile__display-name", @role_ui.color_class]}>
+            {display_name(@profile_user)}
+          </span>
           <:subtitle>
             <span class="xamt-profile__username xamt-upright">@{@profile_user.username}</span>
           </:subtitle>
         </.header>
 
-        <div class="xamt-profile xamt-surface">
+        <div class={["xamt-profile xamt-surface", @role_ui.accent_class]}>
           <.avatar user={@profile_user} class="xamt-avatar xamt-avatar--lg" />
 
           <div class="xamt-profile__col">
+            <div
+              :if={@role_ui.label}
+              id="profile-role-badge"
+              class={["xamt-role-badge", @role_ui.bg_class]}
+            >
+              <.icon name={@role_ui.icon} class="w-3 h-3 shrink-0" />
+              <span>{@role_ui.label}</span>
+            </div>
             <span class="xamt-field__label mongol-text">{gettext("Bio")}</span>
             <p :if={@profile_user.bio} class="xamt-profile__bio mongol-text">{@profile_user.bio}</p>
             <p :if={!@profile_user.bio} class="xamt-profile__bio xamt-empty mongol-text">
