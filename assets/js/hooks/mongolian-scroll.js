@@ -128,6 +128,10 @@ export function attachMongolianWheelScroll(el) {
 /**
  * Legacy per-element hook. Wheel mapping is handled globally; this remains
  * registered so existing phx-hook="MongolianScroll" markup does not error.
+ *
+ * New-message edge indicator (unread badge + scroll-to-latest) lives on the
+ * MessageList hook — driven by LiveView `messages:scroll_bottom`, not DOM
+ * MutationObserver — so stream prepends / edits do not false-trigger.
  */
 export const MongolianScroll = {
   mounted() {},

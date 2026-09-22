@@ -485,18 +485,31 @@ export const MessageComposer = {
 }
 
 // vertical-lr: newest message is the right-most column
-const NEAR_LATEST_PX = 150
+const NEAR_LATEST_PX = 50
 
+/**
+ * Horizontal message list + new-message edge indicator.
+ *
+ * Relies on LiveView `messages:scroll_bottom` (not MutationObserver) so
+ * infinite-scroll prepends / reaction re-inserts do not inflate the unread
+ * count. When the user has scrolled left into history, auto-scroll is blocked
+ * and `#jump-latest` slides in on the right edge with a running count.
+ */
 export const MessageList = {
   mounted() {
     this.jumpBtn = document.getElementById("jump-latest")
+    this.countSpan = document.getElementById("jump-latest-count")
+    this.unreadCount = 0
+    this._channelId = this.el.dataset.channelId
+
     this._onJump = () => this.scrollToLatest(true)
     this.jumpBtn?.addEventListener("click", this._onJump)
 
     this._onScroll = () => {
-      if (this.nearLatest()) this.showJump(false)
+      // Distance to the right edge (latest). Within tolerance → hide badge.
+      if (this.nearLatest()) this.hideJump()
     }
-    this.el.addEventListener("scroll", this._onScroll, { passive: true })
+    this.el.addEventListener("scroll", this._onScroll, {passive: true})
 
     // Lock scrollLeft when older messages prepend and scrollWidth grows
     this._detachScrollLock = attachMessageScrollLock(this.el)
@@ -509,7 +522,8 @@ export const MessageList = {
         if (this.nearLatest()) {
           this.scrollToLatest(true)
         } else {
-          this.showJump(true)
+          this.unreadCount += 1
+          this.showJump()
         }
       })
     })
@@ -519,6 +533,13 @@ export const MessageList = {
   },
 
   updated() {
+    const channelId = this.el.dataset.channelId
+    if (channelId !== this._channelId) {
+      this._channelId = channelId
+      this.hideJump()
+      this.scrollToLatest(false)
+    }
+
     this.highlightFromDataset()
     this._receipt?.updated()
   },
@@ -531,16 +552,31 @@ export const MessageList = {
   },
 
   nearLatest() {
-    return this.el.scrollWidth - this.el.scrollLeft - this.el.clientWidth < NEAR_LATEST_PX
+    const scrollRight =
+      this.el.scrollWidth - this.el.scrollLeft - this.el.clientWidth
+    return scrollRight <= NEAR_LATEST_PX
   },
 
   scrollToLatest(smooth) {
-    this.el.scrollTo({ left: this.el.scrollWidth, behavior: smooth ? "smooth" : "auto" })
-    this.showJump(false)
+    this.el.scrollTo({
+      left: this.el.scrollWidth,
+      behavior: smooth ? "smooth" : "auto",
+    })
+    this.hideJump()
   },
 
-  showJump(visible) {
-    this.jumpBtn?.classList.toggle("is-visible", visible)
+  showJump() {
+    if (!this.jumpBtn) return
+    if (this.countSpan) this.countSpan.textContent = String(this.unreadCount)
+    this.jumpBtn.classList.add("is-visible")
+    this.jumpBtn.setAttribute("aria-hidden", "false")
+  },
+
+  hideJump() {
+    this.unreadCount = 0
+    if (this.countSpan) this.countSpan.textContent = "0"
+    this.jumpBtn?.classList.remove("is-visible")
+    this.jumpBtn?.setAttribute("aria-hidden", "true")
   },
 
   highlightFromDataset() {

@@ -1300,14 +1300,18 @@ defmodule XamtWeb.ServerLive do
                 </article>
               </div>
 
-              <%!-- Toggled by the MessageList hook; kept out of LiveView patches --%>
+              <%!-- Edge indicator: MessageList toggles .is-visible + unread count --%>
               <button
                 type="button"
                 id="jump-latest"
                 class="xamt-jump-latest mongol-text"
                 phx-update="ignore"
+                aria-hidden="true"
+                aria-label={gettext("New messages")}
               >
-                {gettext("New messages")}
+                <span id="jump-latest-count" class="xamt-jump-latest__count">0</span>
+                <span class="xamt-jump-latest__label">{gettext("New messages")}</span>
+                <.icon name="hero-arrow-right" class="size-4 xamt-jump-latest__icon" />
               </button>
             </div>
 
