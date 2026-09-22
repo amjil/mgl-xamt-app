@@ -124,7 +124,7 @@
 
 /* vertical-lr: width caps how many columns show; overflow is to the right. */
 .xamt-text-body.xamt-text-collapsed {
-  max-width: 320px;
+  max-width: 220px;
   overflow-x: hidden;
 }
 
@@ -134,11 +134,16 @@
   right: 0;
   bottom: 0;
   width: 140px;
+  /* Keep layout axes physical so flex pins the button to the bottom-right;
+     the button itself stays vertical-lr for its label. */
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
   background: linear-gradient(to right, transparent, var(--xamt-bg) 65%);
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: flex-end;
-  padding-right: 0.5rem;
+  padding-right: 0;
+  padding-bottom: 0.35rem;
   z-index: 5;
   pointer-events: none;
 }

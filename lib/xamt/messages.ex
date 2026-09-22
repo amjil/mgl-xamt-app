@@ -19,15 +19,13 @@ defmodule Xamt.Messages do
   alias Xamt.Repo
   alias Xamt.Servers.Permissions
   alias Xamt.Servers.ServerMember
-  alias Xamt.Messages.{HtmlSanitizer, Mention, Message, RateLimiter, Reaction}
+  alias Xamt.Messages.{Mentions, Message, RateLimiter, Reactions, Search}
 
   @default_limit 50
-  @mention_tag_re ~r/<(span|a)\b([^>]*\bdata-mention-id=["']([^"']+)["'][^>]*)>(.*?)<\/\1>/si
-  @mention_id_re ~r/data-mention-id=["']([0-9a-fA-F-]{36})["']/
 
   def create_message(%Scope{user: user}, channel_id, attrs) when is_map(attrs) do
     raw_html = Map.get(attrs, "content_html") || Map.get(attrs, :content_html)
-    {content_html, mention_ids} = prepare_mentions(raw_html, channel_id)
+    {content_html, mention_ids} = Mentions.prepare(raw_html, channel_id)
     attrs = put_sanitized_html(attrs, content_html)
     content = build_content(attrs)
     reply_to_id = normalize_reply_to_id(attrs)
@@ -45,11 +43,11 @@ defmodule Xamt.Messages do
                       content: content,
                       content_type: content_type(attrs, content),
                       content_html: content_html,
-                      search_text: search_normalize(index_text(content_html, content)),
+                      search_text: Search.normalize(index_text(content_html, content)),
                       reply_to_id: reply_to_id
                     })
                     |> Repo.insert(),
-                  :ok <- replace_mentions(message.id, mention_ids) do
+                  :ok <- Mentions.replace(message.id, mention_ids) do
                {:ok, message}
              end
            end) do
@@ -69,7 +67,7 @@ defmodule Xamt.Messages do
         Map.get(attrs, "content_html") || Map.get(attrs, :content_html) ||
           message.content_html
 
-      {content_html, mention_ids} = prepare_mentions(raw_html, message.channel_id)
+      {content_html, mention_ids} = Mentions.prepare(raw_html, message.channel_id)
       attrs = put_sanitized_html(attrs, content_html)
       content = build_content(attrs, message.content)
       previous_mention_ids = message.mentioned_user_ids || []
@@ -82,10 +80,10 @@ defmodule Xamt.Messages do
                         content: content,
                         content_type: content_type(attrs, content),
                         content_html: content_html,
-                        search_text: search_normalize(index_text(content_html, content))
+                        search_text: Search.normalize(index_text(content_html, content))
                       })
                       |> Repo.update(),
-                    :ok <- replace_mentions(message.id, mention_ids) do
+                    :ok <- Mentions.replace(message.id, mention_ids) do
                  {:ok, message}
                end
              end) do
@@ -244,82 +242,11 @@ defmodule Xamt.Messages do
     end)
   end
 
-  # Traditional Mongolian joins suffixes with NNBSP (U+202F) and the Mongolian
-  # vowel separator (U+180E); Postgres' parser does not break on either, so a
-  # word plus its suffix would index as a single token. Free variation
-  # selectors (U+180B..U+180D) and zero-width joiners only pick a glyph shape,
-  # so they must not affect whether two spellings match.
-  @search_separators ["\u202F", "\u180E", "\u00A0"]
-  @search_ignored ["\u180B", "\u180C", "\u180D", "\u200C", "\u200D", "\uFEFF"]
-
-  @doc """
-  Normalises text for the search index and for search queries.
-
-  Both sides must go through this function or Mongolian spellings that differ
-  only in variation selectors will fail to match.
-  """
-  def search_normalize(nil), do: ""
-
-  def search_normalize(text) when is_binary(text) do
-    text
-    |> :unicode.characters_to_nfc_binary()
-    |> replace_all(@search_separators, " ")
-    |> replace_all(@search_ignored, "")
-    |> String.replace(~r/\s+/u, " ")
-    |> String.trim()
-  end
-
-  defp replace_all(text, patterns, replacement) do
-    Enum.reduce(patterns, text, &String.replace(&2, &1, replacement))
-  end
-
-  @doc """
-  Full-text search across the given channels, newest first.
-
-  Prefer `search_server_messages/3` from LiveViews and controllers: this
-  lower-level form trusts the caller to supply only authorized channel IDs.
-  """
-  def search_messages(channel_ids, query, opts \\ [])
-  def search_messages([], _query, _opts), do: []
-
-  def search_messages(channel_ids, query, opts) when is_list(channel_ids) do
-    normalized = search_normalize(query)
-
-    if normalized == "" do
-      []
-    else
-      limit = Keyword.get(opts, :limit, 30)
-
-      from(m in Message,
-        where:
-          m.channel_id in ^channel_ids and is_nil(m.deleted_at) and
-            fragment("search_tsv @@ plainto_tsquery('simple', ?)", ^normalized),
-        order_by: [desc: m.inserted_at, desc: m.id],
-        limit: ^limit,
-        preload: [:user, :channel]
-      )
-      |> Repo.all()
-    end
-  end
-
-  @doc """
-  Searches messages in a server the user belongs to.
-
-  Channel IDs are resolved inside the context from membership, so callers cannot
-  widen the search to foreign servers by inventing IDs.
-  """
-  def search_server_messages(%Scope{user: user}, server_id, query, opts \\ [])
-      when is_binary(server_id) do
-    if Xamt.Servers.member?(server_id, user.id) do
-      channel_ids =
-        from(c in Channel, where: c.server_id == ^server_id, select: c.id)
-        |> Repo.all()
-
-      search_messages(channel_ids, query, opts)
-    else
-      []
-    end
-  end
+  defdelegate search_normalize(text), to: Search, as: :normalize
+  defdelegate search_messages(channel_ids, query), to: Search
+  defdelegate search_messages(channel_ids, query, opts), to: Search
+  defdelegate search_server_messages(scope, server_id, query), to: Search
+  defdelegate search_server_messages(scope, server_id, query, opts), to: Search
 
   @doc """
   Shortens `plain_text/1` for the quoted preview shown above a reply.
@@ -348,34 +275,18 @@ defmodule Xamt.Messages do
       if match?(%DateTime{}, message.deleted_at) do
         {:error, :deleted}
       else
-        toggle_reaction_on(message, user, emoji)
+        with {:ok, _} <- Reactions.toggle_on(message, user, emoji) do
+          summary = Map.get(Reactions.summary([message.id]), message.id, %{})
+
+          Phoenix.PubSub.broadcast(
+            Xamt.PubSub,
+            channel_topic(message.channel_id),
+            {:reaction_changed, strip_for_broadcast(message), summary}
+          )
+
+          {:ok, summary}
+        end
       end
-    end
-  end
-
-  defp toggle_reaction_on(message, user, emoji) do
-    existing =
-      Repo.get_by(Reaction, message_id: message.id, user_id: user.id, emoji: emoji)
-
-    result =
-      if existing do
-        Repo.delete(existing)
-      else
-        %Reaction{}
-        |> Reaction.changeset(%{message_id: message.id, user_id: user.id, emoji: emoji})
-        |> Repo.insert()
-      end
-
-    with {:ok, _} <- result do
-      summary = Map.get(reaction_summary([message.id]), message.id, %{})
-
-      Phoenix.PubSub.broadcast(
-        Xamt.PubSub,
-        channel_topic(message.channel_id),
-        {:reaction_changed, strip_for_broadcast(message), summary}
-      )
-
-      {:ok, summary}
     end
   end
 
@@ -450,24 +361,7 @@ defmodule Xamt.Messages do
     |> Repo.one()
   end
 
-  @doc """
-  Reactions for the given messages as `%{message_id => %{emoji => [user_id]}}`.
-  """
-  def reaction_summary([]), do: %{}
-
-  def reaction_summary(message_ids) when is_list(message_ids) do
-    from(r in Reaction,
-      where: r.message_id in ^message_ids,
-      order_by: [asc: r.inserted_at],
-      select: {r.message_id, r.emoji, r.user_id}
-    )
-    |> Repo.all()
-    |> Enum.reduce(%{}, fn {message_id, emoji, user_id}, acc ->
-      Map.update(acc, message_id, %{emoji => [user_id]}, fn by_emoji ->
-        Map.update(by_emoji, emoji, [user_id], &(&1 ++ [user_id]))
-      end)
-    end)
-  end
+  defdelegate reaction_summary(message_ids), to: Reactions, as: :summary
 
   # Join-bind belongs_to associations so list/get is one round-trip for the
   # message, author, quoted message, and quoted author. `mentions` stays a
@@ -588,16 +482,6 @@ defmodule Xamt.Messages do
 
   defp attach_mention_ids(other), do: other
 
-  defp prepare_mentions(html, channel_id) when is_binary(html) and is_binary(channel_id) do
-    html = HtmlSanitizer.sanitize(html)
-    server_id = channel_server_id(channel_id)
-    ids = extract_mention_ids(html)
-    users = mentionable_users(server_id, ids)
-    {rewrite_mention_tags(html, users), Map.keys(users)}
-  end
-
-  defp prepare_mentions(_html, _channel_id), do: {"", []}
-
   defp put_sanitized_html(attrs, content_html) when is_map(attrs) do
     attrs
     |> Map.put("content_html", content_html)
@@ -643,89 +527,8 @@ defmodule Xamt.Messages do
     end
   end
 
-  defp extract_mention_ids(html) do
-    @mention_id_re
-    |> Regex.scan(html)
-    |> Enum.map(fn [_, id] -> id end)
-    |> Enum.uniq()
-    |> Enum.filter(&valid_uuid?/1)
-  end
-
-  defp valid_uuid?(id) do
-    match?({:ok, _}, Ecto.UUID.cast(id))
-  end
-
-  defp mentionable_users(_server_id, []), do: %{}
-
-  defp mentionable_users(server_id, ids) when is_binary(server_id) do
-    from(u in User,
-      join: m in ServerMember,
-      on: m.user_id == u.id,
-      where: m.server_id == ^server_id and u.id in ^ids,
-      select: u
-    )
-    |> Repo.all()
-    |> Map.new(&{&1.id, &1})
-  end
-
-  defp mentionable_users(_server_id, _ids), do: %{}
-
-  defp rewrite_mention_tags(html, users_by_id) do
-    Regex.replace(@mention_tag_re, html, fn _full, _tag, _attrs, id, inner ->
-      case Map.get(users_by_id, id) do
-        %User{} = user -> mention_chip_html(user)
-        _ -> strip_tags(inner)
-      end
-    end)
-  end
-
-  defp mention_chip_html(%User{id: id, username: username}) do
-    safe = html_escape(username || "")
-
-    ~s(<a class="xamt-mention mongol-text" href="/profile/#{safe}" data-phx-link="redirect" data-phx-link-state="push" data-mention-id="#{id}" data-mention-username="#{safe}">@#{safe}</a>)
-  end
-
-  defp strip_tags(html) when is_binary(html) do
-    html
-    |> String.replace(~r/<[^>]+>/, "")
-    |> html_escape()
-  end
-
-  defp html_escape(text) when is_binary(text) do
-    text
-    |> String.replace("&", "&amp;")
-    |> String.replace("<", "&lt;")
-    |> String.replace(">", "&gt;")
-    |> String.replace("\"", "&quot;")
-  end
-
   defp channel_server_id(channel_id) do
     Repo.one(from c in Channel, where: c.id == ^channel_id, select: c.server_id)
-  end
-
-  defp replace_mentions(message_id, user_ids) do
-    from(m in Mention, where: m.message_id == ^message_id) |> Repo.delete_all()
-
-    now = DateTime.utc_now(:second)
-
-    entries =
-      user_ids
-      |> Enum.uniq()
-      |> Enum.map(fn user_id ->
-        %{
-          id: Ecto.UUID.generate(),
-          message_id: message_id,
-          user_id: user_id,
-          inserted_at: now,
-          updated_at: now
-        }
-      end)
-
-    if entries != [] do
-      Repo.insert_all(Mention, entries)
-    end
-
-    :ok
   end
 
   defp broadcast(channel_id, event, message) do
