@@ -112,6 +112,67 @@
   width: fit-content;
   min-width: 0;
   overflow: visible;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.xamt-text-body {
+  width: fit-content;
+  min-width: 0;
+  transition: max-width 0.3s ease-out;
+}
+
+/* vertical-lr: width caps how many columns show; overflow is to the right. */
+.xamt-text-body.xamt-text-collapsed {
+  max-width: 320px;
+  overflow-x: hidden;
+}
+
+.xamt-read-more-mask {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 140px;
+  background: linear-gradient(to right, transparent, var(--xamt-bg) 65%);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 0.5rem;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.xamt-read-more-mask.is-expanded {
+  background: none;
+  width: auto;
+  /* Sit just past the text edge so the button does not cover columns. */
+  right: auto;
+  left: 100%;
+  margin-left: 0.35rem;
+  padding-right: 0;
+}
+
+.xamt-read-more-mask .xamt-btn-read-more {
+  pointer-events: auto;
+}
+
+.xamt-btn-read-more {
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  background-color: var(--xamt-accent);
+  color: #ffffff;
+  border: 0;
+  border-radius: 9999px;
+  padding: 1rem 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
 }
 
 .xamt-message__content .block-wrapper,

@@ -129,6 +129,38 @@ defmodule XamtWeb.ServerLiveTest do
     assert has_element?(view, "#lightbox-counter", "9 / 10")
   end
 
+  test "long plain text messages show a read-more mask; short ones do not", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    long_body = String.duplicate("a", 401)
+
+    {:ok, long_msg} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>#{long_body}</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    {:ok, short_msg} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>short body</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    assert has_element?(view, "#msg-body-#{long_msg.id}.xamt-text-collapsed")
+    assert has_element?(view, "#msg-toggle-#{long_msg.id}")
+    assert has_element?(view, "#msg-read-more-#{long_msg.id}")
+    assert has_element?(view, "#msg-read-less-#{long_msg.id}[hidden]")
+
+    assert has_element?(view, "#msg-body-#{short_msg.id}")
+    refute has_element?(view, "#msg-body-#{short_msg.id}.xamt-text-collapsed")
+    refute has_element?(view, "#msg-toggle-#{short_msg.id}")
+  end
+
   test "chat drawer has close and home, not server switcher", %{
     conn: conn,
     server: server,

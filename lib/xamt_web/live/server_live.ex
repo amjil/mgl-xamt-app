@@ -1245,7 +1245,10 @@ defmodule XamtWeb.ServerLive do
                           </header>
                           <div
                             id={"msg-content-#{message.id}"}
-                            class="xamt-message__content mongol-text"
+                            class={[
+                              "xamt-message__content mongol-text",
+                              collapsible_text?(message) && "relative"
+                            ]}
                           >
                             <%= if url = audio_src(message) do %>
                               <div class="xamt-message__audio">
@@ -1295,7 +1298,67 @@ defmodule XamtWeb.ServerLive do
                                   </button>
                                 </div>
                               <% else %>
-                                {raw(safe_html(message, @current_scope.user.id))}
+                                <div
+                                  id={"msg-body-#{message.id}"}
+                                  class={[
+                                    "xamt-text-body",
+                                    long_text?(message) && "xamt-text-collapsed"
+                                  ]}
+                                >
+                                  {raw(safe_html(message, @current_scope.user.id))}
+                                </div>
+                                <%= if long_text?(message) do %>
+                                  <div
+                                    id={"msg-toggle-#{message.id}"}
+                                    class="xamt-read-more-mask"
+                                  >
+                                    <button
+                                      type="button"
+                                      id={"msg-read-more-#{message.id}"}
+                                      class="xamt-btn-read-more hover:bg-[color-mix(in_srgb,var(--xamt-accent)_85%,black)] transition-colors"
+                                      phx-click={
+                                        JS.remove_class("xamt-text-collapsed",
+                                          to: "#msg-body-#{message.id}"
+                                        )
+                                        |> JS.add_class("is-expanded",
+                                          to: "#msg-toggle-#{message.id}"
+                                        )
+                                        |> JS.set_attribute({"hidden", ""},
+                                          to: "#msg-read-more-#{message.id}"
+                                        )
+                                        |> JS.remove_attribute("hidden",
+                                          to: "#msg-read-less-#{message.id}"
+                                        )
+                                      }
+                                    >
+                                      {gettext("Read more")}
+                                      <.icon name="hero-chevron-right" class="w-4 h-4 mt-1" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      id={"msg-read-less-#{message.id}"}
+                                      class="xamt-btn-read-more hover:bg-[color-mix(in_srgb,var(--xamt-accent)_85%,black)] transition-colors"
+                                      hidden
+                                      phx-click={
+                                        JS.add_class("xamt-text-collapsed",
+                                          to: "#msg-body-#{message.id}"
+                                        )
+                                        |> JS.remove_class("is-expanded",
+                                          to: "#msg-toggle-#{message.id}"
+                                        )
+                                        |> JS.remove_attribute("hidden",
+                                          to: "#msg-read-more-#{message.id}"
+                                        )
+                                        |> JS.set_attribute({"hidden", ""},
+                                          to: "#msg-read-less-#{message.id}"
+                                        )
+                                      }
+                                    >
+                                      {gettext("Show less")}
+                                      <.icon name="hero-chevron-left" class="w-4 h-4 mt-1" />
+                                    </button>
+                                  </div>
+                                <% end %>
                               <% end %>
                             <% end %>
                             <%= if preview = link_preview(message) do %>
@@ -2592,6 +2655,16 @@ defmodule XamtWeb.ServerLive do
   end
 
   defp caption_html?(_), do: false
+
+  @long_text_threshold 400
+
+  defp collapsible_text?(message) do
+    is_nil(audio_src(message)) and is_nil(gallery_images(message)) and long_text?(message)
+  end
+
+  defp long_text?(message) do
+    String.length(Messages.plain_text(message)) > @long_text_threshold
+  end
 
   defp send_audio_message(socket, channel) do
     {done, in_progress} = Phoenix.LiveView.uploaded_entries(socket, :audio)
