@@ -252,6 +252,17 @@ body {
   white-space: nowrap;
 }
 
+/* Desktop Chromium rotates color emoji in vertical-lr + mixed orientation. */
+.xamt-emoji {
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  display: inline-block;
+  line-height: 1;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-style: normal;
+  vertical-align: middle;
+}
+
 /* Bare two-digit runs (counts, badges) fit an em square and can truly combine */
 .xamt-upright--combine {
   writing-mode: inherit;

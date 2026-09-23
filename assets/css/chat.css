@@ -1001,6 +1001,25 @@
   transform: rotate(-28deg);
 }
 
+.xamt-composer__emoji {
+  display: none;
+}
+
+html.xamt-desktop-ime .xamt-composer__emoji {
+  display: inline-flex;
+}
+
+.xamt-composer__emoji-glyph {
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.xamt-composer__emoji[aria-expanded="true"] {
+  background: var(--xamt-accent-soft);
+  border-color: color-mix(in srgb, var(--xamt-accent) 38%, var(--xamt-line));
+}
+
 #audio-form {
   display: flex;
   flex: 0 0 auto;

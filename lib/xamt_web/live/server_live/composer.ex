@@ -208,6 +208,16 @@ defmodule XamtWeb.ServerLive.Composer do
             >
               <.icon name="hero-photo" class="size-4" />
             </label>
+            <button
+              type="button"
+              id="composer-emoji"
+              class="xamt-btn xamt-btn--soft xamt-composer__emoji"
+              title={gettext("Insert emoji")}
+              aria-label={gettext("Insert emoji")}
+              aria-haspopup="dialog"
+            >
+              <span class="xamt-composer__emoji-glyph" aria-hidden="true">😊</span>
+            </button>
             <form
               id="audio-form"
               phx-change="validate_audio"

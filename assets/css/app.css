@@ -34,6 +34,12 @@ body.mgl-ime-mobile-open {
   padding-bottom: 0;
 }
 
+/* Picker mounts on document.body; keep the popover horizontal. */
+mgl-emoji-picker {
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+}
+
 /* Keyboard-safe shell: --xamt-vh is kept in sync by initVisualViewport().
    overflow:hidden is set on html/body in mongolian.css so iOS cannot rubber-band
    the page behind the keys. Inner surfaces contain overscroll so the chain

@@ -4550,8 +4550,8 @@ function buildTemplate2() {
     .emoji-nav {
       display: flex;
       gap: 4px;
-      flex: 0 0 28px;
-      height: 28px;
+      flex: 0 0 52px;
+      height: 52px;
       align-items: stretch;
     }
     .emoji-nav button {
@@ -4560,7 +4560,7 @@ function buildTemplate2() {
       border-radius: 8px;
       background: var(--key-action);
       font: inherit;
-      font-size: 13px;
+      font-size: 16px;
       font-weight: 600;
       color: inherit;
     }
@@ -5031,7 +5031,7 @@ function buildTemplate4() {
     :host([open]) { display: block; }
     .panel {
       width: min(360px, calc(100vw - 16px));
-      max-height: min(380px, calc(100vh - 24px));
+      height: min(380px, calc(100vh - 24px));
       background: var(--bg);
       border: 1px solid var(--border);
       border-radius: 12px;
@@ -5042,16 +5042,18 @@ function buildTemplate4() {
     }
     .cats {
       display: flex;
+      flex: 0 0 44px;
+      height: 44px;
       gap: 2px;
-      padding: 6px 6px 0;
+      padding: 4px 4px 0;
+      box-sizing: border-box;
       border-bottom: 1px solid var(--border);
-      overflow-x: auto;
-      scrollbar-width: none;
+      overflow: hidden;
     }
-    .cats::-webkit-scrollbar { display: none; }
     .cats button {
-      flex: 1 0 36px;
-      height: 36px;
+      flex: 1 1 0;
+      min-width: 0;
+      height: 40px;
       border: none;
       border-radius: 8px 8px 0 0;
       background: transparent;
@@ -5063,13 +5065,19 @@ function buildTemplate4() {
     .cats button.active { background: var(--key-bg); }
     .grid {
       display: grid;
-      grid-template-columns: repeat(8, 1fr);
+      grid-template-columns: repeat(8, minmax(0, 1fr));
       gap: 2px;
       padding: 8px;
+      flex: 1 1 auto;
+      min-height: 0;
+      min-width: 0;
+      overflow-x: hidden;
       overflow-y: auto;
       background: var(--key-bg);
     }
     .grid button {
+      width: 100%;
+      min-width: 0;
       height: 36px;
       border: none;
       border-radius: 6px;

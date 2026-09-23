@@ -11,6 +11,7 @@
  */
 import { MglIME } from "../../vendor/mgl-web-ime/mgl-web-ime.js"
 import { imeProvider } from "../utils/ime.js"
+import { attachFieldEmojiTrigger, syncDesktopImeClass } from "../utils/ime-emoji.js"
 import {
   attachVirtualKeyboard,
   dismissOwnedIme,
@@ -45,6 +46,8 @@ export const MongolianIME = {
     })
     if (ime.keyboardMode === "virtual") suppressSystemKeyboard(this.el)
     this._detachKeyboard = attachVirtualKeyboard(ime)
+    this._detachEmoji = attachFieldEmojiTrigger(ime, this.el)
+    syncDesktopImeClass(ime)
     instances.set(this.el, ime)
 
     this.handleEvent("search:focus", () => {
@@ -82,11 +85,16 @@ export const MongolianIME = {
     // treat the field as a normal text input and raise the system keyboard.
     const ime = instances.get(this.el)
     if (ime?.keyboardMode === "virtual") suppressSystemKeyboard(this.el)
+    if (ime?.keyboardMode !== "virtual" && !this.el.nextElementSibling?.classList?.contains("xamt-ime-emoji")) {
+      this._detachEmoji?.()
+      this._detachEmoji = attachFieldEmojiTrigger(ime, this.el)
+    }
   },
 
   destroyed() {
     this._form?.removeEventListener("pointerdown", this._onFormPointerDown, true)
     this._form?.removeEventListener("submit", this._onFormSubmit)
+    this._detachEmoji?.()
     this._detachKeyboard?.()
     const ime = instances.get(this.el)
     if (ime && typeof ime.destroy === "function") ime.destroy()

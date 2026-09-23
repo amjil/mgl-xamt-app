@@ -48,6 +48,9 @@ defmodule Xamt.Messages.HtmlSanitizer do
     "del" => MapSet.new(~w(class))
   }
 
+  # ZWJ sequences + optional variation selectors. Flags are Extended_Pictographic pairs.
+  @emoji_re ~r/(\p{Extended_Pictographic}(?:\x{FE0F}|\x{FE0E})?(?:\x{200D}\p{Extended_Pictographic}(?:\x{FE0F}|\x{FE0E})?)*)/u
+
   @doc """
   Returns allowlisted HTML. Empty / non-binary input becomes `""`.
   """
@@ -59,6 +62,7 @@ defmodule Xamt.Messages.HtmlSanitizer do
       {:ok, tree} ->
         tree
         |> scrub_nodes()
+        |> wrap_emojis()
         |> Floki.raw_html()
 
       {:error, _} ->
@@ -99,6 +103,53 @@ defmodule Xamt.Messages.HtmlSanitizer do
   end
 
   defp scrub_node(_), do: []
+
+  defp wrap_emojis(nodes) when is_list(nodes), do: Enum.flat_map(nodes, &wrap_emoji_node/1)
+
+  defp wrap_emoji_node(text) when is_binary(text), do: wrap_emoji_text(text)
+
+  defp wrap_emoji_node({tag, attrs, children}) when is_binary(tag) do
+    cond do
+      tag in ["code", "pre"] ->
+        [{tag, attrs, children}]
+
+      emoji_span?(tag, attrs) ->
+        [{tag, attrs, children}]
+
+      true ->
+        [{tag, attrs, wrap_emojis(children)}]
+    end
+  end
+
+  defp wrap_emoji_node(other), do: [other]
+
+  defp wrap_emoji_text(text) do
+    @emoji_re
+    |> Regex.split(text, include_captures: true, trim: false)
+    |> Enum.flat_map(fn
+      "" ->
+        []
+
+      part ->
+        if Regex.match?(@emoji_re, part) do
+          [{"span", [{"class", "xamt-emoji"}], [part]}]
+        else
+          [part]
+        end
+    end)
+  end
+
+  defp emoji_span?("span", attrs) do
+    attrs
+    |> Enum.find_value(fn {name, value} ->
+      name == "class" && value
+    end)
+    |> Kernel.||("")
+    |> String.split()
+    |> Enum.member?("xamt-emoji")
+  end
+
+  defp emoji_span?(_, _), do: false
 
   defp scrub_attrs(tag, attrs) do
     allowed = Map.get(@allowed_attrs, tag, MapSet.new())

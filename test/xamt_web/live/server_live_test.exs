@@ -34,6 +34,7 @@ defmodule XamtWeb.ServerLiveTest do
     assert html =~ channel.name
     assert has_element?(view, "#message-composer-wrap[data-channel-id='#{channel.id}']")
     assert has_element?(view, "#composer-peek")
+    assert has_element?(view, "#composer-emoji")
 
     {:ok, message} =
       Messages.create_message(scope, channel.id, %{
@@ -470,6 +471,7 @@ defmodule XamtWeb.ServerLiveTest do
 
     assert has_element?(view, "#reply-preview")
     assert has_element?(view, "#composer-send")
+    assert has_element?(view, "#composer-emoji")
 
     render_hook(view, "send_message", %{
       "content_html" => "<p>a reply</p>",
@@ -1456,6 +1458,7 @@ defmodule XamtWeb.ServerLiveTest do
     {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
 
     assert has_element?(view, "#composer-poll")
+    assert has_element?(view, "#composer-emoji")
     refute has_element?(view, "#poll-composer-form")
 
     view |> element("#composer-poll") |> render_click()

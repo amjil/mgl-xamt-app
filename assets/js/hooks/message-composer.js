@@ -6,6 +6,7 @@ import { createMongolianEditor } from "../../vendor/mongolian-editor.js"
 import { MglIME, createCustomAdapter, measureCaretRect } from "../../vendor/mgl-web-ime/mgl-web-ime.js"
 import { imeProvider } from "../utils/ime.js"
 import { attachVirtualKeyboard, suppressSystemKeyboard } from "../utils/ime-keyboard.js"
+import { isImeUiTarget, syncDesktopImeClass } from "../utils/ime-emoji.js"
 import {
   OfflineStore,
   flushPendingMessages,
@@ -13,6 +14,7 @@ import {
   toast,
 } from "../utils/offline-store.js"
 import { attachMentionAutocomplete, hydrateMentions } from "./mention-autocomplete.js"
+import { insertUprightText, wrapEmojis } from "../utils/emoji.js"
 
 function editorRoot(editorEl) {
   return editorEl?.querySelector?.(".editor-content") || editorEl
@@ -133,7 +135,7 @@ function buildEditorAdapter(getRoot) {
     insertText: (text) => {
       const el = activeEditable(getRoot())
       el?.focus?.()
-      document.execCommand("insertText", false, text)
+      insertUprightText(text)
     },
     deleteBackward: () => {
       activeEditable(getRoot())?.focus?.()
@@ -145,7 +147,7 @@ function buildEditorAdapter(getRoot) {
     },
     replaceSelection: (text) => {
       activeEditable(getRoot())?.focus?.()
-      document.execCommand("insertText", false, text)
+      insertUprightText(text)
     },
     getCaretRect: () => {
       const el = activeEditable(getRoot())
@@ -204,7 +206,7 @@ export const MessageComposer = {
         if (this.withinOpenGrace()) return
         const active = document.activeElement
         if (this.wrap?.contains(active)) return
-        if (active?.closest?.("mgl-keyboard, mgl-candidates, .xamt-mention-picker")) return
+        if (isImeUiTarget(active) || active?.closest?.(".xamt-mention-picker")) return
         if (!this.hasDraft()) this.setOpen(false)
       })
     }
@@ -220,13 +222,21 @@ export const MessageComposer = {
       if (this.withinOpenGrace()) return
       if (this.wrap?.contains(e.target)) return
       if (e.target.closest?.("#composer-peek")) return
-      if (e.target.closest?.("mgl-keyboard, mgl-candidates, .xamt-mention-picker")) return
+      if (isImeUiTarget(e.target) || e.target.closest?.(".xamt-mention-picker")) return
       if (this.hasDraft()) return
       this._root()?.querySelector("[contenteditable]")?.blur?.()
       this.setOpen(false)
     }
     document.addEventListener("pointerdown", this._onDocPointer, true)
     this._detachKeyboard = attachVirtualKeyboard(this.ime)
+    this._syncComposerEmojiExpanded = () => {
+      const btn = document.getElementById("composer-emoji")
+      if (!btn) return
+      btn.setAttribute("aria-expanded", String(Boolean(this.ime?.emojiPickerEl?.open)))
+    }
+    this.ime?.emojiPickerEl?.addEventListener("mgl-emoji-open", this._syncComposerEmojiExpanded)
+    this.ime?.emojiPickerEl?.addEventListener("mgl-emoji-close", this._syncComposerEmojiExpanded)
+    this.syncEmojiButton()
 
     // Send lives in the toolbar, outside this hook's phx-update="ignore"
     // node. Reply/edit patches replace that button, and updated() does not
@@ -255,9 +265,28 @@ export const MessageComposer = {
       this.setOpen(true)
       this.editor.focus()
     }
+    this._onEmojiPointer = (e) => {
+      const btn = e.target.closest?.("#composer-emoji")
+      if (!btn) return
+      if (!this.el.closest(".xamt-composer-wrap")?.contains(btn)) return
+      e.preventDefault()
+    }
+    this._onEmojiClick = (e) => {
+      const btn = e.target.closest?.("#composer-emoji")
+      if (!btn) return
+      const wrap = this.el.closest(".xamt-composer-wrap")
+      if (!wrap?.contains(btn)) return
+      e.preventDefault()
+      this.wrap = wrap
+      this.setOpen(true)
+      this.editor.focus()
+      this.ime?.toggleEmojiPicker(btn)
+    }
     document.addEventListener("click", this._onSend)
     document.addEventListener("pointerdown", this._onPeek, {passive: false})
     document.addEventListener("click", this._onPeek)
+    document.addEventListener("pointerdown", this._onEmojiPointer, {passive: false})
+    document.addEventListener("click", this._onEmojiClick)
 
     this._flushing = false
     this._onOnline = () => this.flushOfflineQueue()
@@ -326,6 +355,7 @@ export const MessageComposer = {
     }
     this._channelId = channelId
     this.wrap = wrap
+    this.syncEmojiButton()
   },
 
   // LiveView WebSocket restored — retry queued pushEvents
@@ -338,6 +368,8 @@ export const MessageComposer = {
     document.removeEventListener("click", this._onSend)
     document.removeEventListener("pointerdown", this._onPeek)
     document.removeEventListener("click", this._onPeek)
+    document.removeEventListener("pointerdown", this._onEmojiPointer)
+    document.removeEventListener("click", this._onEmojiClick)
     window.removeEventListener("online", this._onOnline)
     navigator.serviceWorker?.removeEventListener("message", this._onSwMessage)
     this.host?.removeEventListener("paste", this._onPaste, true)
@@ -348,6 +380,8 @@ export const MessageComposer = {
     document.removeEventListener("pointerdown", this._onDocPointer, true)
     this._detachMentions?.()
     this._detachKeyboard?.()
+    this.ime?.emojiPickerEl?.removeEventListener("mgl-emoji-open", this._syncComposerEmojiExpanded)
+    this.ime?.emojiPickerEl?.removeEventListener("mgl-emoji-close", this._syncComposerEmojiExpanded)
     if (this.ime && typeof this.ime.destroy === "function") this.ime.destroy()
   },
 
@@ -371,6 +405,7 @@ export const MessageComposer = {
   populate({ html } = {}) {
     if (html != null) this.editor.setHtml(html)
     hydrateMentions(this._root())
+    wrapEmojis(this._root())
     this.syncIme()
     this.setOpen(true)
     this.editor.focus()
@@ -380,6 +415,7 @@ export const MessageComposer = {
     const next = Boolean(open)
     if (next) this._openedAt = performance.now()
     this.el.classList.toggle("is-open", next)
+    if (!next) this.ime?.hideEmojiPicker?.()
   },
 
   withinOpenGrace() {
@@ -394,6 +430,10 @@ export const MessageComposer = {
   syncIme() {
     // mgl-web-ime keeps composition in ImeCore; reset it after we rewrite the DOM.
     this.ime?.core?.cancelComposition?.()
+  },
+
+  syncEmojiButton() {
+    syncDesktopImeClass(this.ime)
   },
 
   _canPush() {
@@ -476,6 +516,7 @@ export const MessageComposer = {
       return
     }
 
+    this.ime?.hideEmojiPicker?.()
     this.pushEvent(event, payload)
     // Online clear is driven by server push_event("composer:clear")
   },

@@ -117,6 +117,66 @@ input[type="tel"] {
   border-color: #d46a6a;
 }
 
+/* Desktop-only emoji trigger inserted after MongolianIME fields. */
+.xamt-ime-emoji {
+  appearance: none;
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  width: 2rem;
+  height: 2rem;
+  min-width: 2rem;
+  min-height: 2rem;
+  padding: 0;
+  border: 1px solid var(--xamt-line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--xamt-bg-2) 90%, transparent);
+  color: inherit;
+  cursor: pointer;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  align-self: flex-end;
+  box-shadow: none;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.xamt-ime-emoji:hover {
+  background: var(--xamt-accent-soft);
+  border-color: color-mix(in srgb, var(--xamt-accent) 38%, var(--xamt-line));
+  transform: translateY(-1px);
+}
+
+.xamt-ime-emoji:active {
+  transform: scale(0.94);
+}
+
+.xamt-ime-emoji[aria-expanded="true"] {
+  background: var(--xamt-accent-soft);
+  border-color: color-mix(in srgb, var(--xamt-accent) 50%, var(--xamt-line));
+}
+
+.xamt-ime-emoji__glyph {
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.xamt-form--vertical .xamt-ime-emoji,
+.xamt-form--vertical button.xamt-ime-emoji {
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  padding: 0;
+  display: inline-grid;
+  align-self: flex-end;
+}
+
+.xamt-search .xamt-ime-emoji {
+  display: none;
+}
+
 .xamt-checkbox {
   width: 1rem;
   height: 1rem;

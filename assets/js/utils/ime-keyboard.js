@@ -76,7 +76,8 @@ export function attachVirtualKeyboard(ime, {eager = false} = {}) {
     if (inNode(e, target)) return
     if (inNode(e, ime.keyboardEl)) return
     if (inNode(e, ime.candidatesEl)) return
-    if (e.target?.closest?.("mgl-candidates")) return
+    if (inNode(e, ime.emojiPickerEl)) return
+    if (e.target?.closest?.("mgl-candidates, mgl-emoji-picker, .xamt-ime-emoji, #composer-emoji")) return
     release()
   }
 

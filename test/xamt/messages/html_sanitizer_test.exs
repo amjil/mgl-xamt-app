@@ -48,4 +48,19 @@ defmodule Xamt.Messages.HtmlSanitizerTest do
     assert cleaned =~ ~s(data-mention-id="#{id}")
     assert cleaned =~ ~s(data-mention-username="bob")
   end
+
+  test "wraps emoji so vertical-lr columns keep them upright" do
+    cleaned = HtmlSanitizer.sanitize("<p>hi 😀 there</p>")
+
+    assert cleaned =~ ~s(<span class="xamt-emoji">😀</span>)
+    assert cleaned =~ "hi "
+    assert cleaned =~ " there"
+  end
+
+  test "does not rewrap an existing emoji span" do
+    cleaned = HtmlSanitizer.sanitize(~s(<p><span class="xamt-emoji">🎉</span></p>))
+
+    assert cleaned =~ ~s(<span class="xamt-emoji">🎉</span>)
+    refute cleaned =~ ~s(<span class="xamt-emoji"><span class="xamt-emoji">)
+  end
 end
