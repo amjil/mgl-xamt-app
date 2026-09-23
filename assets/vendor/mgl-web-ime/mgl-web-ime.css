@@ -2,6 +2,7 @@
 
 @font-face {
   font-family: "Oyun Qagan Tig";
+  /* Root-absolute so this survives being @imported into /assets/css/*.css */
   src: url("/fonts/OyunQaganTig.ttf") format("truetype");
   font-weight: normal;
   font-style: normal;
@@ -58,6 +59,10 @@
 /* Desktop candidate popup host tweaks */
 
 mgl-candidates[variant="popup"] {
+  pointer-events: auto;
+}
+
+mgl-emoji-picker {
   pointer-events: auto;
 }
 
