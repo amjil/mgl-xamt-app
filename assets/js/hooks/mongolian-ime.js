@@ -11,7 +11,12 @@
  */
 import { MglIME } from "../../vendor/mgl-web-ime/mgl-web-ime.js"
 import { imeProvider } from "../utils/ime.js"
-import { attachVirtualKeyboard } from "../utils/ime-keyboard.js"
+import {
+  attachVirtualKeyboard,
+  dismissOwnedIme,
+  preferVirtualIme,
+  suppressSystemKeyboard,
+} from "../utils/ime-keyboard.js"
 
 const instances = new WeakMap()
 
@@ -30,15 +35,29 @@ export const MongolianIME = {
   mounted() {
     if (instances.has(this.el)) return
 
+    const virtual = preferVirtualIme()
     const ime = new MglIME({
       target: this.el,
-      profile: "auto",
-      keyboard: "auto",
+      profile: virtual ? "mobile" : "auto",
+      keyboard: virtual ? "virtual" : "auto",
       provider: imeProvider(),
       mount: document.body,
     })
+    if (ime.keyboardMode === "virtual") suppressSystemKeyboard(this.el)
     this._detachKeyboard = attachVirtualKeyboard(ime)
     instances.set(this.el, ime)
+
+    this.handleEvent("search:focus", () => {
+      if (this.el.id !== "channel-search-q") return
+      if (ime.keyboardMode === "virtual") suppressSystemKeyboard(this.el)
+      this.el.focus({preventScroll: true})
+      if (ime.keyboardMode === "virtual") ime.showKeyboard()
+    })
+
+    this.handleEvent("search:dismiss", () => {
+      if (this.el.id !== "channel-search-q") return
+      dismissOwnedIme()
+    })
 
     // Commit the candidate before HTML5 / LiveView read the field. pointerdown
     // runs before blur, so the input still has a caret for replaceBeforeCaret.
@@ -59,7 +78,10 @@ export const MongolianIME = {
   },
 
   updated() {
-    // Keep the existing IME across LiveView morphs (validation, patch).
+    // Morphs strip inputmode / readonly; put them back before iOS can
+    // treat the field as a normal text input and raise the system keyboard.
+    const ime = instances.get(this.el)
+    if (ime?.keyboardMode === "virtual") suppressSystemKeyboard(this.el)
   },
 
   destroyed() {

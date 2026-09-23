@@ -34,6 +34,8 @@ export function attachVirtualKeyboard(ime, {eager = false} = {}) {
   let claimedAt = 0
 
   const claim = () => {
+    suppressSystemKeyboard(target)
+    navigator.virtualKeyboard?.hide?.()
     if (owner && owner !== ime) owner.hideKeyboard()
     owner = ime
     claimedAt = performance.now()
@@ -42,7 +44,7 @@ export function attachVirtualKeyboard(ime, {eager = false} = {}) {
 
   const release = () => {
     if (owner !== ime) return
-    ime.hideKeyboard()
+    dismissVirtualIme(ime)
     owner = null
   }
 
@@ -65,6 +67,10 @@ export function attachVirtualKeyboard(ime, {eager = false} = {}) {
       return
     }
     if (owner !== ime) return
+    if (e.target?.closest?.(".xamt-search-hit, #search-results")) {
+      release()
+      return
+    }
     if (performance.now() - claimedAt < CLAIM_GRACE_MS) return
     if (e.target?.closest?.("#composer-peek")) return
     if (inNode(e, target)) return
@@ -88,22 +94,74 @@ export function attachVirtualKeyboard(ime, {eager = false} = {}) {
     ime.keyboardEl?.removeEventListener("pointerdown", onKeyPointer)
     document.removeEventListener("pointerdown", onDocPointer, true)
     if (owner === ime) {
-      ime.hideKeyboard()
+      dismissVirtualIme(ime)
       owner = null
     }
   }
 }
 
-/** Stop the OS keyboard from covering the custom IME on a contenteditable. */
+function isEditable(el) {
+  if (!(el instanceof HTMLElement)) return false
+  if (el.isContentEditable || el.getAttribute?.("contenteditable") === "true") return true
+  return el.tagName === "INPUT" || el.tagName === "TEXTAREA"
+}
+
+/**
+ * Stop the OS / WebView keyboard from covering mgl-web-ime.
+ *
+ * Native <input> / <textarea> still summon iOS/Android's keyboard on focus
+ * unless inputmode is none. Do not set `readonly` — that hides the caret.
+ * LiveView morphs strip JS-only attributes, so callers must re-apply this
+ * after patches.
+ */
 export function suppressSystemKeyboard(root) {
   if (!root) return
   const apply = (el) => {
-    if (!(el instanceof HTMLElement)) return
-    if (!el.isContentEditable && el.getAttribute?.("contenteditable") !== "true") return
+    if (!isEditable(el)) return
     el.setAttribute("inputmode", "none")
     el.setAttribute("virtualkeyboardpolicy", "manual")
+    if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
+      el.removeAttribute("readonly")
+    }
   }
 
   apply(root)
-  root.querySelectorAll?.("[contenteditable]").forEach(apply)
+  root.querySelectorAll?.("[contenteditable], input, textarea").forEach(apply)
+  navigator.virtualKeyboard?.hide?.()
+}
+
+/** Hide the virtual keyboard and candidate bar without leaving a stale list. */
+export function dismissVirtualIme(ime) {
+  if (!ime) return
+  ime.core?.setState?.({
+    keyboardVisible: false,
+    candidateVisible: false,
+    candidates: [],
+    composition: "",
+  })
+  ime.hideCandidates?.()
+  ime.hideKeyboard?.()
+  if (ime.candidatesEl) ime.candidatesEl.visible = false
+  ime.blur?.()
+}
+
+/** Dismiss whichever IME currently owns the on-screen keyboard. */
+export function dismissOwnedIme() {
+  if (owner) {
+    dismissVirtualIme(owner)
+    owner = null
+  }
+  document.querySelectorAll("mgl-candidates[visible]").forEach((el) => {
+    el.visible = false
+  })
+}
+
+/** Match the mobile chat breakpoint so a wide phone still gets the virtual IME. */
+export function preferVirtualIme() {
+  if (typeof window === "undefined") return false
+  if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent)) {
+    return true
+  }
+  const touch = "ontouchstart" in window || (navigator.maxTouchPoints ?? 0) > 0
+  return touch && window.matchMedia("(max-width: 960px)").matches
 }

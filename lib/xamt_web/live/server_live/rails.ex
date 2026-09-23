@@ -278,7 +278,13 @@ defmodule XamtWeb.ServerLive.Rails do
           type="button"
           id="mobile-nav-search"
           class="xamt-icon-btn xamt-search__toggle"
-          phx-click="toggle_mobile_search"
+          phx-click={
+            if @mobile_search? do
+              JS.push("toggle_mobile_search")
+            else
+              JS.push("toggle_mobile_search") |> JS.focus(to: "#channel-search-q")
+            end
+          }
           aria-label={gettext("Search")}
           aria-expanded={@mobile_search?}
         >
@@ -286,16 +292,18 @@ defmodule XamtWeb.ServerLive.Rails do
         </button>
         <label class="xamt-search__field">
           <span class="sr-only">{gettext("Search")}</span>
-          <input
-            type="search"
+          <textarea
             name="q"
             id="channel-search-q"
-            value={@search_q}
+            rows="1"
             placeholder={gettext("Search")}
             class="xamt-input mongol-input"
             phx-hook="MongolianIME"
+            inputmode="none"
+            virtualkeyboardpolicy="manual"
             autocomplete="off"
-          />
+            wrap="off"
+          >{@search_q}</textarea>
         </label>
         <button
           :if={@search_results}

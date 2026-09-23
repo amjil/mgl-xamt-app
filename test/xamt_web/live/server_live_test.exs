@@ -528,6 +528,27 @@ defmodule XamtWeb.ServerLiveTest do
     assert render(view) =~ "unique-needle"
   end
 
+  test "mobile search toggle opens the field and keeps it in the toolbar", %{
+    conn: conn,
+    server: server,
+    channel: channel
+  } do
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    refute has_element?(view, "#channel-search.is-open")
+    assert has_element?(view, "#channel-search-q")
+    assert has_element?(view, "#mobile-nav-search")
+
+    view |> element("#mobile-nav-search") |> render_click()
+
+    assert has_element?(view, "#channel-search.is-open")
+    assert has_element?(view, "#channel-search-q")
+    assert has_element?(view, ".xamt-mobile-toolbar #channel-search-q")
+
+    view |> element("#mobile-nav-search") |> render_click()
+    refute has_element?(view, "#channel-search.is-open")
+  end
+
   test "search finds a message in another channel and patches to it", %{
     conn: conn,
     server: server,

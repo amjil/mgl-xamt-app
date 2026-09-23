@@ -1744,7 +1744,32 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  body.mgl-ime-mobile-open .xamt-mobile-toolbar {
+  /* Composer: hide the toolbar so the chat column uses the full width. */
+  body.mgl-ime-mobile-open:not(:has(.xamt-search.is-open)) .xamt-mobile-toolbar {
+    display: none;
+  }
+
+  /* Search lives in the toolbar. `display: none` would also hide the
+     position:fixed input, which is why the field vanished under the IME. */
+  body.mgl-ime-mobile-open:has(.xamt-search.is-open) .xamt-mobile-toolbar {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: visible;
+    padding: 0;
+    border: 0;
+    pointer-events: none;
+  }
+
+  body.mgl-ime-mobile-open:has(.xamt-search.is-open) .xamt-mobile-toolbar > :not(.xamt-search) {
+    display: none;
+  }
+
+  body.mgl-ime-mobile-open:has(.xamt-search.is-open) .xamt-search {
+    pointer-events: auto;
+  }
+
+  body.mgl-ime-mobile-open:has(.xamt-search.is-open) .xamt-search__toggle {
     display: none;
   }
 
@@ -1796,17 +1821,35 @@
 
   .xamt-search.is-open .xamt-search__field {
     position: fixed;
-    top: calc(var(--xamt-safe-top) + 0.55rem);
+    top: var(--xamt-safe-top);
     left: calc(var(--xamt-safe-left) + var(--xamt-toolbar-w) + 0.4rem);
     z-index: calc(var(--xamt-z-drawer) + 1);
     display: block;
+    padding: 0.15rem;
+    border-radius: 0.65rem;
+    background: color-mix(in srgb, var(--xamt-bg-2) 94%, var(--xamt-shade));
+    box-shadow: var(--xamt-shadow);
+  }
+
+  /* Vertical-lr: inline-size is the physical height of the field. */
+  .xamt-search.is-open .xamt-search__field .xamt-input {
+    inline-size: min(22rem, calc(var(--xamt-vh) - var(--xamt-ime-kb) - 1rem));
+    max-inline-size: min(22rem, calc(var(--xamt-vh) - var(--xamt-ime-kb) - 1rem));
+    resize: none;
+    caret-color: var(--xamt-accent);
   }
 
   .xamt-search.is-open #clear-search {
     position: fixed;
-    top: calc(var(--xamt-safe-top) + 0.55rem);
+    top: var(--xamt-safe-top);
     left: calc(var(--xamt-safe-left) + var(--xamt-toolbar-w) + 3.1rem);
     z-index: calc(var(--xamt-z-drawer) + 1);
+  }
+
+  .xamt-search-results {
+    top: 0.12rem;
+    bottom: auto;
+    max-inline-size: min(16rem, calc(var(--xamt-vh) - var(--xamt-ime-kb) - 1rem));
   }
 
   body.mgl-ime-mobile-open .xamt-search.is-open .xamt-search__field {
@@ -2047,10 +2090,6 @@
 }
 
 @media (max-width: 640px) {
-  .xamt-search__field .xamt-input {
-    inline-size: 6.5rem;
-  }
-
   .xamt-mobile-toolbar {
     padding: 0.45rem 0.22rem;
   }

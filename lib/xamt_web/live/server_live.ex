@@ -774,7 +774,12 @@ defmodule XamtWeb.ServerLive do
   def handle_event("set_mobile_panel", _params, socket), do: {:noreply, socket}
 
   def handle_event("toggle_mobile_search", _params, socket) do
-    {:noreply, assign(socket, :mobile_search?, !socket.assigns.mobile_search?)}
+    open? = !socket.assigns.mobile_search?
+
+    {:noreply,
+     socket
+     |> assign(:mobile_search?, open?)
+     |> push_event(if(open?, do: "search:focus", else: "search:dismiss"), %{})}
   end
 
   def handle_event("search", %{"q" => q}, socket) do
@@ -800,7 +805,10 @@ defmodule XamtWeb.ServerLive do
   end
 
   def handle_event("clear_search", _params, socket) do
-    {:noreply, assign(socket, search_q: "", search_results: nil, mobile_search?: false)}
+    {:noreply,
+     socket
+     |> assign(search_q: "", search_results: nil, mobile_search?: false)
+     |> push_event("search:dismiss", %{})}
   end
 
   def handle_event("open_search_result", %{"id" => id} = params, socket) do
@@ -812,6 +820,7 @@ defmodule XamtWeb.ServerLive do
       |> assign(:search_results, nil)
       |> assign(:search_q, "")
       |> assign(:mobile_search?, false)
+      |> push_event("search:dismiss", %{})
 
     cond do
       is_nil(channel_id) or (active && active.id == channel_id) ->

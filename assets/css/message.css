@@ -53,11 +53,14 @@
 .xamt-search__field .xamt-input {
   inline-size: 8rem;
   block-size: 2.35rem;
+  max-inline-size: 8rem;
+  resize: none;
+  caret-color: var(--xamt-accent);
 }
 
 .xamt-search-results {
   position: absolute;
-  inset: 0.6rem auto 0.6rem 0.6rem;
+  inset: 0.2rem auto auto 0.6rem;
   z-index: var(--xamt-z-jump);
   display: flex;
   flex-direction: column;
@@ -569,8 +572,14 @@
   border-color: var(--xamt-role-creator-line);
 }
 
-/* Horizontal chrome (member rail, etc.) flips padding back to row capsules */
-.xamt-rail .xamt-role-badge,
+/* Member columns stay vertical-lr so the capsule runs with the name */
+.xamt-member .xamt-role-badge {
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+}
+
+/* Horizontal chrome (profile sidebar, etc.) flips padding back to row capsules */
 .xamt-sidebar .xamt-role-badge {
   padding: 0.15rem 0.4rem;
   writing-mode: horizontal-tb;
