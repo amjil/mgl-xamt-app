@@ -8,6 +8,7 @@ defmodule XamtWeb.HomeLiveTest do
   alias Xamt.Repo
   alias Xamt.Servers
   alias Xamt.Servers.Server
+  alias Xamt.SiteSettings
 
   test "regular users do not see the create server control", %{conn: conn} do
     {:ok, view, html} = live(log_in_user(conn, user_fixture()), ~p"/")
@@ -123,5 +124,21 @@ defmodule XamtWeb.HomeLiveTest do
 
     refute has_element?(view, "#edit-server-form")
     assert html =~ "Unauthorized"
+  end
+
+  test "guests see a register link while registration is open", %{conn: conn} do
+    {:ok, view, html} = live(conn, ~p"/")
+
+    assert html =~ ~p"/register"
+    assert has_element?(view, "a[href='/register']", "Register")
+  end
+
+  test "guests do not see a register link when registration is closed", %{conn: conn} do
+    SiteSettings.put_registration_enabled!(false)
+
+    {:ok, view, html} = live(conn, ~p"/")
+
+    refute html =~ ~p"/register"
+    refute has_element?(view, "a[href='/register']")
   end
 end

@@ -76,6 +76,13 @@ defmodule XamtWeb.UserAuth do
     end
   end
 
+  @doc """
+  Assigns site-wide flags used by layouts and auth templates.
+  """
+  def assign_site_settings(conn, _opts) do
+    assign(conn, :registration_enabled?, Xamt.SiteSettings.registration_enabled?())
+  end
+
   defp ensure_user_token(conn) do
     if token = get_session(conn, :user_token) do
       {token, conn}
@@ -268,7 +275,8 @@ defmodule XamtWeb.UserAuth do
 
   defp mount_current_scope(socket, session) do
     socket =
-      Phoenix.Component.assign_new(socket, :current_scope, fn ->
+      socket
+      |> Phoenix.Component.assign_new(:current_scope, fn ->
         case session do
           %{"user_token" => user_token} ->
             case Accounts.get_user_by_session_token(user_token) do
@@ -279,6 +287,9 @@ defmodule XamtWeb.UserAuth do
           _ ->
             Scope.for_user(nil)
         end
+      end)
+      |> Phoenix.Component.assign_new(:registration_enabled?, fn ->
+        Xamt.SiteSettings.registration_enabled?()
       end)
 
     maybe_attach_web_push_hook(socket)

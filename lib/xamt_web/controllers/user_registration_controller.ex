@@ -3,7 +3,10 @@ defmodule XamtWeb.UserRegistrationController do
 
   alias Xamt.Accounts
   alias Xamt.Accounts.User
+  alias Xamt.SiteSettings
   alias XamtWeb.UserAuth
+
+  plug :require_registration_enabled
 
   def new(conn, _params) do
     changeset = Accounts.change_user_registration(%User{})
@@ -19,6 +22,17 @@ defmodule XamtWeb.UserRegistrationController do
 
       {:error, %Ecto.Changeset{} = changeset} ->
         render(conn, :new, changeset: changeset)
+    end
+  end
+
+  defp require_registration_enabled(conn, _opts) do
+    if SiteSettings.registration_enabled?() do
+      conn
+    else
+      conn
+      |> put_flash(:error, gettext("Registration is currently closed."))
+      |> redirect(to: ~p"/login")
+      |> halt()
     end
   end
 end

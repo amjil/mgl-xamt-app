@@ -426,6 +426,9 @@ defmodule Xamt.AccountsTest do
       {:ok, admin} = Accounts.update_user_global_role(creator, "admin")
       assert admin.global_role == "admin"
       assert User.can_create_server?(admin)
+      assert User.admin?(admin)
+      refute User.admin?(creator)
+      refute User.admin?(user)
     end
 
     test "rejects unknown roles" do

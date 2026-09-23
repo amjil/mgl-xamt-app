@@ -2,6 +2,8 @@ defmodule XamtWeb.SettingsLive do
   use XamtWeb, :live_view
 
   alias Xamt.Accounts
+  alias Xamt.Accounts.User
+  alias Xamt.SiteSettings
 
   @impl true
   def mount(_params, _session, socket) do
@@ -13,6 +15,8 @@ defmodule XamtWeb.SettingsLive do
      |> assign(:page_title, gettext("Settings"))
      |> assign(:form, to_form(changeset, as: :user))
      |> assign(:status_form, to_form(Accounts.change_user_custom_status(user), as: :status))
+     |> assign(:site_admin?, User.admin?(user))
+     |> assign(:registration_enabled?, SiteSettings.registration_enabled?())
      |> allow_upload(:avatar,
        accept: ~w(.jpg .jpeg .png .gif .webp),
        max_entries: 1,
@@ -78,6 +82,29 @@ defmodule XamtWeb.SettingsLive do
       status_emoji: Map.get(params, "emoji"),
       status_text: Map.get(params, "text")
     })
+  end
+
+  def handle_event("toggle_registration", _params, socket) do
+    enabled = !socket.assigns.registration_enabled?
+
+    case SiteSettings.update_registration_enabled(socket.assigns.current_scope.user, enabled) do
+      {:ok, setting} ->
+        flash =
+          if setting.registration_enabled do
+            gettext("Registration is now open.")
+          else
+            gettext("Registration is now closed.")
+          end
+
+        {:noreply,
+         socket
+         |> assign(:registration_enabled?, setting.registration_enabled)
+         |> put_flash(:info, flash)}
+
+      {:error, :unauthorized} ->
+        {:noreply,
+         put_flash(socket, :error, gettext("You don't have permission to change this."))}
+    end
   end
 
   defp apply_settings_status(socket, attrs) do
@@ -236,6 +263,38 @@ defmodule XamtWeb.SettingsLive do
               {gettext("Save")}
             </button>
           </form>
+        </section>
+
+        <section :if={@site_admin?} id="site-settings" class="xamt-site-settings xamt-surface">
+          <h2 class="xamt-section-title mongol-text">{gettext("Site")}</h2>
+          <p class="xamt-site-settings__copy mongol-text">
+            {gettext("Control whether new people can create an account.")}
+          </p>
+
+          <div class="xamt-site-settings__row">
+            <button
+              type="button"
+              id="registration-toggle"
+              class="xamt-switch"
+              role="switch"
+              aria-checked={to_string(@registration_enabled?)}
+              phx-click="toggle_registration"
+            >
+              <span class="xamt-switch__track" aria-hidden="true">
+                <span class="xamt-switch__thumb"></span>
+              </span>
+            </button>
+            <div class="xamt-site-settings__meta">
+              <span class="xamt-site-settings__label mongol-text">
+                {gettext("Allow registration")}
+              </span>
+              <span class="xamt-site-settings__state mongol-text">
+                {if @registration_enabled?,
+                  do: gettext("Open"),
+                  else: gettext("Closed")}
+              </span>
+            </div>
+          </div>
         </section>
 
         <nav class="xamt-settings__links">

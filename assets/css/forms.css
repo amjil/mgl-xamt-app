@@ -559,3 +559,100 @@ input[type="tel"] {
   flex: 0 0 auto;
   padding: 0.35rem;
 }
+
+/* Site-wide admin toggle (settings page) */
+.xamt-site-settings {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 1.15rem 1rem;
+}
+
+.xamt-site-settings__copy {
+  margin: 0;
+  max-inline-size: 16rem;
+  color: var(--xamt-muted);
+}
+
+.xamt-site-settings__row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.xamt-site-settings__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.xamt-site-settings__label {
+  font-weight: 600;
+}
+
+.xamt-site-settings__state {
+  color: var(--xamt-muted);
+  font-size: 0.85rem;
+}
+
+.xamt-switch {
+  appearance: none;
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 2.85rem;
+  height: 1.6rem;
+  padding: 0;
+  border: 1px solid var(--xamt-line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--xamt-bg) 82%, var(--xamt-line));
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.xamt-switch:hover {
+  border-color: var(--xamt-line-strong);
+}
+
+.xamt-switch:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--xamt-gold-soft);
+}
+
+.xamt-switch[aria-checked="true"] {
+  background: linear-gradient(160deg, #57b48c, var(--xamt-accent) 55%, #2f7a5c);
+  border-color: transparent;
+  box-shadow: 0 8px 16px color-mix(in srgb, var(--xamt-accent) 28%, transparent);
+}
+
+.xamt-switch__track {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.xamt-switch__thumb {
+  position: absolute;
+  top: 0.16rem;
+  left: 0.16rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  background: #f7faf8;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
+  transition: transform 180ms ease;
+}
+
+.xamt-switch[aria-checked="true"] .xamt-switch__thumb {
+  transform: translateX(1.25rem);
+}

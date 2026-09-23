@@ -3,6 +3,9 @@ defmodule XamtWeb.UserRegistrationControllerTest do
 
   import Xamt.AccountsFixtures
 
+  alias Xamt.Accounts
+  alias Xamt.SiteSettings
+
   describe "GET /users/register" do
     test "renders registration page", %{conn: conn} do
       conn = get(conn, ~p"/users/register")
@@ -16,6 +19,14 @@ defmodule XamtWeb.UserRegistrationControllerTest do
       conn = conn |> log_in_user(user_fixture()) |> get(~p"/users/register")
 
       assert redirected_to(conn) == ~p"/"
+    end
+
+    test "redirects to login when registration is closed", %{conn: conn} do
+      SiteSettings.put_registration_enabled!(false)
+
+      conn = get(conn, ~p"/users/register")
+      assert redirected_to(conn) == ~p"/login"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "closed"
     end
   end
 
@@ -42,6 +53,20 @@ defmodule XamtWeb.UserRegistrationControllerTest do
       response = html_response(conn, 200)
       assert response =~ "Register"
       assert response =~ "must have the @ sign and no spaces"
+    end
+
+    test "rejects new accounts when registration is closed", %{conn: conn} do
+      SiteSettings.put_registration_enabled!(false)
+      email = unique_user_email()
+
+      conn =
+        post(conn, ~p"/users/register", %{
+          "user" => valid_user_attributes(email: email)
+        })
+
+      assert redirected_to(conn) == ~p"/login"
+      refute get_session(conn, :user_token)
+      refute Accounts.get_user_by_email(email)
     end
   end
 end

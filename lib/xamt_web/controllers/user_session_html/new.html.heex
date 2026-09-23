@@ -7,11 +7,14 @@
     <.header>
       {gettext("Log in")}
       <:subtitle>
-        <%= if @current_scope do %>
-          {gettext("You need to reauthenticate to perform sensitive actions on your account.")}
-        <% else %>
-          {gettext("Don't have an account?")}
-          <.link href={~p"/register"} class="xamt-link">{gettext("Sign up")}</.link>
+        <%= cond do %>
+          <% @current_scope -> %>
+            {gettext("You need to reauthenticate to perform sensitive actions on your account.")}
+          <% @registration_enabled? -> %>
+            {gettext("Don't have an account?")}
+            <.link href={~p"/register"} class="xamt-link">{gettext("Sign up")}</.link>
+          <% true -> %>
+            {gettext("Registration is currently closed.")}
         <% end %>
       </:subtitle>
     </.header>

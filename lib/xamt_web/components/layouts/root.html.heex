@@ -55,7 +55,7 @@
               <li>
                 <.link navigate={~p"/login"} class="mongol-text">{gettext("Log in")}</.link>
               </li>
-              <li>
+              <li :if={@registration_enabled?}>
                 <.link navigate={~p"/register"} class="mongol-text">{gettext("Register")}</.link>
               </li>
             <% end %>

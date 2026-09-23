@@ -5,9 +5,12 @@ defmodule XamtWeb.HomeLive do
   alias Xamt.Servers
   alias Xamt.Servers.Permissions
   alias Xamt.Servers.Server
+  alias Xamt.SiteSettings
 
   @impl true
   def mount(_params, _session, socket) do
+    if connected?(socket), do: SiteSettings.subscribe()
+
     scope = socket.assigns.current_scope
 
     {servers, discoverable} =
@@ -36,6 +39,11 @@ defmodule XamtWeb.HomeLive do
        :show_create,
        params["create"] == "1" and socket.assigns.can_create_server?
      )}
+  end
+
+  @impl true
+  def handle_info({:site_settings_updated, setting}, socket) do
+    {:noreply, assign(socket, :registration_enabled?, setting.registration_enabled)}
   end
 
   @impl true
@@ -292,7 +300,13 @@ defmodule XamtWeb.HomeLive do
             <.link navigate={~p"/login"} class="xamt-btn xamt-btn--primary mongol-text">
               {gettext("Log in")}
             </.link>
-            <.link navigate={~p"/register"} class="xamt-btn mongol-text">{gettext("Register")}</.link>
+            <.link
+              :if={@registration_enabled?}
+              navigate={~p"/register"}
+              class="xamt-btn mongol-text"
+            >
+              {gettext("Register")}
+            </.link>
           </section>
         <% end %>
       </div>

@@ -39,6 +39,16 @@ defmodule XamtWeb.UserSessionControllerTest do
       assert response =~ ~p"/register"
       assert response =~ "Log in with email"
     end
+
+    test "hides sign-up when registration is closed", %{conn: conn} do
+      Xamt.SiteSettings.put_registration_enabled!(false)
+
+      conn = get(conn, ~p"/users/log-in")
+      response = html_response(conn, 200)
+      assert response =~ "Log in"
+      refute response =~ ~p"/register"
+      assert response =~ "Registration is currently closed."
+    end
   end
 
   describe "GET /users/log-in/:token" do

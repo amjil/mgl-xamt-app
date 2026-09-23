@@ -35,6 +35,12 @@ defmodule Xamt.Accounts.User do
 
   def can_create_server?(_), do: false
 
+  @doc """
+  True when the user is a global admin (site-wide settings, etc.).
+  """
+  def admin?(%__MODULE__{global_role: "admin"}), do: true
+  def admin?(_), do: false
+
   @doc false
   def invite_changeset(user, attrs, opts \\ []) do
     user
