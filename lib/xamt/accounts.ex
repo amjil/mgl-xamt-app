@@ -111,9 +111,11 @@ defmodule Xamt.Accounts do
   end
 
   @custom_status_presets [
-    %{"emoji" => "🏍️", "text" => "Out on a motorcycle ride"},
-    %{"emoji" => "🚗", "text" => "On a road trip"},
-    %{"emoji" => "🎧", "text" => "Listening to an audiobook"}
+    %{"emoji" => "💼", "text" => "Working"},
+    %{"emoji" => "🔥", "text" => "Busy"},
+    %{"emoji" => "🏖️", "text" => "On vacation"},
+    %{"emoji" => "📅", "text" => "In a meeting"},
+    %{"emoji" => "📚", "text" => "Studying"}
   ]
 
   @doc """

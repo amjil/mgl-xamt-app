@@ -23,9 +23,9 @@ defmodule XamtWeb.SettingsLiveTest do
     |> render_click()
 
     updated = Accounts.get_user!(user.id)
-    assert updated.status_emoji == "🎧"
-    assert updated.status_text == "Listening to an audiobook"
-    assert render(view) =~ "🎧"
+    assert updated.status_emoji == "🏖️"
+    assert updated.status_text == "On vacation"
+    assert render(view) =~ "🏖️"
   end
 
   test "saves a custom status from the form", %{conn: conn, user: user} do

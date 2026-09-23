@@ -1393,11 +1393,11 @@ defmodule XamtWeb.ServerLiveTest do
     refute has_element?(view, "#status-picker-drawer")
 
     updated = Accounts.get_user!(user.id)
-    assert updated.status_emoji == "🏍️"
-    assert updated.status_text == "Out on a motorcycle ride"
+    assert updated.status_emoji == "💼"
+    assert updated.status_text == "Working"
 
     html = render(view)
-    assert html =~ "🏍️"
+    assert html =~ "💼"
   end
 
   test "clears custom status from the picker", %{
