@@ -132,10 +132,21 @@
 }
 
 .xamt-rail__header {
+  appearance: none;
   flex: 0 0 auto;
+  margin: 0;
   padding: 1.05rem 0.85rem;
+  border: 0;
   border-bottom: 1px solid var(--xamt-line);
   background: color-mix(in srgb, var(--xamt-bg-3) 35%, transparent);
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.xamt-rail__header:hover {
+  background: color-mix(in srgb, var(--xamt-bg-3) 55%, transparent);
 }
 
 .xamt-rail--channels .xamt-rail__header {
@@ -689,6 +700,47 @@
 
 .xamt-composer__peek {
   display: none;
+}
+
+.xamt-nav-profile {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin-inline-start: auto;
+  padding: 0.18rem;
+  border: 0;
+  border-radius: 9999px;
+  color: #f4fff9;
+  background: linear-gradient(160deg, #63c197, var(--xamt-accent) 55%, #2f7a5c);
+  box-shadow:
+    0 8px 18px color-mix(in srgb, var(--xamt-accent) 32%, transparent),
+    0 1px 0 rgba(255, 255, 255, 0.18) inset;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    filter 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.xamt-nav-profile:hover {
+  filter: brightness(1.05);
+}
+
+.xamt-nav-profile:active {
+  transform: scale(0.94);
+}
+
+.xamt-nav-profile .xamt-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  border: 0;
+  background: color-mix(in srgb, var(--xamt-bg-2) 70%, #1c221e);
+  color: #f4fff9;
+  font-family: var(--xamt-font-ui);
 }
 
 .xamt-composer__field {
@@ -1713,8 +1765,12 @@ html.xamt-desktop-ime .xamt-composer__emoji {
     flex: 0 0 auto;
   }
 
-  .xamt-mobile-nav__members {
+  .xamt-search {
     margin-inline-start: auto;
+  }
+
+  .xamt-nav-profile {
+    margin-inline-start: 0;
   }
 
   .xamt-main__header {
@@ -1829,6 +1885,10 @@ html.xamt-desktop-ime .xamt-composer__emoji {
     margin-inline-start: auto;
   }
 
+  .xamt-nav-profile {
+    margin-inline-start: 0;
+  }
+
   .xamt-chat-window {
     position: relative;
     writing-mode: vertical-lr;
@@ -1863,10 +1923,20 @@ html.xamt-desktop-ime .xamt-composer__emoji {
   }
 
   /* Vertical-lr: inline-size is the physical height of the field. */
+  .xamt-search.is-open .xamt-search__field {
+    max-block-size: 2.35rem;
+    overflow: hidden;
+  }
+
   .xamt-search.is-open .xamt-search__field .xamt-input {
     inline-size: min(22rem, calc(var(--xamt-vh) - var(--xamt-ime-kb) - 1rem));
     max-inline-size: min(22rem, calc(var(--xamt-vh) - var(--xamt-ime-kb) - 1rem));
+    block-size: 2.35rem;
+    max-block-size: 2.35rem;
     resize: none;
+    overflow-x: hidden;
+    overflow-y: hidden;
+    overscroll-behavior: none;
     caret-color: var(--xamt-accent);
   }
 
@@ -2033,6 +2103,11 @@ html.xamt-desktop-ime .xamt-composer__emoji {
 
   .xamt-composer-wrap .xamt-composer__peek:active {
     transform: scale(0.94);
+  }
+
+  .xamt-nav-profile {
+    width: 2.85rem;
+    height: 2.85rem;
   }
 
   /* Open: restore the normal composer column. */

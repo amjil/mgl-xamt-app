@@ -36,9 +36,16 @@ defmodule XamtWeb.ServerLive.Rails do
     ~H"""
     <aside class="xamt-rail xamt-rail--channels">
       <div class="xamt-rail__pane xamt-rail__pane--top">
-        <header id="server-info" class="xamt-rail__header">
+        <button
+          type="button"
+          id="server-info"
+          class="xamt-rail__header"
+          phx-click="toggle_server_menu"
+          aria-label={gettext("Server info")}
+          aria-expanded={@show_server_menu}
+        >
           <h1 class="xamt-rail__title mongol-text">{upright_text(@server.name)}</h1>
-        </header>
+        </button>
 
         <div class="xamt-rail__section">
           <div class="xamt-rail__section-head">
@@ -318,17 +325,6 @@ defmodule XamtWeb.ServerLive.Rails do
       </form>
       <button
         type="button"
-        id="mobile-nav-server"
-        class="xamt-mobile-nav__btn xamt-mobile-nav__server"
-        phx-click="toggle_server_menu"
-        aria-label={gettext("Server info")}
-        aria-expanded={@show_server_menu}
-        aria-haspopup="dialog"
-      >
-        <.icon name="hero-information-circle" class="size-5" />
-      </button>
-      <button
-        type="button"
         id="mobile-nav-members"
         class="xamt-mobile-nav__btn xamt-mobile-nav__members"
         phx-click="set_mobile_panel"
@@ -338,6 +334,19 @@ defmodule XamtWeb.ServerLive.Rails do
       >
         <.icon name="hero-users" class="size-5" />
       </button>
+      <.link
+        :if={@current_scope.user}
+        navigate={~p"/profile/#{@current_scope.user.username}"}
+        id="nav-profile"
+        class="xamt-nav-profile"
+        aria-label={gettext("Profile")}
+      >
+        <.avatar
+          user={@current_scope.user}
+          id="nav-profile-avatar"
+          class="xamt-avatar xamt-avatar--sm"
+        />
+      </.link>
     </header>
     """
   end

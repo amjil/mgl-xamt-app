@@ -48,13 +48,23 @@
   flex-direction: row;
   align-items: center;
   gap: 0.35rem;
+  min-width: 0;
+}
+
+.xamt-search__field {
+  overflow: hidden;
+  max-block-size: 2.35rem;
 }
 
 .xamt-search__field .xamt-input {
   inline-size: 8rem;
   block-size: 2.35rem;
   max-inline-size: 8rem;
+  max-block-size: 2.35rem;
   resize: none;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  overscroll-behavior: none;
   caret-color: var(--xamt-accent);
 }
 

@@ -34,6 +34,7 @@ defmodule XamtWeb.ServerLiveTest do
     assert html =~ channel.name
     assert has_element?(view, "#message-composer-wrap[data-channel-id='#{channel.id}']")
     assert has_element?(view, "#composer-peek")
+    assert has_element?(view, "#nav-profile")
     assert has_element?(view, "#composer-emoji")
 
     {:ok, message} =
@@ -633,7 +634,7 @@ defmodule XamtWeb.ServerLiveTest do
     {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
     refute has_element?(view, "#server-menu-drawer")
 
-    view |> element("#mobile-nav-server") |> render_click()
+    view |> element("#server-info") |> render_click()
     assert has_element?(view, "#server-menu-drawer")
 
     view |> element("#server-menu-new-channel") |> render_click()
@@ -766,6 +767,7 @@ defmodule XamtWeb.ServerLiveTest do
     {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
     assert has_element?(view, "#mobile-nav-menu")
     assert has_element?(view, "#mobile-nav-members")
+    assert has_element?(view, "#nav-profile")
     assert has_element?(view, ".xamt-app--panel-messages")
     refute has_element?(view, "#drawer-backdrop")
 
@@ -786,6 +788,27 @@ defmodule XamtWeb.ServerLiveTest do
     refute has_element?(view, "#drawer-backdrop")
   end
 
+  test "profile button in the chat toolbar opens the current user's profile", %{
+    conn: conn,
+    user: user,
+    server: server,
+    channel: channel
+  } do
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    assert has_element?(view, "#nav-profile[href='/profile/#{user.username}']")
+    assert has_element?(view, "#nav-profile-avatar")
+
+    {:ok, profile_view, html} =
+      view
+      |> element("#nav-profile")
+      |> render_click()
+      |> follow_redirect(conn, ~p"/profile/#{user.username}")
+
+    assert html =~ "Profile"
+    assert has_element?(profile_view, "#profile-panel")
+  end
+
   test "mobile members button opens the members drawer", %{
     conn: conn,
     server: server,
@@ -804,10 +827,11 @@ defmodule XamtWeb.ServerLiveTest do
     channel: channel
   } do
     {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
-    assert has_element?(view, "#mobile-nav-server")
+    refute has_element?(view, "#mobile-nav-server")
+    assert has_element?(view, "#server-info")
     refute has_element?(view, "#server-menu-drawer")
 
-    view |> element("#mobile-nav-server") |> render_click()
+    view |> element("#server-info") |> render_click()
     assert has_element?(view, "#server-menu-drawer")
     assert has_element?(view, "#server-menu-title", server.name)
     assert has_element?(view, "#server-menu-slug", "/#{server.slug}")
@@ -824,10 +848,10 @@ defmodule XamtWeb.ServerLiveTest do
     member_conn = log_in_user(build_conn(), member)
 
     {:ok, view, _html} = live(member_conn, ~p"/servers/#{server.slug}/#{channel.slug}")
-    assert has_element?(view, "#mobile-nav-server")
+    refute has_element?(view, "#mobile-nav-server")
     refute has_element?(view, "#server-menu")
 
-    view |> element("#mobile-nav-server") |> render_click()
+    view |> element("#server-info") |> render_click()
     assert has_element?(view, "#server-menu-drawer")
     assert has_element?(view, "#server-menu-title", server.name)
     refute has_element?(view, "#server-menu-new-channel")
