@@ -252,15 +252,42 @@ body {
   white-space: nowrap;
 }
 
-/* Desktop Chromium rotates color emoji in vertical-lr + mixed orientation. */
+/* Desktop Chromium rotates color emoji in vertical-lr + mixed orientation.
+   Size the orthogonal box to the Mongolian column (line-height 1.75): a 1em
+   square sat on the start edge. Same box as channel titles / server cards. */
 .xamt-emoji {
   writing-mode: horizontal-tb;
   -webkit-writing-mode: horizontal-tb;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75em;
+  height: 1em;
   line-height: 1;
+  letter-spacing: 0;
+  overflow: visible;
   font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
   font-style: normal;
   vertical-align: middle;
+}
+
+/* Android Chrome starts a new vertical-lr column for any orthogonal
+   (horizontal-tb) inline box. Stay in the text run; mobile color emoji
+   already face the reader without the island. Title/card selectors are
+   listed so their 1.75em inline-flex box does not win on touch. */
+@media (pointer: coarse) {
+  .xamt-emoji,
+  .xamt-rail--channels .xamt-rail__title .xamt-emoji,
+  .xamt-server-card__name .xamt-emoji {
+    writing-mode: inherit;
+    -webkit-writing-mode: inherit;
+    display: inline;
+    width: auto;
+    height: auto;
+    line-height: inherit;
+    letter-spacing: inherit;
+    vertical-align: baseline;
+  }
 }
 
 /* Bare two-digit runs (counts, badges) fit an em square and can truly combine */
