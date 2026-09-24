@@ -45,14 +45,14 @@ defmodule XamtWeb.InviteLive do
 
         <%= if @usable? do %>
           <.header>
-            <span class="mongol-text">{@invite.server.name}</span>
+            <span class="mongol-text">{upright_text(@invite.server.name)}</span>
             <:subtitle>
               <span>/{@invite.server.slug}</span>
             </:subtitle>
           </.header>
 
           <p :if={@invite.server.description} class="xamt-profile__bio mongol-text">
-            {@invite.server.description}
+            {upright_text(@invite.server.description)}
           </p>
 
           <button

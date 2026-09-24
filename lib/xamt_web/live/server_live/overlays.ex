@@ -179,14 +179,16 @@ defmodule XamtWeb.ServerLive.Overlays do
       on_cancel={JS.push("close_server_menu")}
     >
       <div class="xamt-sheet-form xamt-server-menu-sheet">
-        <h2 id="server-menu-title" class="xamt-section-title mongol-text">{@server.name}</h2>
+        <h2 id="server-menu-title" class="xamt-section-title mongol-text">
+          {upright_text(@server.name)}
+        </h2>
         <p id="server-menu-slug" class="xamt-server-menu-sheet__slug">/{@server.slug}</p>
         <p
           :if={@server.description}
           id="server-menu-description"
           class="xamt-server-menu-sheet__desc mongol-text"
         >
-          {@server.description}
+          {upright_text(@server.description)}
         </p>
         <nav
           :if={@can_manage_channels?}

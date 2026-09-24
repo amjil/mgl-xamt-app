@@ -57,6 +57,16 @@ defmodule Xamt.Messages.HtmlSanitizerTest do
     assert cleaned =~ " there"
   end
 
+  test "wrap_plain keeps emoji upright and escapes the rest" do
+    {:safe, html} = HtmlSanitizer.wrap_plain("hi 😀 <script>")
+    rendered = html |> IO.iodata_to_binary()
+
+    assert rendered =~ ~s(<span class="xamt-emoji">😀</span>)
+    assert rendered =~ "hi "
+    refute rendered =~ "<script>"
+    assert rendered =~ "&lt;script&gt;"
+  end
+
   test "does not rewrap an existing emoji span" do
     cleaned = HtmlSanitizer.sanitize(~s(<p><span class="xamt-emoji">🎉</span></p>))
 

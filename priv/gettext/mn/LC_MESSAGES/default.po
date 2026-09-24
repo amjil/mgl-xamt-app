@@ -115,6 +115,12 @@ msgstr ""
 msgid "Description"
 msgstr ""
 
+#: lib/xamt_web/live/home_live.ex:240
+#: lib/xamt_web/live/home_live.ex:369
+#, elixir-autogen, elixir-format
+msgid "Slug"
+msgstr ""
+
 #: lib/xamt_web/controllers/user_registration_html/new.html.heex:25
 #: lib/xamt_web/live/settings_live.ex:174
 #, elixir-autogen, elixir-format

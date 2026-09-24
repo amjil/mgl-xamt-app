@@ -19,6 +19,40 @@ defmodule Xamt.Servers do
   def change_server(%Server{} = server, attrs \\ %{}) do
     server
     |> Ecto.Changeset.cast(attrs, [:name, :slug, :description, :icon, :visibility])
+    |> maybe_slugify_slug()
+    |> Ecto.Changeset.validate_length(:name, max: 100)
+    |> Ecto.Changeset.validate_length(:slug, max: 100)
+    |> validate_slug_format()
+    |> Ecto.Changeset.validate_inclusion(:visibility, Server.visibilities())
+  end
+
+  defp maybe_slugify_slug(changeset) do
+    case Ecto.Changeset.get_change(changeset, :slug) do
+      slug when is_binary(slug) ->
+        if String.trim(slug) == "" do
+          changeset
+        else
+          Ecto.Changeset.put_change(changeset, :slug, Slug.slugify(slug))
+        end
+
+      _ ->
+        changeset
+    end
+  end
+
+  defp validate_slug_format(changeset) do
+    case Ecto.Changeset.get_field(changeset, :slug) do
+      slug when is_binary(slug) and slug != "" ->
+        Ecto.Changeset.validate_format(
+          changeset,
+          :slug,
+          ~r/^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+          message: "must use lowercase letters, numbers, and hyphens"
+        )
+
+      _ ->
+        changeset
+    end
   end
 
   @doc """
@@ -34,8 +68,7 @@ defmodule Xamt.Servers do
 
   defp insert_server(%Scope{user: user}, attrs) do
     name = Map.get(attrs, "name") || Map.get(attrs, :name)
-    base_slug = Map.get(attrs, "slug") || Map.get(attrs, :slug) || Slug.slugify(name)
-    slug = unique_server_slug(base_slug)
+    slug = unique_server_slug(requested_slug(attrs, name))
 
     now = DateTime.utc_now(:second)
 
@@ -440,6 +473,22 @@ defmodule Xamt.Servers do
       get_member(server_id, user_id)
     )
   end
+
+  defp requested_slug(attrs, name) do
+    case present_slug(Map.get(attrs, "slug") || Map.get(attrs, :slug)) do
+      nil -> Slug.slugify(name)
+      slug -> Slug.slugify(slug)
+    end
+  end
+
+  defp present_slug(slug) when is_binary(slug) do
+    case String.trim(slug) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp present_slug(_), do: nil
 
   defp unique_server_slug(slug, attempt \\ 0) do
     candidate = if attempt == 0, do: slug, else: "#{slug}-#{attempt}"

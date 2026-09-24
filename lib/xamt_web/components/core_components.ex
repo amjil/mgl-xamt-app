@@ -26,6 +26,12 @@ defmodule XamtWeb.CoreComponents do
   use Gettext, backend: XamtWeb.Gettext
 
   alias Phoenix.LiveView.JS
+  alias Xamt.Messages.HtmlSanitizer
+
+  @doc """
+  Escapes plain text and keeps color emoji upright in vertical-lr columns.
+  """
+  def upright_text(text), do: HtmlSanitizer.wrap_plain(text)
 
   @doc """
   Renders flash notices.

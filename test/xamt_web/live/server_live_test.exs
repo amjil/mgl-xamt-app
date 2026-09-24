@@ -599,6 +599,17 @@ defmodule XamtWeb.ServerLiveTest do
     refute has_element?(view, "#server-info", "/#{server.slug}")
   end
 
+  test "keeps emoji in the server name upright", %{conn: conn, scope: scope} do
+    {:ok, server} =
+      Servers.create_server(scope, %{"name" => "Hall \u{1F600}", "slug" => "emoji-hall"})
+
+    channel = hd(Channels.list_channels(server.id))
+    {:ok, view, html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    assert html =~ ~s(<span class="xamt-emoji">\u{1F600}</span>)
+    assert has_element?(view, "#server-info h1", "Hall")
+  end
+
   test "admin can open the create-channel drawer from the plus control", %{
     conn: conn,
     server: server,

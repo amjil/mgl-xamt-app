@@ -37,7 +37,7 @@ defmodule XamtWeb.ServerLive.Rails do
     <aside class="xamt-rail xamt-rail--channels">
       <div class="xamt-rail__pane xamt-rail__pane--top">
         <header id="server-info" class="xamt-rail__header">
-          <h1 class="xamt-rail__title mongol-text">{@server.name}</h1>
+          <h1 class="xamt-rail__title mongol-text">{upright_text(@server.name)}</h1>
         </header>
 
         <div class="xamt-rail__section">

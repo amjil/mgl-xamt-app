@@ -19,14 +19,14 @@ defmodule XamtWeb.ServerLive.Components do
         </div>
 
         <.header>
-          <span class="mongol-text">{@server.name}</span>
+          <span class="mongol-text">{upright_text(@server.name)}</span>
           <:subtitle>
             <span>/{@server.slug}</span>
           </:subtitle>
         </.header>
 
         <p :if={@server.description} class="xamt-profile__bio mongol-text">
-          {@server.description}
+          {upright_text(@server.description)}
         </p>
 
         <button

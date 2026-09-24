@@ -30,6 +30,23 @@ defmodule Xamt.ServersTest do
     assert Server.public?(server)
   end
 
+  test "create_server uses a provided slug", %{owner_scope: scope} do
+    mongolian_name = "\u1830\u1820\u1837\u1820\u1828"
+
+    {:ok, server} =
+      Servers.create_server(scope, %{"name" => mongolian_name, "slug" => "Saran Hall!"})
+
+    assert server.name == mongolian_name
+    assert server.slug == "saran-hall"
+  end
+
+  test "create_server falls back to untitled for a Mongolian name without a slug", %{
+    owner_scope: scope
+  } do
+    {:ok, server} = Servers.create_server(scope, %{"name" => "\u1830\u1820\u1837\u1820\u1828"})
+    assert server.slug == "untitled"
+  end
+
   test "only admins can create an invite", %{
     owner_scope: owner_scope,
     outsider_scope: outsider_scope,

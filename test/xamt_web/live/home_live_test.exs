@@ -26,6 +26,7 @@ defmodule XamtWeb.HomeLiveTest do
     refute has_element?(view, "#create-server-form")
 
     view |> element("#toggle-create-server") |> render_click()
+    assert has_element?(view, "#create-server-drawer")
     assert has_element?(view, "#create-server-form")
 
     assert {:error, {:live_redirect, %{to: to}}} =
@@ -37,9 +38,45 @@ defmodule XamtWeb.HomeLiveTest do
     assert Repo.get_by(Server, slug: "new-hall")
   end
 
+  test "creators can set a custom slug, including for Mongolian names", %{conn: conn} do
+    conn = log_in_user(conn, creator_fixture())
+    {:ok, view, _html} = live(conn, ~p"/")
+    mongolian_name = "\u1830\u1820\u1837\u1820\u1828"
+
+    view |> element("#toggle-create-server") |> render_click()
+
+    view
+    |> form("#create-server-form", server: %{name: "New Hall"})
+    |> render_change()
+
+    assert has_element?(view, "#server_slug")
+    assert render(view) =~ ~s(value="new-hall")
+
+    assert {:error, {:live_redirect, %{to: to}}} =
+             view
+             |> form("#create-server-form",
+               server: %{name: mongolian_name, slug: "saran-hall"}
+             )
+             |> render_submit()
+
+    assert to == "/servers/saran-hall"
+    server = Repo.get_by(Server, slug: "saran-hall")
+    assert server.name == mongolian_name
+  end
+
   test "admins can open the create form from the query param", %{conn: conn} do
     {:ok, view, _html} = live(log_in_user(conn, admin_fixture()), ~p"/?create=1")
+    assert has_element?(view, "#create-server-drawer")
     assert has_element?(view, "#create-server-form")
+  end
+
+  test "creators can close the create drawer", %{conn: conn} do
+    {:ok, view, _html} = live(log_in_user(conn, creator_fixture()), ~p"/?create=1")
+    assert has_element?(view, "#create-server-drawer")
+
+    view |> element("#create-server-cancel") |> render_click()
+    refute has_element?(view, "#create-server-drawer")
+    refute has_element?(view, "#create-server-form")
   end
 
   test "regular users cannot create a server by sending the event", %{conn: conn} do
@@ -73,7 +110,7 @@ defmodule XamtWeb.HomeLiveTest do
 
     view
     |> form("#edit-server-form", %{
-      server: %{name: "Renamed Hall", description: "updated hall"}
+      server: %{name: "Renamed Hall", slug: "renamed-hall", description: "updated hall"}
     })
     |> render_submit()
 
@@ -81,6 +118,7 @@ defmodule XamtWeb.HomeLiveTest do
     assert has_element?(view, ".xamt-server-card__name", "Renamed Hall")
     assert has_element?(view, ".xamt-server-card__desc", "updated hall")
     assert Repo.get!(Server, server.id).description == "updated hall"
+    assert Repo.get!(Server, server.id).slug == "renamed-hall"
   end
 
   test "server settings expose a copyable invite URL", %{conn: conn} do

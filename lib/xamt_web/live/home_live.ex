@@ -6,6 +6,7 @@ defmodule XamtWeb.HomeLive do
   alias Xamt.Servers.Permissions
   alias Xamt.Servers.Server
   alias Xamt.SiteSettings
+  alias Xamt.Slug
 
   @impl true
   def mount(_params, _session, socket) do
@@ -27,6 +28,7 @@ defmodule XamtWeb.HomeLive do
      |> assign(:discoverable, discoverable)
      |> assign(:form, to_form(Servers.change_server(%Server{}), as: :server))
      |> assign(:show_create, false)
+     |> assign(:suggested_slug, "")
      |> assign(:can_create_server?, can_create_server?(scope))
      |> clear_server_settings()}
   end
@@ -49,7 +51,24 @@ defmodule XamtWeb.HomeLive do
   @impl true
   def handle_event("toggle_create", _params, socket) do
     if socket.assigns.can_create_server? do
-      {:noreply, assign(socket, :show_create, !socket.assigns.show_create)}
+      {:noreply, open_create(socket)}
+    else
+      {:noreply, deny_create(socket)}
+    end
+  end
+
+  def handle_event("cancel_create", _params, socket) do
+    {:noreply, close_create(socket)}
+  end
+
+  def handle_event("validate_create", %{"server" => params}, socket) do
+    if socket.assigns.can_create_server? do
+      {params, suggested} = maybe_suggest_slug(params, socket.assigns.suggested_slug)
+
+      {:noreply,
+       socket
+       |> assign(:form, to_form(Servers.change_server(%Server{}, params), as: :server))
+       |> assign(:suggested_slug, suggested)}
     else
       {:noreply, deny_create(socket)}
     end
@@ -83,6 +102,7 @@ defmodule XamtWeb.HomeLive do
       server ->
         {:noreply,
          socket
+         |> close_create()
          |> assign(:editing_server, server)
          |> assign(:server_form, to_form(Servers.change_server(server), as: :server))
          |> assign(:invites, Servers.list_invites(server.id))}
@@ -180,53 +200,9 @@ defmodule XamtWeb.HomeLive do
                 class="xamt-btn xamt-btn--soft mongol-text"
                 phx-click="toggle_create"
               >
-                {if @show_create, do: gettext("Cancel"), else: gettext("Create server")}
+                {gettext("Create server")}
               </button>
             </div>
-
-            <form
-              :if={@show_create}
-              id="create-server-form"
-              phx-submit="create_server"
-              class="xamt-form xamt-form--vertical"
-            >
-              <label class="xamt-label">
-                <span class="xamt-field__label mongol-text">{gettext("Name")}</span>
-                <input
-                  type="text"
-                  name="server[name]"
-                  id="server_name"
-                  required
-                  class="xamt-input mongol-input"
-                  phx-hook="MongolianIME"
-                  autocomplete="off"
-                />
-              </label>
-              <label class="xamt-label">
-                <span class="xamt-field__label mongol-text">{gettext("Description")}</span>
-                <textarea
-                  name="server[description]"
-                  id="server_description"
-                  rows="2"
-                  class="xamt-input mongol-input"
-                  phx-hook="MongolianIME"
-                ></textarea>
-              </label>
-              <label class="xamt-label">
-                <span class="xamt-field__label mongol-text">{gettext("Visibility")}</span>
-                <select name="server[visibility]" id="server_visibility" class="xamt-select">
-                  <option value="private">{gettext("Private — invite only")}</option>
-                  <option value="public">{gettext("Public — anyone can find and join")}</option>
-                </select>
-              </label>
-              <button
-                type="submit"
-                id="create-server-submit"
-                class="xamt-btn xamt-btn--primary mongol-text"
-              >
-                {gettext("Create")}
-              </button>
-            </form>
 
             <ul class="xamt-server-list">
               <li
@@ -239,12 +215,14 @@ defmodule XamtWeb.HomeLive do
                 <.link navigate={~p"/servers/#{server.slug}"} class="xamt-server-card">
                   <span class="xamt-server-card__icon">{server_initial(server.name)}</span>
                   <span class="xamt-server-card__meta">
-                    <span class="xamt-server-card__name mongol-text">{server.name}</span>
+                    <span class="xamt-server-card__name mongol-text">
+                      {upright_text(server.name)}
+                    </span>
                     <span
                       :if={present_text?(server.description)}
                       class="xamt-server-card__desc mongol-text"
                     >
-                      {server.description}
+                      {upright_text(server.description)}
                     </span>
                   </span>
                 </.link>
@@ -285,7 +263,9 @@ defmodule XamtWeb.HomeLive do
                 <.link navigate={~p"/servers/#{server.slug}"} class="xamt-server-card">
                   <span class="xamt-server-card__icon">{server_initial(server.name)}</span>
                   <span class="xamt-server-card__meta">
-                    <span class="xamt-server-card__name mongol-text">{server.name}</span>
+                    <span class="xamt-server-card__name mongol-text">
+                      {upright_text(server.name)}
+                    </span>
                     <span class="xamt-server-card__slug">/{server.slug}</span>
                   </span>
                 </.link>
@@ -312,6 +292,79 @@ defmodule XamtWeb.HomeLive do
       </div>
 
       <.drawer
+        :if={@show_create}
+        id="create-server-drawer"
+        show
+        on_cancel={JS.push("cancel_create")}
+      >
+        <div id="create-server" class="xamt-sheet-form">
+          <h2 class="xamt-section-title mongol-text">{gettext("Create server")}</h2>
+
+          <.form
+            for={@form}
+            id="create-server-form"
+            phx-change="validate_create"
+            phx-submit="create_server"
+            class="xamt-form xamt-form--vertical"
+          >
+            <.input
+              field={@form[:name]}
+              id="server_name"
+              label={gettext("Name")}
+              required
+              class="xamt-input mongol-input"
+              phx-hook="MongolianIME"
+              autocomplete="off"
+            />
+            <.input
+              field={@form[:slug]}
+              id="server_slug"
+              label={gettext("Slug")}
+              class="xamt-input xamt-input--latin"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="my-server"
+            />
+            <.input
+              field={@form[:description]}
+              id="server_description"
+              type="textarea"
+              label={gettext("Description")}
+              class="xamt-textarea mongol-input"
+              phx-hook="MongolianIME"
+            />
+            <.input
+              field={@form[:visibility]}
+              id="server_visibility"
+              type="select"
+              label={gettext("Visibility")}
+              options={[
+                {gettext("Private — invite only"), "private"},
+                {gettext("Public — anyone can find and join"), "public"}
+              ]}
+            />
+            <div class="xamt-form__actions">
+              <button
+                type="submit"
+                id="create-server-submit"
+                class="xamt-btn xamt-btn--primary mongol-text"
+              >
+                {gettext("Create")}
+              </button>
+              <button
+                type="button"
+                id="create-server-cancel"
+                class="xamt-btn mongol-text"
+                phx-click="cancel_create"
+              >
+                {gettext("Cancel")}
+              </button>
+            </div>
+          </.form>
+        </div>
+      </.drawer>
+
+      <.drawer
         :if={@editing_server}
         id="edit-server-drawer"
         show
@@ -333,6 +386,14 @@ defmodule XamtWeb.HomeLive do
               phx-hook="MongolianIME"
               class="xamt-input mongol-input"
               autocomplete="off"
+            />
+            <.input
+              field={@server_form[:slug]}
+              id="server-settings-slug"
+              label={gettext("Slug")}
+              class="xamt-input xamt-input--latin"
+              autocomplete="off"
+              spellcheck="false"
             />
             <.input
               field={@server_form[:description]}
@@ -426,13 +487,26 @@ defmodule XamtWeb.HomeLive do
   end
 
   defp server_initial(name) when is_binary(name) do
-    name |> String.trim() |> String.first() || "?"
+    initial = name |> String.trim() |> String.first() || "?"
+    upright_text(initial)
   end
 
   defp server_initial(_), do: "?"
 
   defp present_text?(text) when is_binary(text), do: String.trim(text) != ""
   defp present_text?(_), do: false
+
+  defp maybe_suggest_slug(params, previous_suggested) do
+    name = Map.get(params, "name") || ""
+    slug = Map.get(params, "slug") || ""
+    suggested = Slug.slugify(name)
+
+    if slug == "" or slug == previous_suggested do
+      {Map.put(params, "slug", suggested), suggested}
+    else
+      {params, previous_suggested}
+    end
+  end
 
   defp can_create_server?(%{user: %User{} = user}), do: User.can_create_server?(user)
   defp can_create_server?(_), do: false
@@ -466,9 +540,24 @@ defmodule XamtWeb.HomeLive do
     |> assign(:invites, [])
   end
 
-  defp deny_create(socket) do
+  defp open_create(socket) do
+    socket
+    |> clear_server_settings()
+    |> assign(:show_create, true)
+    |> assign(:suggested_slug, "")
+    |> assign(:form, to_form(Servers.change_server(%Server{}), as: :server))
+  end
+
+  defp close_create(socket) do
     socket
     |> assign(:show_create, false)
+    |> assign(:suggested_slug, "")
+    |> assign(:form, to_form(Servers.change_server(%Server{}), as: :server))
+  end
+
+  defp deny_create(socket) do
+    socket
+    |> close_create()
     |> put_flash(:error, gettext("You don't have permission to create a server"))
   end
 

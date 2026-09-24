@@ -52,6 +52,33 @@ defmodule Xamt.Messages.HtmlSanitizer do
   @emoji_re ~r/(\p{Extended_Pictographic}(?:\x{FE0F}|\x{FE0E})?(?:\x{200D}\p{Extended_Pictographic}(?:\x{FE0F}|\x{FE0E})?)*)/u
 
   @doc """
+  Escapes plain text and wraps color-emoji runs in `.xamt-emoji` so
+  vertical-lr columns keep them upright.
+  """
+  def wrap_plain(nil), do: {:safe, ""}
+  def wrap_plain(""), do: {:safe, ""}
+
+  def wrap_plain(text) when is_binary(text) do
+    html =
+      @emoji_re
+      |> Regex.split(text, include_captures: true, trim: false)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.map(fn part ->
+        escaped = Plug.HTML.html_escape(part)
+
+        if Regex.match?(@emoji_re, part) do
+          ["<span class=\"xamt-emoji\">", escaped, "</span>"]
+        else
+          escaped
+        end
+      end)
+
+    {:safe, html}
+  end
+
+  def wrap_plain(_), do: {:safe, ""}
+
+  @doc """
   Returns allowlisted HTML. Empty / non-binary input becomes `""`.
   """
   def sanitize(nil), do: ""

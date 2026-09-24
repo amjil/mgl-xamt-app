@@ -31,9 +31,11 @@ defmodule Xamt.Servers.Server do
   def changeset(server, attrs) do
     server
     |> cast(attrs, [:owner_id, :name, :slug, :description, :icon, :visibility])
+    |> update_change(:slug, &Xamt.Slug.slugify/1)
     |> validate_required([:owner_id, :name, :slug])
     |> validate_length(:name, max: 100)
     |> validate_length(:slug, max: 100)
+    |> validate_format(:slug, ~r/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
     |> validate_inclusion(:visibility, @visibilities)
     |> unique_constraint(:slug)
   end
