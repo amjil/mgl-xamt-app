@@ -986,8 +986,13 @@
   box-sizing: border-box;
 }
 
+.xamt-composer__editor .mgl-editor-scope {
+  --block-gap: 0px;
+}
+
 .xamt-composer__editor .mgl-editor-scope .block-content {
   color: inherit;
+  margin: 0;
 }
 
 .xamt-composer__editor .mgl-editor-scope .block-children {

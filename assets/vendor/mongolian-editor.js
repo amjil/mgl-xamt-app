@@ -1215,20 +1215,19 @@ export function createMongolianEditor(containerSelector) {
         }
     });
 
-    function handleEnter(e) {
+    function insertBreak() {
         const sel = window.getSelection();
-        if (!sel.rangeCount) return;
+        if (!sel.rangeCount) return false;
 
         if (!sel.isCollapsed) {
             const range = sel.getRangeAt(0);
-            if (blockOf(range.startContainer) !== blockOf(range.endContainer)) return;
+            if (blockOf(range.startContainer) !== blockOf(range.endContainer)) return false;
             document.execCommand('delete');
         }
 
         const block = currentBlock();
-        if (!block || isAtomic(block) || !block.dataset.blockType) return;
+        if (!block || isAtomic(block) || !block.dataset.blockType) return false;
 
-        e.preventDefault();
         const type = block.dataset.blockType;
 
         if (type === 'toggle') {
@@ -1242,19 +1241,36 @@ export function createMongolianEditor(containerSelector) {
             } else {
                 appendAfter(block, buildBlock('paragraph', ''));
             }
-            return;
+            return true;
         }
 
         // Empty nested block: Enter = outdent one level
-        if (isBlockEmpty(block) && isNested(block) && outdentBlock(block)) return;
+        if (isBlockEmpty(block) && isNested(block) && outdentBlock(block)) return true;
 
         if (CONTINUING.has(type) && type !== 'paragraph' && isBlockEmpty(block)) {
             convertBlock('paragraph', { caret: 'start', block });
-            return;
+            return true;
         }
 
         const tail = extractTailHtml(block);
         appendAfter(block, buildBlock(CONTINUING.has(type) ? type : 'paragraph', tail));
+        return true;
+    }
+
+    function handleEnter(e) {
+        const sel = window.getSelection();
+        if (!sel.rangeCount) return;
+
+        if (!sel.isCollapsed) {
+            const range = sel.getRangeAt(0);
+            if (blockOf(range.startContainer) !== blockOf(range.endContainer)) return;
+        }
+
+        const block = currentBlock();
+        if (!block || isAtomic(block) || !block.dataset.blockType) return;
+
+        e.preventDefault();
+        insertBreak();
     }
 
     /**
@@ -1346,37 +1362,40 @@ export function createMongolianEditor(containerSelector) {
         placeCaretAtEnd(prev);
     }
 
-    function handleBackspace(e) {
+    function deleteAtBoundary() {
         const block = currentBlock();
-        if (!block || isAtomic(block) || !block.dataset.blockType) return;
-        if (!caretAtContentStart(block)) return;
+        if (!block || isAtomic(block) || !block.dataset.blockType) return false;
+        // Empty new paragraphs only have a placeholder <br>; treat that as
+        // "at start" so IME backspace can merge the line away.
+        if (!caretAtContentStart(block) && !isBlockEmpty(block)) return false;
 
         if (block.dataset.blockType !== 'paragraph') {
-            e.preventDefault();
             convertBlock('paragraph', { caret: 'start', block });
-            return;
+            return true;
         }
 
         const prev = block.previousElementSibling;
 
         if (!prev) {
-            if (isNested(block)) {
-                e.preventDefault();
-                outdentBlock(block);
-            }
-            return;
+            if (isNested(block)) return Boolean(outdentBlock(block));
+            return false;
         }
 
-        e.preventDefault();
         if (isAtomic(prev)) {
             if (contentOf(prev) === selectedImage) deselectImage();
             const box = childrenOf(prev);
             if (box && box.children.length) prev.replaceWith(...Array.from(box.children));
             else prev.remove();
             scheduleRenumber();
-            return;
+            return true;
         }
         mergeIntoPrevious(block, prev);
+        return true;
+    }
+
+    function handleBackspace(e) {
+        if (!deleteAtBoundary()) return;
+        e.preventDefault();
     }
 
     editor.addEventListener('keydown', (e) => {
@@ -1564,6 +1583,8 @@ export function createMongolianEditor(containerSelector) {
         getHtml: getCleanHtml,
         setHtml: setHtml,
         getJson: () => getJson(editor),
+        insertBreak,
+        deleteAtBoundary,
         indent: () => indentBlock(currentBlock()),
         outdent: () => outdentBlock(currentBlock()),
         focus: () => {

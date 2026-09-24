@@ -141,7 +141,9 @@ defmodule Xamt.Messages.HtmlSanitizer do
         [{tag, attrs, children}]
 
       emoji_span?(tag, attrs) ->
-        [{tag, attrs, children}]
+        children
+        |> emoji_span_text()
+        |> wrap_emoji_text()
 
       true ->
         [{tag, attrs, wrap_emojis(children)}]
@@ -149,6 +151,16 @@ defmodule Xamt.Messages.HtmlSanitizer do
   end
 
   defp wrap_emoji_node(other), do: [other]
+
+  defp emoji_span_text(children) when is_list(children) do
+    children
+    |> Enum.map(fn
+      text when is_binary(text) -> text
+      {_tag, _attrs, nested} when is_list(nested) -> emoji_span_text(nested)
+      _ -> ""
+    end)
+    |> IO.iodata_to_binary()
+  end
 
   defp wrap_emoji_text(text) do
     @emoji_re

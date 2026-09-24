@@ -73,4 +73,12 @@ defmodule Xamt.Messages.HtmlSanitizerTest do
     assert cleaned =~ ~s(<span class="xamt-emoji">🎉</span>)
     refute cleaned =~ ~s(<span class="xamt-emoji"><span class="xamt-emoji">)
   end
+
+  test "pulls leaked script text out of an emoji island" do
+    cleaned = HtmlSanitizer.sanitize(~s(<p><span class="xamt-emoji">😀hello</span></p>))
+
+    assert cleaned =~ ~s(<span class="xamt-emoji">😀</span>)
+    assert cleaned =~ "hello"
+    refute cleaned =~ ~s(<span class="xamt-emoji">😀hello</span>)
+  end
 end

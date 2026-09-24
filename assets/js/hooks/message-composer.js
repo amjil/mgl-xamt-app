@@ -14,7 +14,7 @@ import {
   toast,
 } from "../utils/offline-store.js"
 import { attachMentionAutocomplete, hydrateMentions } from "./mention-autocomplete.js"
-import { insertUprightText, wrapEmojis } from "../utils/emoji.js"
+import { deleteAtomicIsland, insertUprightText, islandJustDeleted, isEmojiText, wrapEmojis } from "../utils/emoji.js"
 
 function editorRoot(editorEl) {
   return editorEl?.querySelector?.(".editor-content") || editorEl
@@ -70,79 +70,131 @@ function activeEditable(root) {
   return root.querySelector(".block-content") || root
 }
 
-function buildEditorAdapter(getRoot) {
+function serializedLength(node) {
+  if (!node) return 0
+  if (node.nodeType === Node.TEXT_NODE) return node.data.length
+  if (node.nodeName === "BR") return 1
+  let length = 0
+  for (const child of node.childNodes) length += serializedLength(child)
+  return length
+}
+
+function serializeText(root) {
+  if (!root) return ""
+  if (root.nodeType === Node.TEXT_NODE) return root.data
+  if (root.nodeName === "BR") return "\n"
+  let text = ""
+  for (const child of root.childNodes) text += serializeText(child)
+  return text
+}
+
+function caretIndex(root, container, offset) {
+  const range = document.createRange()
+  try {
+    range.setStart(root, 0)
+    range.setEnd(container, offset)
+  } catch {
+    return serializedLength(root)
+  }
+  return serializedLength(range.cloneContents())
+}
+
+function pointFromIndex(root, index) {
+  let left = Math.max(0, index)
+
+  function visit(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (left <= node.data.length) return {node, offset: left}
+      left -= node.data.length
+      return null
+    }
+    if (node.nodeName === "BR") {
+      if (left <= 0) return beforeNode(node)
+      left -= 1
+      return null
+    }
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      for (const child of node.childNodes) {
+        const hit = visit(child)
+        if (hit) return hit
+      }
+    }
+    return null
+  }
+
+  return visit(root) || endPoint(root)
+}
+
+function beforeNode(node) {
+  const parent = node.parentNode
+  return {node: parent, offset: Array.prototype.indexOf.call(parent.childNodes, node)}
+}
+
+function endPoint(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  let last = null
+  while (walker.nextNode()) last = walker.currentNode
+  if (last) return {node: last, offset: last.data.length}
+  return {node: root, offset: root.childNodes.length}
+}
+
+function placeRange(el, start, end) {
+  const from = pointFromIndex(el, start)
+  const to = pointFromIndex(el, end)
+  const range = document.createRange()
+  range.setStart(from.node, from.offset)
+  range.setEnd(to.node, to.offset)
+  const sel = window.getSelection()
+  sel.removeAllRanges()
+  sel.addRange(range)
+}
+
+function buildEditorAdapter(getRoot, {insertBreak, deleteAtBoundary} = {}) {
   return createCustomAdapter({
     getElement: () => activeEditable(getRoot()),
     focus: () => activeEditable(getRoot())?.focus?.(),
     blur: () => activeEditable(getRoot())?.blur?.(),
-    getText: () => activeEditable(getRoot())?.innerText || "",
+    getText: () => serializeText(activeEditable(getRoot())),
     getSelection: () => {
       const el = activeEditable(getRoot())
       const sel = window.getSelection()
       if (!el || !sel || sel.rangeCount === 0) {
-        const len = (el?.innerText || "").length
+        const len = serializedLength(el)
         return { start: len, end: len }
       }
       const range = sel.getRangeAt(0)
-      if (!el.contains(range.commonAncestorContainer)) {
-        const len = (el.innerText || "").length
+      if (!el.contains(range.commonAncestorContainer) && el !== range.commonAncestorContainer) {
+        const len = serializedLength(el)
         return { start: len, end: len }
       }
-      const pre = range.cloneRange()
-      pre.selectNodeContents(el)
-      pre.setEnd(range.startContainer, range.startOffset)
-      const start = pre.toString().length
-      return { start, end: start + range.toString().length }
+      const start = caretIndex(el, range.startContainer, range.startOffset)
+      const end = range.collapsed ? start : caretIndex(el, range.endContainer, range.endOffset)
+      return { start, end }
     },
     setSelection: ({ start, end }) => {
       const el = activeEditable(getRoot())
       if (!el) return
-      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
-      let pos = 0
-      let startNode = null
-      let startOff = 0
-      let endNode = null
-      let endOff = 0
-      let node
-      while ((node = walker.nextNode())) {
-        const len = node.textContent.length
-        if (!startNode && pos + len >= start) {
-          startNode = node
-          startOff = start - pos
-        }
-        if (!endNode && pos + len >= end) {
-          endNode = node
-          endOff = end - pos
-          break
-        }
-        pos += len
-      }
-      if (!startNode) {
-        el.focus()
-        return
-      }
-      if (!endNode) {
-        endNode = startNode
-        endOff = startOff
-      }
-      const range = document.createRange()
-      range.setStart(startNode, Math.min(startOff, startNode.textContent.length))
-      range.setEnd(endNode, Math.min(endOff, endNode.textContent.length))
-      const sel = window.getSelection()
-      sel.removeAllRanges()
-      sel.addRange(range)
+      placeRange(el, start, end ?? start)
     },
     insertText: (text) => {
       const el = activeEditable(getRoot())
       el?.focus?.()
+      if (text === "\n" || text === "\r\n") {
+        if (insertBreak?.()) return
+        document.execCommand("insertLineBreak")
+        return
+      }
       insertUprightText(text)
     },
     deleteBackward: () => {
       activeEditable(getRoot())?.focus?.()
+      if (deleteAtomicIsland("backward")) return
+      if (deleteAtBoundary?.()) return
       document.execCommand("delete")
     },
     deleteForward: () => {
       activeEditable(getRoot())?.focus?.()
+      if (deleteAtomicIsland("forward")) return
       document.execCommand("forwardDelete")
     },
     replaceSelection: (text) => {
@@ -177,7 +229,10 @@ export const MessageComposer = {
       )
     }
 
-    this.adapter = buildEditorAdapter(this._root)
+    this.adapter = buildEditorAdapter(this._root, {
+      insertBreak: () => this.editor?.insertBreak?.() === true,
+      deleteAtBoundary: () => this.editor?.deleteAtBoundary?.() === true,
+    })
     this.ime = new MglIME({
       adapter: this.adapter,
       // Without a target, desktop IME handles every window keydown and the
@@ -316,11 +371,23 @@ export const MessageComposer = {
     }
     this.host.addEventListener("paste", this._onPaste, true)
 
+    this._onBeforeInput = (e) => {
+      if (e.inputType === "deleteContentBackward") {
+        if (islandJustDeleted() || deleteAtomicIsland("backward")) e.preventDefault()
+        return
+      }
+      if (e.inputType === "deleteContentForward") {
+        if (islandJustDeleted() || deleteAtomicIsland("forward")) e.preventDefault()
+      }
+    }
+    this.host.addEventListener("beforeinput", this._onBeforeInput, true)
+
     // Throttle typing events: one typing_started until idle timeout
     this._typingTimer = null
     this._isTyping = false
 
     this.host.addEventListener("input", () => {
+      this.ejectLeakedEmojiText()
       if (!this._canPush()) return
 
       if (!this._isTyping) {
@@ -380,6 +447,7 @@ export const MessageComposer = {
     window.removeEventListener("online", this._onOnline)
     navigator.serviceWorker?.removeEventListener("message", this._onSwMessage)
     this.host?.removeEventListener("paste", this._onPaste, true)
+    this.host?.removeEventListener("beforeinput", this._onBeforeInput, true)
     this.host?.removeEventListener("focusin", this._onEditableFocus)
     this.host?.removeEventListener("focusin", this._onComposerFocus)
     this.host?.removeEventListener("focusout", this._onComposerBlur)
@@ -432,6 +500,23 @@ export const MessageComposer = {
   hasDraft() {
     const text = (this._root()?.innerText || "").replace(/[\s\u200B-\u200D\uFEFF]/g, "")
     return text.length > 0
+  },
+
+  ejectLeakedEmojiText() {
+    const root = this._root()
+    if (!root) return
+    let leaked = false
+    for (const span of root.querySelectorAll(".xamt-emoji")) {
+      const value = span.textContent || ""
+      if (value && !isEmojiText(value)) {
+        leaked = true
+        break
+      }
+    }
+    if (!leaked) return
+    const sel = this.adapter?.getSelection?.()
+    wrapEmojis(root)
+    if (sel) this.adapter.setSelection(sel)
   },
 
   syncIme() {
