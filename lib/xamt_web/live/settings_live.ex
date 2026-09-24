@@ -242,7 +242,13 @@ defmodule XamtWeb.SettingsLive do
               placeholder="😀"
               maxlength="10"
               class="xamt-input xamt-status-picker__emoji"
+              phx-hook="StatusEmoji"
               autocomplete="off"
+              readonly
+              inputmode="none"
+              aria-haspopup="dialog"
+              aria-label={gettext("Choose emoji")}
+              title={gettext("Choose emoji")}
             />
             <input
               type="text"

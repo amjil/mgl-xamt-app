@@ -17,6 +17,7 @@ defmodule XamtWeb.SettingsLiveTest do
     assert html =~ "Settings"
     assert has_element?(view, "#settings-status")
     assert has_element?(view, "#settings-status-preset-0")
+    assert has_element?(view, "#settings-status-emoji[phx-hook='StatusEmoji']")
 
     view
     |> element("#settings-status-preset-2")

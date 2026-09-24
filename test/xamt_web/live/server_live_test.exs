@@ -1408,6 +1408,7 @@ defmodule XamtWeb.ServerLiveTest do
 
     assert has_element?(view, "#status-picker-drawer")
     assert has_element?(view, "#status-preset-0")
+    assert has_element?(view, "#status-custom-emoji[phx-hook='StatusEmoji']")
 
     view
     |> element("#status-preset-0")
@@ -1448,6 +1449,27 @@ defmodule XamtWeb.ServerLiveTest do
     updated = Accounts.get_user!(user.id)
     assert updated.status_emoji == nil
     assert updated.status_text == nil
+  end
+
+  test "saves a custom status from the picker form", %{
+    conn: conn,
+    user: user,
+    server: server,
+    channel: channel
+  } do
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    view
+    |> element("#member-avatar-#{user.id}-trigger")
+    |> render_click()
+
+    view
+    |> form("#status-custom-form", %{emoji: "🎧", text: "Listening"})
+    |> render_submit()
+
+    updated = Accounts.get_user!(user.id)
+    assert updated.status_emoji == "🎧"
+    assert updated.status_text == "Listening"
   end
 
   test "composer opens poll form and sends a poll", %{

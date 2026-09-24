@@ -16,6 +16,7 @@ import {ToastHandler} from "./hooks/toast-handler"
 import {ReadReceipt} from "./hooks/read-receipt"
 import {WebPush} from "./hooks/web-push"
 import {LightboxSwipe} from "./hooks/lightbox-swipe"
+import {StatusEmoji} from "./hooks/status-emoji"
 import {adoptImeElements} from "./utils/ime"
 import {initVisualViewport, trackImeKeyboard} from "./utils/viewport"
 import {toast} from "./utils/offline-store"
@@ -40,6 +41,7 @@ const Hooks = {
   ReadReceipt,
   WebPush,
   LightboxSwipe,
+  StatusEmoji,
 }
 
 // Jittered backoff for reconnect/rejoin so a server restart or regional

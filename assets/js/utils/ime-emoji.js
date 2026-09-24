@@ -19,7 +19,7 @@ export function syncDesktopImeClass(ime) {
 export function isImeUiTarget(target) {
   return Boolean(
     target?.closest?.(
-      "mgl-keyboard, mgl-candidates, mgl-emoji-picker, mgl-ime-toggle, .xamt-ime-emoji, #composer-emoji"
+      "mgl-keyboard, mgl-candidates, mgl-emoji-picker, mgl-ime-toggle, .xamt-ime-emoji, #composer-emoji, .xamt-status-picker__emoji"
     )
   )
 }

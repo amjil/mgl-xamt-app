@@ -474,10 +474,10 @@ input[type="tel"] {
   text-align: center;
 }
 
-.xamt-form--vertical .xamt-input,
+.xamt-form--vertical .xamt-input:not(.xamt-status-picker__emoji),
 .xamt-form--vertical .mongol-input,
 .xamt-form--vertical .xamt-select,
-.xamt-form--vertical input[type="text"],
+.xamt-form--vertical input[type="text"]:not(.xamt-status-picker__emoji),
 .xamt-form--vertical input[type="email"],
 .xamt-form--vertical input[type="password"],
 .xamt-form--vertical input[type="url"],
@@ -496,7 +496,7 @@ input[type="tel"] {
 }
 
 .xamt-form--vertical .mongol-input,
-.xamt-form--vertical input[type="text"]:not(.xamt-input--latin):not([type="email"]):not([type="password"]),
+.xamt-form--vertical input[type="text"]:not(.xamt-input--latin):not(.xamt-status-picker__emoji):not([type="email"]):not([type="password"]),
 .xamt-form--vertical textarea.mongol-input {
   font-family: var(--xamt-font-mongol);
 }
@@ -607,17 +607,38 @@ input[type="tel"] {
   padding: 0;
 }
 
-.xamt-status-picker__emoji {
-  writing-mode: horizontal-tb;
-  -webkit-writing-mode: horizontal-tb;
+.xamt-status-picker__emoji,
+.xamt-form--vertical input.xamt-status-picker__emoji {
+  writing-mode: horizontal-tb !important;
+  -webkit-writing-mode: horizontal-tb !important;
   text-orientation: mixed;
-  font-family: var(--xamt-font-ui);
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", var(--xamt-font-ui);
   text-align: center;
   width: 2.75rem;
+  height: 2.75rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
   block-size: 2.75rem;
   inline-size: 2.75rem;
   flex: 0 0 auto;
   padding: 0.35rem;
+  cursor: pointer;
+  caret-color: transparent;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.xamt-status-picker__emoji:hover {
+  background: var(--xamt-accent-soft);
+  border-color: color-mix(in srgb, var(--xamt-accent) 38%, var(--xamt-line));
+}
+
+.xamt-status-picker__emoji[aria-expanded="true"] {
+  background: var(--xamt-accent-soft);
+  border-color: color-mix(in srgb, var(--xamt-accent) 50%, var(--xamt-line));
+  box-shadow: 0 0 0 3px var(--xamt-gold-soft);
 }
 
 /* Site-wide admin toggle (settings page) */
