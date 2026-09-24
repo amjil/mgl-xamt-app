@@ -183,6 +183,13 @@ body:has(.xamt-app) {
   max-inline-size: 18rem;
 }
 
+.xamt-page-head__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
 .xamt-kicker {
   margin: 0;
   font-size: 0.78rem;

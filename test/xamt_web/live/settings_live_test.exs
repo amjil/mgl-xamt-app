@@ -46,7 +46,7 @@ defmodule XamtWeb.SettingsLiveTest do
 
     refute has_element?(view, "#site-settings")
     refute has_element?(view, "#registration-toggle")
-    refute has_element?(view, "#create-user-link")
+    refute has_element?(view, "#manage-users-link")
   end
 
   test "admins can close and reopen registration", %{conn: conn} do
@@ -54,7 +54,7 @@ defmodule XamtWeb.SettingsLiveTest do
     {:ok, view, _html} = live(log_in_user(conn, admin), ~p"/settings")
 
     assert has_element?(view, "#site-settings")
-    assert has_element?(view, "#create-user-link")
+    assert has_element?(view, "#manage-users-link")
     assert has_element?(view, "#registration-toggle[aria-checked='true']")
 
     view |> element("#registration-toggle") |> render_click()

@@ -123,6 +123,120 @@ defmodule Xamt.Accounts do
   end
 
   @doc """
+  Users matching `query` for a site admin.
+
+  A blank query returns accounts ordered by username. A non-blank query
+  treats each whitespace-separated token as a case-insensitive substring
+  that must appear in the username, email, or display name.
+  """
+  def search_users_as_admin(%Scope{user: %User{} = actor}, query \\ "", opts \\ []) do
+    if User.admin?(actor) do
+      {:ok, load_users_for_admin(query, opts)}
+    else
+      {:error, :unauthorized}
+    end
+  end
+
+  @doc """
+  Returns a changeset for the admin edit-user form.
+  """
+  def change_user_admin_update(user, attrs \\ %{}, opts \\ []) do
+    User.admin_update_changeset(
+      user,
+      attrs,
+      opts
+      |> Keyword.put_new(:validate_unique, false)
+      |> Keyword.put_new(:hash_password, false)
+    )
+  end
+
+  @doc """
+  Updates an account on behalf of a site admin.
+
+  Independent of the public profile and email-confirmation flows. A blank
+  password is left unchanged. Changing the password expires the user's
+  sessions. The last remaining admin cannot be demoted.
+  """
+  def update_user_as_admin(%Scope{user: %User{} = actor}, %User{} = user, attrs)
+      when is_map(attrs) do
+    if User.admin?(actor) do
+      changeset =
+        user
+        |> User.admin_update_changeset(attrs)
+        |> maybe_protect_last_admin(user)
+
+      if changeset.valid? and Ecto.Changeset.get_change(changeset, :hashed_password) do
+        case update_user_and_delete_all_tokens(changeset) do
+          {:ok, {updated, _tokens}} -> {:ok, updated}
+          {:error, _} = error -> error
+        end
+      else
+        Repo.update(changeset)
+      end
+    else
+      {:error, :unauthorized}
+    end
+  end
+
+  defp maybe_protect_last_admin(changeset, %User{} = user) do
+    new_role = Ecto.Changeset.get_field(changeset, :global_role)
+
+    if User.admin?(user) and new_role != "admin" and admin_count() <= 1 do
+      Ecto.Changeset.add_error(changeset, :global_role, "cannot remove the last admin")
+    else
+      changeset
+    end
+  end
+
+  defp admin_count do
+    Repo.aggregate(from(u in User, where: u.global_role == "admin"), :count)
+  end
+
+  defp load_users_for_admin(query, opts) do
+    limit = Keyword.get(opts, :limit, 100)
+    tokens = search_tokens(query)
+
+    from(u in User, order_by: [asc: u.username], limit: ^limit)
+    |> apply_user_search(tokens)
+    |> Repo.all()
+  end
+
+  defp search_tokens(query) do
+    query
+    |> to_string()
+    |> String.trim()
+    |> String.split(~r/\s+/, trim: true)
+    |> Enum.map(&String.trim_leading(&1, "@"))
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.take(5)
+  end
+
+  defp apply_user_search(query, []), do: query
+
+  defp apply_user_search(query, tokens) do
+    Enum.reduce(tokens, query, fn token, acc ->
+      pattern = like_pattern(token)
+
+      from(u in acc,
+        where:
+          ilike(u.username, ^pattern) or
+            ilike(u.email, ^pattern) or
+            ilike(fragment("coalesce(?, '')", u.display_name), ^pattern)
+      )
+    end)
+  end
+
+  defp like_pattern(token) do
+    escaped =
+      token
+      |> String.replace("\\", "\\\\")
+      |> String.replace("%", "\\%")
+      |> String.replace("_", "\\_")
+
+    "%" <> escaped <> "%"
+  end
+
+  @doc """
   Updates a user's profile.
   """
   def update_user_profile(user, attrs) do

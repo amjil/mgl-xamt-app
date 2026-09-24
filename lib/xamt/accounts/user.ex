@@ -273,6 +273,41 @@ defmodule Xamt.Accounts.User do
   end
 
   @doc """
+  Changeset for site admins to update another account.
+
+  Accepts profile fields, email, username, role, and an optional new
+  password. A blank password is ignored so the current hash is kept.
+  Keep this out of public forms so users cannot escalate themselves.
+  """
+  def admin_update_changeset(user, attrs, opts \\ []) do
+    user
+    |> cast(attrs, [:email, :username, :display_name, :bio, :global_role, :password])
+    |> validate_required([:email, :username, :global_role])
+    |> validate_inclusion(:global_role, @global_roles)
+    |> validate_length(:display_name, max: 100)
+    |> validate_length(:bio, max: 500)
+    |> validate_username(opts)
+    |> validate_registration_email(opts)
+    |> maybe_change_admin_password(opts)
+  end
+
+  defp maybe_change_admin_password(changeset, opts) do
+    case get_change(changeset, :password) do
+      password when is_binary(password) ->
+        if String.trim(password) == "" do
+          delete_change(changeset, :password)
+        else
+          changeset
+          |> validate_confirmation(:password, message: "does not match password")
+          |> validate_password(opts)
+        end
+
+      _ ->
+        changeset
+    end
+  end
+
+  @doc """
   Verifies the password.
 
   If there is no user or the user doesn't have a password, we call

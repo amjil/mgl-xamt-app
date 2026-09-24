@@ -67,6 +67,7 @@ a phone on the LAN.
 | `/` | Home / discover |
 | `/login` `/register` | Auth (aliases of `/users/log-in` `/users/register`) |
 | `/users/settings` | Email & password |
+| `/admin/users` | Admin: search and edit users (site admin only) |
 | `/admin/users/new` | Admin: create a user (site admin only) |
 | `/invite/:code` | Redeem invite |
 | `/servers/:server_slug` | Server (redirects to first channel) |

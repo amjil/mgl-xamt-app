@@ -66,7 +66,9 @@ defmodule XamtWeb.Router do
 
     live_session :admin,
       on_mount: [{XamtWeb.UserAuth, :ensure_authenticated}, {XamtWeb.UserAuth, :ensure_admin}] do
+      live "/admin/users", AdminUsersLive, :index
       live "/admin/users/new", AdminUserLive, :new
+      live "/admin/users/:id/edit", AdminUserLive, :edit
     end
   end
 

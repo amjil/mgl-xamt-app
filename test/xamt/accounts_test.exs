@@ -473,6 +473,146 @@ defmodule Xamt.AccountsTest do
     end
   end
 
+  describe "search_users_as_admin/2" do
+    test "admins can list and filter users by username, email, or display name" do
+      admin = admin_fixture()
+      scope = Scope.for_user(admin)
+      suffix = System.unique_integer([:positive])
+
+      alice =
+        user_fixture(%{
+          username: "alice#{suffix}",
+          display_name: "Alice Neighbor",
+          email: "alice#{suffix}@example.com"
+        })
+
+      bob =
+        user_fixture(%{
+          username: "bob#{suffix}",
+          display_name: "Bob Guest",
+          email: "findme#{suffix}@example.com"
+        })
+
+      assert {:ok, listed} = Accounts.search_users_as_admin(scope, "")
+      assert Enum.any?(listed, &(&1.id == alice.id))
+      assert Enum.any?(listed, &(&1.id == bob.id))
+
+      assert {:ok, [found]} = Accounts.search_users_as_admin(scope, "alice#{suffix}")
+      assert found.id == alice.id
+
+      assert {:ok, [found_email]} = Accounts.search_users_as_admin(scope, "findme#{suffix}")
+      assert found_email.id == bob.id
+
+      assert {:ok, [found_name]} = Accounts.search_users_as_admin(scope, "Alice Neighbor")
+      assert found_name.id == alice.id
+
+      assert {:ok, [found_mention]} = Accounts.search_users_as_admin(scope, "@bob#{suffix}")
+      assert found_mention.id == bob.id
+
+      assert {:ok, []} = Accounts.search_users_as_admin(scope, "no-such-user-#{suffix}")
+    end
+
+    test "rejects non-admins" do
+      user = user_fixture()
+      creator = creator_fixture()
+
+      assert {:error, :unauthorized} = Accounts.search_users_as_admin(Scope.for_user(user), "")
+
+      assert {:error, :unauthorized} =
+               Accounts.search_users_as_admin(Scope.for_user(creator), "alice")
+    end
+  end
+
+  describe "update_user_as_admin/3" do
+    test "admins can update profile fields and role" do
+      admin = admin_fixture()
+      user = user_fixture(%{display_name: "Old Name"})
+      email = unique_user_email()
+      username = unique_user_username()
+
+      assert {:ok, updated} =
+               Accounts.update_user_as_admin(Scope.for_user(admin), user, %{
+                 display_name: "New Neighbor",
+                 username: username,
+                 email: email,
+                 bio: "Writes in Mongolian.",
+                 global_role: "creator"
+               })
+
+      assert updated.display_name == "New Neighbor"
+      assert updated.username == username
+      assert updated.email == email
+      assert updated.bio == "Writes in Mongolian."
+      assert updated.global_role == "creator"
+      assert User.can_create_server?(updated)
+    end
+
+    test "blank password leaves the current hash" do
+      admin = admin_fixture()
+      user = user_fixture()
+      hash = user.hashed_password
+
+      assert {:ok, updated} =
+               Accounts.update_user_as_admin(Scope.for_user(admin), user, %{
+                 username: user.username,
+                 email: user.email,
+                 global_role: user.global_role,
+                 password: "",
+                 password_confirmation: ""
+               })
+
+      assert updated.hashed_password == hash
+    end
+
+    test "password change updates the hash and expires sessions" do
+      admin = admin_fixture()
+      user = user_fixture()
+      token = Accounts.generate_user_session_token(user)
+      new_password = "a brand new secret"
+
+      assert {:ok, updated} =
+               Accounts.update_user_as_admin(Scope.for_user(admin), user, %{
+                 username: user.username,
+                 email: user.email,
+                 global_role: user.global_role,
+                 password: new_password,
+                 password_confirmation: new_password
+               })
+
+      assert User.valid_password?(updated, new_password)
+      refute Accounts.get_user_by_session_token(token)
+    end
+
+    test "rejects non-admins" do
+      actor = user_fixture()
+      target = user_fixture()
+
+      assert {:error, :unauthorized} =
+               Accounts.update_user_as_admin(Scope.for_user(actor), target, %{
+                 display_name: "Nope",
+                 username: target.username,
+                 email: target.email,
+                 global_role: "admin"
+               })
+
+      assert Accounts.get_user!(target.id).global_role == "user"
+    end
+
+    test "cannot demote the last admin" do
+      admin = admin_fixture()
+
+      assert {:error, changeset} =
+               Accounts.update_user_as_admin(Scope.for_user(admin), admin, %{
+                 username: admin.username,
+                 email: admin.email,
+                 global_role: "user"
+               })
+
+      assert "cannot remove the last admin" in errors_on(changeset).global_role
+      assert Accounts.get_user!(admin.id).global_role == "admin"
+    end
+  end
+
   describe "update_user_global_role/2" do
     test "promotes a user to creator or admin" do
       user = user_fixture()

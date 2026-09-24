@@ -303,11 +303,11 @@ defmodule XamtWeb.SettingsLive do
           </div>
 
           <.link
-            navigate={~p"/admin/users/new"}
-            id="create-user-link"
+            navigate={~p"/admin/users"}
+            id="manage-users-link"
             class="xamt-btn xamt-btn--soft mongol-text"
           >
-            {gettext("Create user")}
+            {gettext("Users")}
           </.link>
         </section>
 
