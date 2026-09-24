@@ -16,8 +16,30 @@ export function isEmojiText(text) {
   return typeof text === "string" && text.length > 0 && ONLY_EMOJI.test(text) && /\p{Extended_Pictographic}/u.test(text)
 }
 
+export function containsEmoji(text) {
+  if (typeof text !== "string" || text.length === 0) return false
+  FIND_EMOJI.lastIndex = 0
+  return FIND_EMOJI.test(text)
+}
+
 export function emojiHtml(text) {
   return `<span class="xamt-emoji">${escapeHtml(text)}</span>`
+}
+
+/** Escape `text` and wrap color-emoji runs so vertical-lr columns stay upright. */
+export function emojiRichText(text) {
+  if (!text) return ""
+  const parts = []
+  let last = 0
+  FIND_EMOJI.lastIndex = 0
+  let match
+  while ((match = FIND_EMOJI.exec(text))) {
+    if (match.index > last) parts.push(escapeHtml(text.slice(last, match.index)))
+    parts.push(emojiHtml(match[0]))
+    last = match.index + match[0].length
+  }
+  if (last < text.length) parts.push(escapeHtml(text.slice(last)))
+  return parts.join("")
 }
 
 export function insertUprightText(text) {

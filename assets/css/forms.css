@@ -159,18 +159,11 @@ input[type="tel"] {
 }
 
 .xamt-ime-emoji__glyph {
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
   font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
   font-size: 1.05rem;
   line-height: 1;
-}
-
-.xamt-form--vertical .xamt-ime-emoji,
-.xamt-form--vertical button.xamt-ime-emoji {
-  writing-mode: horizontal-tb;
-  -webkit-writing-mode: horizontal-tb;
-  padding: 0;
-  display: inline-grid;
-  align-self: flex-end;
 }
 
 .xamt-search .xamt-ime-emoji {
@@ -474,6 +467,70 @@ input[type="tel"] {
   text-align: center;
 }
 
+/* Emoji trigger sits under the label, flush with the field's physical bottom.
+   Must follow `.xamt-form--vertical button` so writing-mode / padding win. */
+.xamt-form--vertical .xamt-label:has(> .xamt-ime-emoji),
+.xamt-form--vertical label.xamt-field:has(> .xamt-ime-emoji),
+.xamt-form--vertical .xamt-field > label:has(> .xamt-ime-emoji) {
+  display: grid;
+  grid-template-rows: auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 0.4rem;
+  row-gap: 0.5rem;
+  align-items: start;
+}
+
+.xamt-form--vertical .xamt-label:has(> .xamt-ime-emoji) > .xamt-field__label,
+.xamt-form--vertical label.xamt-field:has(> .xamt-ime-emoji) > .xamt-field__label,
+.xamt-form--vertical .xamt-field > label:has(> .xamt-ime-emoji) > .xamt-field__label {
+  grid-row: 1;
+  grid-column: 1;
+  align-self: start;
+}
+
+.xamt-form--vertical .xamt-ime-emoji,
+.xamt-form--vertical button.xamt-ime-emoji {
+  grid-row: 1;
+  grid-column: 2;
+  align-self: end;
+  justify-self: center;
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+}
+
+.xamt-form--vertical .xamt-label:has(> .xamt-ime-emoji) > :is(input, textarea, select, .xamt-ime-mirror),
+.xamt-form--vertical label.xamt-field:has(> .xamt-ime-emoji) > :is(input, textarea, select, .xamt-ime-mirror),
+.xamt-form--vertical .xamt-field > label:has(> .xamt-ime-emoji) > :is(input, textarea, select, .xamt-ime-mirror) {
+  grid-row: 2;
+  grid-column: 1 / -1;
+}
+
+/* Native inputs cannot wrap glyphs; a mirror paints upright .xamt-emoji. */
+.xamt-ime-mirror {
+  pointer-events: none;
+  z-index: 0;
+  color: var(--xamt-text);
+  background-color: var(--xamt-bg);
+  border-color: transparent;
+  box-shadow: none;
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.xamt-form--vertical label:has(> .xamt-ime-mirror:not([hidden])) > :is(input, textarea) {
+  position: relative;
+  z-index: 1;
+  color: transparent;
+  caret-color: var(--xamt-text);
+  background-color: transparent;
+}
+
 .xamt-form--vertical .xamt-input:not(.xamt-status-picker__emoji),
 .xamt-form--vertical .mongol-input,
 .xamt-form--vertical .xamt-select,
@@ -511,7 +568,8 @@ input[type="tel"] {
 
 .xamt-form--vertical textarea,
 .xamt-form--vertical textarea.mongol-input,
-.xamt-form--vertical textarea.xamt-input {
+.xamt-form--vertical textarea.xamt-input,
+.xamt-form--vertical .xamt-ime-mirror.xamt-textarea {
   block-size: 7rem;
   inline-size: var(--xamt-field-extent-lg);
   resize: block;
