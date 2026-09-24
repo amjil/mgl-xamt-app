@@ -185,6 +185,17 @@ input[type="tel"] {
   margin: 0;
 }
 
+/* Wrapping <label> steals mouseup when a vertical-lr drag includes the first
+   glyph (the pointer slips into label padding and the range collapses). Leave
+   hits on the caption and control so clicking the name still focuses. */
+label:has(> input, > textarea, > select) {
+  pointer-events: none;
+}
+
+label:has(> input, > textarea, > select) > * {
+  pointer-events: auto;
+}
+
 .xamt-field__label {
   font-size: 0.85rem;
   color: var(--xamt-muted);

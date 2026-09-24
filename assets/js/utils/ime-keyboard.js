@@ -72,7 +72,15 @@ export function attachVirtualKeyboard(ime, {eager = false} = {}) {
       return
     }
     if (performance.now() - claimedAt < CLAIM_GRACE_MS) return
-    if (e.target?.closest?.("#composer-peek")) return
+    // Composer chrome (poll / photo / voice / send / emoji) must receive the
+    // first tap. Dismissing here ate that tap and required a second click.
+    if (
+      e.target?.closest?.(
+        "#composer-peek, #composer-toolbar, .xamt-composer__toolbar, .xamt-composer-wrap"
+      )
+    ) {
+      return
+    }
     if (inNode(e, target)) return
     if (inNode(e, ime.keyboardEl)) return
     if (inNode(e, ime.candidatesEl)) return

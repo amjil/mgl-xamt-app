@@ -11,6 +11,8 @@ const MIME_CANDIDATES = [
   "video/mp4",
 ]
 
+const DEFAULT_MAX_SECONDS = 60
+
 function resolveGetUserMedia() {
   const devices = navigator.mediaDevices
   if (devices && typeof devices.getUserMedia === "function") {
@@ -102,10 +104,11 @@ function mergeFloat32(buffers) {
   return result
 }
 
-function setRecordingState(btn, recording) {
-  if (!btn) return
-  btn.classList.toggle("is-recording", recording)
-  btn.setAttribute("aria-pressed", recording ? "true" : "false")
+function formatCountdown(seconds) {
+  const total = Math.max(0, Math.ceil(seconds))
+  const minutes = Math.floor(total / 60)
+  const rest = total % 60
+  return `${minutes}:${String(rest).padStart(2, "0")}`
 }
 
 function insecurePage() {
@@ -119,31 +122,113 @@ export const AudioRecorder = {
     this.wavRecorder = null
     this.audioCtx = null
     this.isRecording = false
+    this.sending = false
+    this.pendingFile = null
+    this.previewUrl = null
+    this.timerId = null
+    this.deadlineAt = 0
     this._unmounted = false
+
+    this.chrome = this.el.querySelector("#voice-chrome")
+    this.panel = this.el.querySelector("#voice-panel")
+    this.countdownValue = this.el.querySelector("#voice-countdown-value")
     this.recordBtn = this.el.querySelector("#btn-record")
+    this.previewEl = this.el.querySelector("#voice-preview")
+    this.sendBtn = this.el.querySelector("#btn-voice-send")
+    this.discardBtn = this.el.querySelector("#btn-voice-discard")
 
     this._onClick = () => {
+      if (this.sending) return
       if (this.isRecording) {
         this.stopRecording()
         return
       }
+      if (this.pendingFile) return
 
       this.prepareAudioContext()
       this.startInAppRecording().then((started) => {
-        setRecordingState(this.recordBtn, started)
+        this.setRecordingState(started)
       })
     }
 
+    this._onSend = () => this.sendPending()
+    this._onDiscard = () => this.discardPending()
+
     this.recordBtn?.addEventListener("click", this._onClick)
+    this.sendBtn?.addEventListener("click", this._onSend)
+    this.discardBtn?.addEventListener("click", this._onDiscard)
+    this.setPanelState("idle")
   },
 
   destroyed() {
     this._unmounted = true
     this.recordBtn?.removeEventListener("click", this._onClick)
+    this.sendBtn?.removeEventListener("click", this._onSend)
+    this.discardBtn?.removeEventListener("click", this._onDiscard)
     this.stopRecording()
+    this.discardPending({ silent: true })
     if (this.audioCtx) {
       this.audioCtx.close()
       this.audioCtx = null
+    }
+  },
+
+  maxSeconds() {
+    const n = Number(this.el.dataset.maxSeconds)
+    return Number.isFinite(n) && n > 0 ? n : DEFAULT_MAX_SECONDS
+  },
+
+  setVoiceActive(active) {
+    this.chrome?.classList.toggle("is-voice-active", active)
+  },
+
+  setPanelState(state) {
+    if (this.panel) this.panel.dataset.state = state
+    this.setVoiceActive(state === "recording" || state === "review")
+    this.recordBtn?.classList.toggle("is-reviewing", state === "review")
+    this.recordBtn?.toggleAttribute("disabled", state === "review" || this.sending)
+  },
+
+  setRecordingState(recording) {
+    if (!this.recordBtn) return
+    this.recordBtn.classList.toggle("is-recording", recording)
+    this.recordBtn.setAttribute("aria-pressed", recording ? "true" : "false")
+    const label = recording
+      ? this.el.dataset.stopLabel || "Stop recording"
+      : this.el.dataset.recordLabel || "Record voice message"
+    this.recordBtn.setAttribute("aria-label", label)
+    this.recordBtn.setAttribute("title", label)
+  },
+
+  setReviewBusy(busy) {
+    this.sendBtn?.toggleAttribute("disabled", busy)
+    this.discardBtn?.toggleAttribute("disabled", busy)
+    this.recordBtn?.toggleAttribute("disabled", busy || this.panel?.dataset.state === "review")
+  },
+
+  startCountdown() {
+    this.clearCountdown()
+    const max = this.maxSeconds()
+    this.deadlineAt = Date.now() + max * 1000
+    this.renderCountdown(max)
+    this.setPanelState("recording")
+    this.timerId = window.setInterval(() => {
+      const remaining = Math.max(0, (this.deadlineAt - Date.now()) / 1000)
+      this.renderCountdown(remaining)
+      if (remaining <= 0) this.stopRecording()
+    }, 200)
+  },
+
+  renderCountdown(seconds) {
+    if (this.countdownValue) this.countdownValue.textContent = formatCountdown(seconds)
+    const max = this.maxSeconds()
+    this.el.style.setProperty("--voice-remain", String(Math.max(0, Math.min(1, seconds / max))))
+  },
+
+  clearCountdown() {
+    if (this.timerId) {
+      window.clearInterval(this.timerId)
+      this.timerId = null
     }
   },
 
@@ -210,6 +295,7 @@ export const AudioRecorder = {
       }
 
       this.isRecording = true
+      this.startCountdown()
       return true
     } catch (err) {
       console.error("Microphone access failed:", err)
@@ -283,7 +369,8 @@ export const AudioRecorder = {
   stopRecording() {
     if (!this.isRecording) return
     this.isRecording = false
-    setRecordingState(this.recordBtn, false)
+    this.clearCountdown()
+    this.setRecordingState(false)
 
     if (this.mediaRecorder && this.mediaRecorder.state !== "inactive") {
       this.mediaRecorder.stop()
@@ -323,12 +410,58 @@ export const AudioRecorder = {
 
     if (!blob || blob.size === 0) {
       toast("error", this.el.dataset.micEmpty || "Recording was empty")
+      this.resetVoiceUi()
       return
     }
 
     const type = (mimeType || blob.type || "audio/webm").split(";")[0]
     const ext = extensionFor(type)
-    this.uploadFile(blobToFile(blob, `voice_${Date.now()}.${ext}`, type))
+    this.pendingFile = blobToFile(blob, `voice_${Date.now()}.${ext}`, type)
+    this.revokePreview()
+    this.previewUrl = URL.createObjectURL(blob)
+    if (this.previewEl) {
+      this.previewEl.src = this.previewUrl
+      this.previewEl.currentTime = 0
+    }
+
+    this.setPanelState("review")
+    this.setReviewBusy(false)
+  },
+
+  sendPending() {
+    if (!this.pendingFile || this.sending || this._unmounted) return
+    this.sending = true
+    this.setReviewBusy(true)
+    if (this.previewEl) this.previewEl.pause()
+    this.uploadFile(this.pendingFile)
+  },
+
+  discardPending(opts = {}) {
+    this.clearCountdown()
+    if (this.previewEl) {
+      this.previewEl.pause()
+      this.previewEl.removeAttribute("src")
+      this.previewEl.load()
+    }
+    this.revokePreview()
+    this.pendingFile = null
+    this.sending = false
+    if (!opts.silent) this.resetVoiceUi()
+  },
+
+  revokePreview() {
+    if (this.previewUrl) {
+      URL.revokeObjectURL(this.previewUrl)
+      this.previewUrl = null
+    }
+  },
+
+  resetVoiceUi() {
+    this.sending = false
+    this.setReviewBusy(false)
+    this.setRecordingState(false)
+    this.setPanelState("idle")
+    this.el.style.removeProperty("--voice-remain")
   },
 
   uploadFile(file) {
@@ -343,6 +476,8 @@ export const AudioRecorder = {
     const input = this.el.querySelector("input[data-phx-upload-ref]")
     if (!input) {
       toast("error", this.el.dataset.micEmpty || "Recording was empty")
+      this.sending = false
+      this.setReviewBusy(false)
       return
     }
 
@@ -359,23 +494,22 @@ export const AudioRecorder = {
 
       if (active.length > 0 && active.every((ref) => done.includes(ref))) {
         this.el.requestSubmit()
+        this.discardPending()
         return
       }
 
       // Preflight finished but entry never completed (rejected / cancelled).
       if (tries > 15 && pre.length > 0 && done.length === 0 && active.length === 0) {
-        toast(
-          "error",
-          this.el.dataset.micUploadError || "Could not upload voice message"
-        )
+        toast("error", this.el.dataset.micUploadError || "Could not upload voice message")
+        this.sending = false
+        this.setReviewBusy(false)
         return
       }
 
       if (tries >= maxTries) {
-        toast(
-          "error",
-          this.el.dataset.micUploadError || "Could not upload voice message"
-        )
+        toast("error", this.el.dataset.micUploadError || "Could not upload voice message")
+        this.sending = false
+        this.setReviewBusy(false)
         return
       }
 

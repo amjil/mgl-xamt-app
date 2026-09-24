@@ -37,6 +37,63 @@ async function commitPending(ime) {
   await ime.core?.commitCurrent?.({ addSpaceAfter: false })
 }
 
+/** Vertical-lr native fields drop a range that includes offset 0 on mouseup. */
+function retainNativeSelection(el) {
+  if (!el || !("selectionStart" in el)) return () => {}
+
+  let pending = null
+  let restoring = false
+
+  const remember = () => {
+    if (restoring || document.activeElement !== el) return
+    const start = el.selectionStart
+    const end = el.selectionEnd
+    if (typeof start === "number" && typeof end === "number" && start !== end) {
+      pending = {start, end}
+    }
+  }
+
+  const restore = () => {
+    if (!pending || restoring) return
+    const {start, end} = pending
+    pending = null
+    if (el.selectionStart === el.selectionEnd && start !== end) {
+      restoring = true
+      try {
+        el.setSelectionRange(start, end)
+      } catch {
+        /* ignore */
+      }
+      restoring = false
+    }
+  }
+
+  const onLabelPointer = (event) => {
+    if (event.target === el || el.contains(event.target)) return
+    if (document.activeElement !== el) return
+    if (el.selectionStart === el.selectionEnd) return
+    event.preventDefault()
+  }
+
+  el.addEventListener("select", remember)
+  document.addEventListener("selectionchange", remember)
+  el.addEventListener("mouseup", restore)
+  el.addEventListener("keyup", restore)
+
+  const label = el.closest("label")
+  label?.addEventListener("mousedown", onLabelPointer)
+  label?.addEventListener("click", onLabelPointer)
+
+  return () => {
+    el.removeEventListener("select", remember)
+    document.removeEventListener("selectionchange", remember)
+    el.removeEventListener("mouseup", restore)
+    el.removeEventListener("keyup", restore)
+    label?.removeEventListener("mousedown", onLabelPointer)
+    label?.removeEventListener("click", onLabelPointer)
+  }
+}
+
 export const MongolianIME = {
   mounted() {
     if (instances.has(this.el)) return
@@ -52,6 +109,7 @@ export const MongolianIME = {
     if (ime.keyboardMode === "virtual") suppressSystemKeyboard(this.el)
     this._detachKeyboard = attachVirtualKeyboard(ime)
     this._detachEmoji = attachFieldEmojiTrigger(ime, this.el)
+    this._detachSelection = retainNativeSelection(this.el)
     syncDesktopImeClass(ime)
     instances.set(this.el, ime)
 
@@ -105,6 +163,7 @@ export const MongolianIME = {
     this._form?.removeEventListener("submit", this._onFormSubmit)
     this._detachEmoji?.()
     this._detachKeyboard?.()
+    this._detachSelection?.()
     const ime = instances.get(this.el)
     if (ime && typeof ime.destroy === "function") ime.destroy()
     instances.delete(this.el)

@@ -1091,13 +1091,38 @@ html.xamt-desktop-ime .xamt-composer__emoji {
   margin: 0;
 }
 
+#voice-chrome {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.xamt-record-btn .xamt-record-btn__stop {
+  display: none;
+}
+
 .xamt-record-btn.is-recording {
   color: #ef4444;
   border-color: color-mix(in srgb, #ef4444 45%, var(--xamt-line));
   animation: xamt-record-pulse 1.1s ease-in-out infinite;
 }
 
-#audio-form.phx-submit-loading .xamt-record-btn {
+.xamt-record-btn.is-recording .xamt-record-btn__mic,
+.xamt-record-btn.is-reviewing .xamt-record-btn__mic {
+  display: none;
+}
+
+.xamt-record-btn.is-recording .xamt-record-btn__stop {
+  display: block;
+}
+
+.xamt-record-btn.is-reviewing {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+#audio-form.phx-submit-loading .xamt-record-btn,
+#audio-form.phx-submit-loading .xamt-voice__actions .xamt-btn {
   pointer-events: none;
   opacity: 0.55;
 }
@@ -1109,6 +1134,113 @@ html.xamt-desktop-ime .xamt-composer__emoji {
   }
   50% {
     opacity: 0.45;
+  }
+}
+
+.xamt-voice__panel {
+  display: none;
+  position: absolute;
+  right: calc(100% + 0.45rem);
+  bottom: 0;
+  z-index: 6;
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  min-width: 11.5rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--xamt-line) 80%, transparent);
+  border-radius: 0.95rem;
+  background: color-mix(in srgb, var(--xamt-bg) 94%, transparent);
+  box-shadow:
+    0 12px 28px color-mix(in srgb, var(--xamt-shade) 22%, transparent),
+    0 1px 0 rgba(255, 255, 255, 0.16) inset;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: xamt-voice-in 180ms ease;
+}
+
+.xamt-voice__panel[data-state="recording"],
+.xamt-voice__panel[data-state="review"] {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+}
+
+.xamt-voice__countdown,
+.xamt-voice__review {
+  display: none;
+}
+
+.xamt-voice__panel[data-state="recording"] .xamt-voice__countdown {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+}
+
+.xamt-voice__panel[data-state="review"] .xamt-voice__review {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.xamt-voice__dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: #ef4444;
+  box-shadow: 0 0 0 4px color-mix(in srgb, #ef4444 18%, transparent);
+  animation: xamt-record-pulse 1.1s ease-in-out infinite;
+}
+
+.xamt-voice__time {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  color: var(--xamt-text);
+}
+
+.xamt-voice__preview {
+  width: 12.5rem;
+  height: 2.15rem;
+  border-radius: 999px;
+  outline: none;
+  accent-color: var(--xamt-accent);
+}
+
+.xamt-voice__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.xamt-composer__toolbar .xamt-voice__actions .xamt-btn {
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 0.32rem 0.7rem;
+  border-radius: 999px;
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+}
+
+.xamt-composer__toolbar .xamt-voice__actions .xamt-btn .hero-paper-airplane {
+  transform: rotate(-28deg);
+}
+
+@keyframes xamt-voice-in {
+  from {
+    opacity: 0;
+    transform: translateX(0.35rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 
@@ -2113,6 +2245,7 @@ html.xamt-desktop-ime .xamt-composer__emoji {
   /* Open: restore the normal composer column. */
   .xamt-composer-wrap:focus-within,
   .xamt-composer-wrap:has(#message-composer.is-open),
+  .xamt-composer-wrap:has(#voice-chrome.is-voice-active),
   .xamt-composer-wrap[data-has-uploads="true"],
   .xamt-composer-wrap[data-editing-id],
   .xamt-composer-wrap[data-reply-to-id] {
@@ -2151,6 +2284,7 @@ html.xamt-desktop-ime .xamt-composer__emoji {
 
   .xamt-composer-wrap:focus-within .xamt-composer__field,
   .xamt-composer-wrap:has(#message-composer.is-open) .xamt-composer__field,
+  .xamt-composer-wrap:has(#voice-chrome.is-voice-active) .xamt-composer__field,
   .xamt-composer-wrap[data-has-uploads="true"] .xamt-composer__field,
   .xamt-composer-wrap[data-editing-id] .xamt-composer__field,
   .xamt-composer-wrap[data-reply-to-id] .xamt-composer__field {
@@ -2163,6 +2297,7 @@ html.xamt-desktop-ime .xamt-composer__emoji {
 
   .xamt-composer-wrap:focus-within .xamt-composer__peek,
   .xamt-composer-wrap:has(#message-composer.is-open) .xamt-composer__peek,
+  .xamt-composer-wrap:has(#voice-chrome.is-voice-active) .xamt-composer__peek,
   .xamt-composer-wrap.xamt-composer-wrap--poll .xamt-composer__peek,
   .xamt-composer-wrap[data-has-uploads="true"] .xamt-composer__peek,
   .xamt-composer-wrap[data-editing-id] .xamt-composer__peek,
@@ -2172,12 +2307,14 @@ html.xamt-desktop-ime .xamt-composer__emoji {
 
   .xamt-composer-wrap:focus-within .xamt-reply-bar,
   .xamt-composer-wrap:has(#message-composer.is-open) .xamt-reply-bar,
+  .xamt-composer-wrap:has(#voice-chrome.is-voice-active) .xamt-reply-bar,
   .xamt-composer-wrap.xamt-composer-wrap--poll .xamt-reply-bar,
   .xamt-composer-wrap[data-has-uploads="true"] .xamt-reply-bar,
   .xamt-composer-wrap[data-editing-id] .xamt-reply-bar,
   .xamt-composer-wrap[data-reply-to-id] .xamt-reply-bar,
   .xamt-composer-wrap:focus-within .xamt-upload-preview,
   .xamt-composer-wrap:has(#message-composer.is-open) .xamt-upload-preview,
+  .xamt-composer-wrap:has(#voice-chrome.is-voice-active) .xamt-upload-preview,
   .xamt-composer-wrap.xamt-composer-wrap--poll .xamt-upload-preview,
   .xamt-composer-wrap[data-has-uploads="true"] .xamt-upload-preview,
   .xamt-composer-wrap[data-editing-id] .xamt-upload-preview,

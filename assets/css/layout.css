@@ -669,8 +669,10 @@ img.xamt-message__avatar {
 }
 
 .xamt-profile.xamt-surface {
-  padding: 1.35rem 1.2rem;
-  max-inline-size: none;
+  gap: 1.15rem;
+  padding: 1.35rem 1.15rem;
+  min-inline-size: 12rem;
+  max-inline-size: var(--xamt-field-extent-lg);
   border-block-start: 4px solid transparent;
   transition: border-color 180ms ease, box-shadow 180ms ease;
 }
@@ -689,6 +691,41 @@ img.xamt-message__avatar {
     0 0 0 1px color-mix(in srgb, var(--xamt-role-creator) 28%, transparent);
 }
 
+.xamt-profile__identity,
+.xamt-profile__about,
+.xamt-profile__actions {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.xamt-profile__identity,
+.xamt-profile__about {
+  min-inline-size: 10rem;
+}
+
+/* vertical-lr column = name | @user, left → right */
+.xamt-profile__names {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
+}
+
+.xamt-profile__actions {
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-inline-start: 0.15rem;
+}
+
+.xamt-profile__display-name {
+  margin: 0;
+  font-size: 1.55rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
 .xamt-profile__display-name.xamt-role--admin {
   color: var(--xamt-role-admin);
 }
@@ -697,30 +734,45 @@ img.xamt-message__avatar {
   color: var(--xamt-role-creator);
 }
 
-.xamt-profile__col {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.5rem;
-}
-
 .xamt-profile__username {
   color: var(--xamt-muted);
   margin: 0;
+  font-size: 0.92rem;
+  font-family: var(--xamt-font-ui);
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
 }
 
-.xamt-page-head__lede .xamt-profile__username {
-  font-family: var(--xamt-font-ui);
+.xamt-profile__status {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.15rem 0 0;
+  color: var(--xamt-muted);
+  font-size: 0.88rem;
+}
+
+.xamt-profile .xamt-role-badge {
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  margin-block-start: 0.15rem;
+}
+
+.xamt-profile__about .xamt-field__label {
+  color: var(--xamt-accent-2);
 }
 
 .xamt-profile__bio {
   margin: 0;
-  max-inline-size: 16rem;
   line-height: 1.75;
 }
 
-.xamt-profile__bio:not(.xamt-empty) {
-  min-inline-size: 12rem;
+.xamt-profile__bio.xamt-empty {
+  color: var(--xamt-muted);
+  opacity: 0.72;
 }
 
 .xamt-icon-btn {

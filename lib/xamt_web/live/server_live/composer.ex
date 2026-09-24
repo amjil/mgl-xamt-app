@@ -223,6 +223,7 @@ defmodule XamtWeb.ServerLive.Composer do
               phx-change="validate_audio"
               phx-submit="send_audio"
               phx-hook="AudioRecorder"
+              data-max-seconds="60"
               data-mic-error={gettext("Microphone access is required to record")}
               data-mic-unsupported={gettext("Voice recording is not supported in this browser")}
               data-mic-insecure={
@@ -232,18 +233,67 @@ defmodule XamtWeb.ServerLive.Composer do
               }
               data-mic-empty={gettext("Recording was empty")}
               data-mic-upload-error={gettext("Could not upload voice message")}
+              data-record-label={gettext("Record voice message")}
+              data-stop-label={gettext("Stop recording")}
             >
               <.live_file_input upload={@uploads.audio} class="hidden" />
-              <button
-                type="button"
-                id="btn-record"
-                class="xamt-btn xamt-btn--soft xamt-record-btn"
-                title={gettext("Record voice message")}
-                aria-label={gettext("Record voice message")}
-                aria-pressed="false"
-              >
-                <.icon name="hero-microphone" class="size-4" />
-              </button>
+              <div id="voice-chrome" phx-update="ignore">
+                <button
+                  type="button"
+                  id="btn-record"
+                  class="xamt-btn xamt-btn--soft xamt-record-btn"
+                  title={gettext("Record voice message")}
+                  aria-label={gettext("Record voice message")}
+                  aria-pressed="false"
+                >
+                  <.icon name="hero-microphone" class="size-4 xamt-record-btn__mic" />
+                  <.icon name="hero-stop" class="size-4 xamt-record-btn__stop" />
+                </button>
+                <div id="voice-panel" class="xamt-voice__panel" data-state="idle">
+                  <div id="voice-countdown" class="xamt-voice__countdown">
+                    <span class="xamt-voice__dot" aria-hidden="true"></span>
+                    <span
+                      id="voice-countdown-value"
+                      class="xamt-voice__time"
+                      aria-live="polite"
+                    >
+                      1:00
+                    </span>
+                  </div>
+                  <div id="voice-review" class="xamt-voice__review">
+                    <audio
+                      id="voice-preview"
+                      class="xamt-voice__preview"
+                      controls
+                      preload="metadata"
+                    >
+                      {gettext("Preview recording")}
+                    </audio>
+                    <div class="xamt-voice__actions">
+                      <button
+                        type="button"
+                        id="btn-voice-discard"
+                        class="xamt-btn xamt-btn--soft"
+                        title={gettext("Discard")}
+                        aria-label={gettext("Discard")}
+                      >
+                        <.icon name="hero-x-mark" class="size-4" />
+                        <span>{gettext("Discard")}</span>
+                      </button>
+                      <button
+                        type="button"
+                        id="btn-voice-send"
+                        class="xamt-btn xamt-btn--primary"
+                        title={gettext("Send")}
+                        aria-label={gettext("Send")}
+                      >
+                        <.icon name="hero-paper-airplane" class="size-4" />
+                        <span>{gettext("Send")}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </form>
             <button
               :if={@editing_message_id}

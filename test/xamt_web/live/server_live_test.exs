@@ -1370,8 +1370,11 @@ defmodule XamtWeb.ServerLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
 
-    assert has_element?(view, "#audio-form")
+    assert has_element?(view, "#audio-form[data-max-seconds='60']")
     assert has_element?(view, "#btn-record")
+    assert has_element?(view, "#voice-countdown")
+    assert has_element?(view, "#btn-voice-send")
+    assert has_element?(view, "#btn-voice-discard")
     assert has_element?(view, "#msg-audio-#{message.id}[src='/uploads/voice-test.webm']")
     refute has_element?(view, "#edit-message-#{message.id}")
   end

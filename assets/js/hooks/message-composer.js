@@ -154,7 +154,11 @@ function buildEditorAdapter(getRoot) {
       const sel = window.getSelection()
       const range = sel?.rangeCount ? sel.getRangeAt(0) : null
       const inside = range && el && (el === range.commonAncestorContainer || el.contains(range.commonAncestorContainer))
-      return measureCaretRect(inside ? range : null, el)
+      if (!inside) return measureCaretRect(null, el)
+      if (range.collapsed) return measureCaretRect(range, el)
+      const caret = range.cloneRange()
+      caret.collapse(true)
+      return measureCaretRect(caret, el)
     },
   })
 }
@@ -193,7 +197,10 @@ export const MessageComposer = {
     this._openedAt = 0
     this._lastTouchAt = 0
     this._onHostPointer = () => {
-      if (!this.host.contains(document.activeElement)) this.editor.focus()
+      if (this.host.contains(document.activeElement)) return
+      const sel = window.getSelection()
+      if (sel && !sel.isCollapsed && this.host.contains(sel.anchorNode)) return
+      this.editor.focus()
     }
     this.host.addEventListener("pointerdown", this._onHostPointer)
     this._onComposerFocus = () => this.setOpen(true)

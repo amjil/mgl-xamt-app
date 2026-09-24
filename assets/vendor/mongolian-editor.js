@@ -1132,9 +1132,28 @@ export function createMongolianEditor(containerSelector) {
         alert('HTML has been printed to the console (F12)');
     }
 
+    function snapshotSelection() {
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return null;
+        const range = sel.getRangeAt(0);
+        return { sel, range: range.cloneRange(), collapsed: range.collapsed };
+    }
+
+    function restoreSelection(snap) {
+        if (!snap || snap.collapsed) return;
+        if (snap.sel.rangeCount && !snap.sel.isCollapsed) return;
+        try {
+            snap.sel.removeAllRanges();
+            snap.sel.addRange(snap.range);
+        } catch {
+            /* range detached */
+        }
+    }
+
     function refreshToolbarState() {
         const sel = window.getSelection();
-        const inEditor = !!sel && editor.contains(sel.anchorNode);
+        const inEditor = !!sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode);
+        const snap = inEditor ? snapshotSelection() : null;
         const block = inEditor ? currentBlock() : null;
         const type = block && block.nodeType === Node.ELEMENT_NODE ? block.dataset.blockType : null;
 
@@ -1151,6 +1170,10 @@ export function createMongolianEditor(containerSelector) {
         toolbar.querySelectorAll('button[data-block]').forEach((btn) => {
             btn.classList.toggle('active', !!type && btn.dataset.block === type);
         });
+
+        // queryCommandState can collapse a range that starts at offset 0
+        // inside a vertical-lr contenteditable (first glyph).
+        restoreSelection(snap);
     }
 
     // ------------------------------------------
@@ -1413,9 +1436,13 @@ export function createMongolianEditor(containerSelector) {
         }
         deselectImage();
 
-        // Outer container is not editable; clicking empty space moves the caret into the nearest block
+        // Outer container is not editable; clicking empty space moves the caret
+        // into the nearest block. In vertical-lr the first glyph sits against
+        // this padding, so a drag that includes it mouseups here — keep the range.
         if (e.target === editor || e.target.classList.contains('block-children') ||
             e.target.classList.contains('block-wrapper')) {
+            const sel = window.getSelection();
+            if (sel && !sel.isCollapsed && editor.contains(sel.anchorNode)) return;
             const block = e.target === editor ? lastBlock() : blockOf(e.target);
             if (block && !isAtomic(block)) placeCaretAtEnd(block);
         }

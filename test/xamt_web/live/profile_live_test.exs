@@ -20,5 +20,10 @@ defmodule XamtWeb.ProfileLiveTest do
     refute has_element?(view, "#profile-role-badge")
     refute has_element?(view, ".xamt-profile--role-admin")
     refute has_element?(view, ".xamt-profile--role-creator")
+    assert has_element?(view, ".xamt-profile__names .xamt-profile__display-name")
+    assert has_element?(view, ".xamt-profile__names .xamt-profile__username")
+    refute has_element?(view, ".xamt-profile__username.xamt-upright")
+    assert has_element?(view, "#profile-edit")
+    assert has_element?(view, "#profile-back")
   end
 end

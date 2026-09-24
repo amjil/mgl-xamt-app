@@ -898,6 +898,23 @@ msgstr ""
 msgid "Recording was empty"
 msgstr ""
 
+#: lib/xamt_web/live/server_live/composer.ex:277
+#: lib/xamt_web/live/server_live/composer.ex:278
+#: lib/xamt_web/live/server_live/composer.ex:281
+#, elixir-autogen, elixir-format
+msgid "Discard"
+msgstr ""
+
+#: lib/xamt_web/live/server_live/composer.ex:270
+#, elixir-autogen, elixir-format
+msgid "Preview recording"
+msgstr ""
+
+#: lib/xamt_web/live/server_live/composer.ex:237
+#, elixir-autogen, elixir-format
+msgid "Stop recording"
+msgstr ""
+
 #: lib/xamt_web/controllers/user_registration_controller.ex:33
 #: lib/xamt_web/controllers/user_session_html/new.html.heex:17
 #, elixir-autogen, elixir-format

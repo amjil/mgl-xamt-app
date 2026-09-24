@@ -1072,6 +1072,9 @@ function measureCaretRect(range, fallbackEl) {
     }
     const union = range.getBoundingClientRect();
     if (union.width || union.height) return union;
+    if (!range.collapsed) return fallbackEl?.getBoundingClientRect?.() ?? union;
+    const sel = typeof window !== "undefined" ? window.getSelection() : null;
+    const saved = sel?.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
     try {
       const mirror = range.cloneRange();
       const span = document.createElement("span");
@@ -1079,6 +1082,13 @@ function measureCaretRect(range, fallbackEl) {
       mirror.insertNode(span);
       const r = span.getBoundingClientRect();
       span.parentNode?.removeChild(span);
+      if (saved && sel) {
+        try {
+          sel.removeAllRanges();
+          sel.addRange(saved);
+        } catch {
+        }
+      }
       if (r.width || r.height || r.top || r.left) return r;
     } catch {
     }
