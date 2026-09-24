@@ -59,6 +59,17 @@ defmodule XamtWeb.Router do
     end
   end
 
+  # Admin operator pages. Same authenticated browser pipeline so the session
+  # is required at HTTP; `:ensure_admin` then gates global site admins only.
+  scope "/", XamtWeb do
+    pipe_through [:browser, :require_authenticated_user]
+
+    live_session :admin,
+      on_mount: [{XamtWeb.UserAuth, :ensure_authenticated}, {XamtWeb.UserAuth, :ensure_admin}] do
+      live "/admin/users/new", AdminUserLive, :new
+    end
+  end
+
   ## Authentication route aliases (spec: /login /register)
   scope "/", XamtWeb do
     pipe_through [:browser, :redirect_if_user_is_authenticated]

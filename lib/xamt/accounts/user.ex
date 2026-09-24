@@ -64,6 +64,20 @@ defmodule Xamt.Accounts.User do
     |> maybe_confirm_on_register()
   end
 
+  @doc """
+  Registration changeset used by site admins.
+
+  Same as `registration_changeset/3`, but allows assigning a `global_role`.
+  Keep this out of the public register form so users cannot escalate themselves.
+  """
+  def admin_registration_changeset(user, attrs, opts \\ []) do
+    user
+    |> registration_changeset(attrs, opts)
+    |> cast(attrs, [:global_role])
+    |> validate_required([:global_role])
+    |> validate_inclusion(:global_role, @global_roles)
+  end
+
   defp maybe_confirm_on_register(changeset) do
     if changeset.valid? do
       put_change(changeset, :confirmed_at, DateTime.utc_now(:second))

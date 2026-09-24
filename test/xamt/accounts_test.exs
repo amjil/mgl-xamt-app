@@ -4,7 +4,7 @@ defmodule Xamt.AccountsTest do
   alias Xamt.Accounts
 
   import Xamt.AccountsFixtures
-  alias Xamt.Accounts.{User, UserToken}
+  alias Xamt.Accounts.{Scope, User, UserToken}
 
   describe "get_user_by_email/1" do
     test "does not return the user if the email does not exist" do
@@ -410,6 +410,66 @@ defmodule Xamt.AccountsTest do
   describe "inspect/2 for the User module" do
     test "does not include password" do
       refute inspect(%User{password: "123456"}) =~ "password: \"123456\""
+    end
+  end
+
+  describe "create_user_as_admin/2" do
+    test "admins can create a confirmed user with a role" do
+      admin = admin_fixture()
+      email = unique_user_email()
+      username = unique_user_username()
+
+      attrs =
+        valid_user_attributes(email: email, username: username)
+        |> Map.put(:display_name, "New Neighbor")
+        |> Map.put(:global_role, "creator")
+
+      assert {:ok, user} = Accounts.create_user_as_admin(Scope.for_user(admin), attrs)
+      assert user.email == email
+      assert user.username == username
+      assert user.display_name == "New Neighbor"
+      assert user.global_role == "creator"
+      assert user.confirmed_at
+      assert user.hashed_password
+    end
+
+    test "defaults to the user role" do
+      admin = admin_fixture()
+      {:ok, user} = Accounts.create_user_as_admin(Scope.for_user(admin), valid_user_attributes())
+      assert user.global_role == "user"
+    end
+
+    test "works when public registration is closed" do
+      admin = admin_fixture()
+      Xamt.SiteSettings.put_registration_enabled!(false)
+
+      {:ok, user} = Accounts.create_user_as_admin(Scope.for_user(admin), valid_user_attributes())
+      assert user.id
+    end
+
+    test "rejects non-admins" do
+      user = user_fixture()
+      creator = creator_fixture()
+      attrs = valid_user_attributes()
+
+      assert {:error, :unauthorized} = Accounts.create_user_as_admin(Scope.for_user(user), attrs)
+
+      assert {:error, :unauthorized} =
+               Accounts.create_user_as_admin(Scope.for_user(creator), attrs)
+
+      refute Accounts.get_user_by_email(attrs.email)
+    end
+
+    test "rejects an invalid role" do
+      admin = admin_fixture()
+
+      assert {:error, changeset} =
+               Accounts.create_user_as_admin(
+                 Scope.for_user(admin),
+                 Map.put(valid_user_attributes(), :global_role, "superadmin")
+               )
+
+      assert "is invalid" in errors_on(changeset).global_role
     end
   end
 

@@ -6,7 +6,7 @@ defmodule Xamt.Accounts do
   import Ecto.Query, warn: false
   alias Xamt.Repo
 
-  alias Xamt.Accounts.{User, UserToken, UserNotifier}
+  alias Xamt.Accounts.{Scope, User, UserToken, UserNotifier}
 
   ## Database getters
 
@@ -92,6 +92,34 @@ defmodule Xamt.Accounts do
   """
   def change_user_registration(user, attrs \\ %{}, opts \\ []) do
     User.registration_changeset(user, attrs, Keyword.put_new(opts, :validate_unique, false))
+  end
+
+  @doc """
+  Creates a confirmed user on behalf of a site admin.
+
+  Independent of the public registration switch. Only an actor with
+  `global_role: "admin"` may call this. `global_role` is accepted here so
+  operators can create creators or other admins in one step.
+  """
+  def create_user_as_admin(%Scope{user: %User{} = actor}, attrs) when is_map(attrs) do
+    if User.admin?(actor) do
+      %User{}
+      |> User.admin_registration_changeset(attrs)
+      |> Repo.insert()
+    else
+      {:error, :unauthorized}
+    end
+  end
+
+  @doc """
+  Returns a changeset for the admin create-user form.
+  """
+  def change_user_admin_registration(user, attrs \\ %{}, opts \\ []) do
+    User.admin_registration_changeset(
+      user,
+      attrs,
+      Keyword.put_new(opts, :validate_unique, false)
+    )
   end
 
   @doc """

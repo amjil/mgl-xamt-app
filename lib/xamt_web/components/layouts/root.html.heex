@@ -46,6 +46,11 @@
               <li>
                 <.link navigate={~p"/settings"} class="mongol-text">{gettext("Settings")}</.link>
               </li>
+              <li :if={site_admin?(@current_scope)}>
+                <.link navigate={~p"/admin/users/new"} class="mongol-text">
+                  {gettext("Create user")}
+                </.link>
+              </li>
               <li>
                 <.link href={~p"/users/log-out"} method="delete" class="mongol-text">
                   {gettext("Log out")}

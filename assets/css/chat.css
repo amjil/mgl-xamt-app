@@ -166,6 +166,18 @@
   text-overflow: ellipsis;
 }
 
+/* Keep the glyph in the Mongolian column: the title line-height is 1.75,
+   so a 1em emoji box sat on the start edge and flex+overflow clipped it. */
+.xamt-rail--channels .xamt-rail__title .xamt-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75em;
+  height: 1em;
+  overflow: visible;
+  vertical-align: middle;
+}
+
 .xamt-rail__sub,
 .xamt-role {
   writing-mode: vertical-lr;

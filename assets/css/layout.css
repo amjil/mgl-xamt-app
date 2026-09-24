@@ -555,6 +555,16 @@ html[data-theme-mode="system"] .xamt-theme-toggle__indicator {
   max-inline-size: none;
 }
 
+.xamt-server-card__name .xamt-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75em;
+  height: 1em;
+  overflow: visible;
+  vertical-align: middle;
+}
+
 .xamt-server-card__desc {
   color: var(--xamt-muted);
   font-size: 0.85rem;

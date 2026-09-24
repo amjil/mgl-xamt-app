@@ -5,7 +5,7 @@ defmodule XamtWeb.UserAuth do
   import Phoenix.Controller
 
   alias Xamt.Accounts
-  alias Xamt.Accounts.Scope
+  alias Xamt.Accounts.{Scope, User}
 
   # Make the remember me cookie valid for 14 days. This should match
   # the session validity setting in UserToken.
@@ -270,6 +270,19 @@ defmodule XamtWeb.UserAuth do
       {:halt, Phoenix.LiveView.redirect(socket, to: ~p"/")}
     else
       {:cont, socket}
+    end
+  end
+
+  def on_mount(:ensure_admin, _params, _session, socket) do
+    user = socket.assigns.current_scope && socket.assigns.current_scope.user
+
+    if user && User.admin?(user) do
+      {:cont, socket}
+    else
+      {:halt,
+       socket
+       |> Phoenix.LiveView.put_flash(:error, "You don't have permission to access this page.")
+       |> Phoenix.LiveView.redirect(to: ~p"/settings")}
     end
   end
 

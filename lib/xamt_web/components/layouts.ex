@@ -161,6 +161,9 @@ defmodule XamtWeb.Layouts do
 
   defp web_push_enabled?(_), do: false
 
+  defp site_admin?(%{user: user}) when not is_nil(user), do: Xamt.Accounts.User.admin?(user)
+  defp site_admin?(_), do: false
+
   @doc """
   Provides dark vs light theme toggle based on the `.dark` class variant.
 
