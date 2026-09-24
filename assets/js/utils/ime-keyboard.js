@@ -86,6 +86,10 @@ export function attachVirtualKeyboard(ime, {eager = false} = {}) {
     if (inNode(e, ime.candidatesEl)) return
     if (inNode(e, ime.emojiPickerEl)) return
     if (e.target?.closest?.("mgl-candidates, mgl-emoji-picker, .xamt-ime-emoji, #composer-emoji")) return
+    // Mention picker is portaled to document.body. Treating it as "outside"
+    // hid the keyboard, collapsed --xamt-ime-kb, and the list jumped away
+    // from the finger before the tap could select a user.
+    if (e.target?.closest?.(".xamt-mention-picker")) return
     release()
   }
 

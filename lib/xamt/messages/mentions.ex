@@ -83,10 +83,16 @@ defmodule Xamt.Messages.Mentions do
     end)
   end
 
-  def mention_chip_html(%User{id: id, username: username}) do
-    safe = html_escape(username || "")
+  def mention_chip_html(%User{id: id, username: username} = user) do
+    handle = html_escape(username || "")
+    label = html_escape(mention_label(user))
 
-    ~s(<a class="xamt-mention mongol-text" href="/profile/#{safe}" data-phx-link="redirect" data-phx-link-state="push" data-mention-id="#{id}" data-mention-username="#{safe}">@#{safe}</a>)
+    ~s(<a class="xamt-mention mongol-text" href="/profile/#{handle}" data-phx-link="redirect" data-phx-link-state="push" data-mention-id="#{id}" data-mention-username="#{handle}">@#{label}</a>)
+  end
+
+  defp mention_label(%User{display_name: name, username: username}) do
+    trimmed = name |> to_string() |> String.trim()
+    if trimmed != "", do: trimmed, else: to_string(username || "")
   end
 
   def strip_tags(html) when is_binary(html) do

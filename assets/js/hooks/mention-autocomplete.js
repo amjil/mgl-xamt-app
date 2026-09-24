@@ -22,13 +22,16 @@ export function attachMentionAutocomplete(hook) {
   const onKeyDown = (e) => handleKeyDown(e, hook, state)
   const onPointerDown = (e) => {
     if (!state.open) return
-    if (state.picker?.contains(e.target)) return
+    if (state.picker?.contains(e.target)) {
+      e.preventDefault()
+      return
+    }
     close(state)
   }
 
   hook.host.addEventListener("input", onInput)
   hook.host.addEventListener("keydown", onKeyDown, true)
-  document.addEventListener("pointerdown", onPointerDown, true)
+  document.addEventListener("pointerdown", onPointerDown, {capture: true, passive: false})
 
   const offCommit = hook.ime?.on?.("mgl-ime-commit", () => scan(hook, state))
   const offInput = hook.ime?.on?.("mgl-ime-input", () => scan(hook, state))
@@ -38,7 +41,7 @@ export function attachMentionAutocomplete(hook) {
     close(state)
     hook.host.removeEventListener("input", onInput)
     hook.host.removeEventListener("keydown", onKeyDown, true)
-    document.removeEventListener("pointerdown", onPointerDown, true)
+    document.removeEventListener("pointerdown", onPointerDown, {capture: true})
     offCommit?.()
     offInput?.()
   }
@@ -162,14 +165,15 @@ function insertChip(hook, state, member) {
   const queryLen = 1 + (state.query || "").length
   const sel = hook.adapter.getSelection()
   const start = Math.max(0, (sel?.start || 0) - queryLen)
+  hook.adapter.focus?.()
   hook.adapter.setSelection({ start, end: sel?.end || start })
 
   const id = escapeHtml(String(member.id || ""))
   const username = escapeHtml(String(member.username || ""))
+  const label = escapeHtml(mentionLabel(member))
   const html =
-    `<span class="xamt-mention mongol-text" contenteditable="false" data-mention-id="${id}" data-mention-username="${username}">@${username}</span>\u200b`
+    `<span class="xamt-mention mongol-text" contenteditable="false" data-mention-id="${id}" data-mention-username="${username}">@${label}</span>\u200b`
 
-  el.focus?.()
   document.execCommand("insertHTML", false, html)
   close(state)
 }
@@ -181,16 +185,23 @@ function ensurePicker(hook, state) {
   el.className = "xamt-mention-picker mongol-text"
   el.setAttribute("role", "listbox")
   el.hidden = true
-  el.addEventListener("mousedown", (e) => {
-    const row = e.target.closest?.("[data-mention-pick]")
-    if (!row) return
-    e.preventDefault()
-    e.stopPropagation()
-    const index = Number(row.dataset.mentionPick)
-    if (!Number.isFinite(index)) return
-    state.selected = index
-    pickSelected(hook, state)
-  })
+  // pointerdown + preventDefault keeps the composer focused. mousedown is too
+  // late on iOS/Android: the editor already blurred and the OS/virtual
+  // keyboard has started to dismiss.
+  el.addEventListener(
+    "pointerdown",
+    (e) => {
+      e.preventDefault()
+      const row = e.target.closest?.("[data-mention-pick]")
+      if (!row) return
+      e.stopPropagation()
+      const index = Number(row.dataset.mentionPick)
+      if (!Number.isFinite(index)) return
+      state.selected = index
+      pickSelected(hook, state)
+    },
+    {passive: false}
+  )
   document.body.appendChild(el)
   state.picker = el
   return el
@@ -214,6 +225,7 @@ function renderPicker(hook, state) {
 function rowEl(member, selected, index) {
   const btn = document.createElement("button")
   btn.type = "button"
+  btn.tabIndex = -1
   btn.className = "xamt-mention-picker__row"
   btn.setAttribute("role", "option")
   btn.setAttribute("aria-selected", selected ? "true" : "false")
@@ -315,6 +327,12 @@ function textBeforeCaret(el) {
   pre.selectNodeContents(el)
   pre.setEnd(range.startContainer, range.startOffset)
   return pre.toString()
+}
+
+function mentionLabel(member) {
+  const name = String(member?.display_name || "").trim()
+  if (name) return name
+  return String(member?.username || "").trim()
 }
 
 function escapeHtml(value) {

@@ -921,7 +921,8 @@ defmodule XamtWeb.ServerLiveTest do
 
     html = render(view)
     assert html =~ "xamt-mention"
-    assert html =~ "@#{username}"
+    assert html =~ "@Mia"
+    assert html =~ ~s(data-mention-id="#{mentioned.id}")
     refute html =~ "xamt-message--mentioned"
 
     mentioned_conn = log_in_user(build_conn(), mentioned)

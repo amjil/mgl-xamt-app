@@ -548,7 +548,8 @@ defmodule Xamt.MessagesTest do
     assert message.content_html =~ ~s(class="xamt-mention mongol-text")
     assert message.content_html =~ ~s(data-mention-id="#{target.id}")
     assert message.content_html =~ ~s(data-mention-username="#{target.username}")
-    assert message.content_html =~ "@#{target.username}"
+    assert message.content_html =~ "@#{target.display_name}"
+    refute message.content_html =~ "@#{target.username}"
     refute message.content_html =~ "onclick"
     refute message.content_html =~ "@wrong"
     assert message.content_html =~ ~s(href="/profile/#{target.username}")
