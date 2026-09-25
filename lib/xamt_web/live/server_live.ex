@@ -176,10 +176,10 @@ defmodule XamtWeb.ServerLive do
 
     cond do
       is_nil(channel) ->
-        {:noreply, socket}
+        voice_failed(socket, gettext("Could not send voice message"))
 
       not socket.assigns.can_send_messages? ->
-        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+        voice_failed(socket, gettext("Unauthorized"))
 
       true ->
         send_audio_message(socket, channel)
@@ -1589,7 +1589,7 @@ defmodule XamtWeb.ServerLive do
 
     cond do
       done == [] ->
-        {:noreply, put_flash(socket, :error, gettext("Could not send voice message"))}
+        voice_failed(socket, gettext("Could not send voice message"))
 
       true ->
         case XamtWeb.Uploads.consume_audio(socket, :audio) do
@@ -1603,24 +1603,41 @@ defmodule XamtWeb.ServerLive do
 
             case Messages.create_message(socket.assigns.current_scope, channel.id, attrs) do
               {:ok, _message} ->
-                {:noreply, assign(socket, :replying_to, nil)}
+                voice_sent(socket)
 
               {:error, :rate_limited} ->
-                {:noreply, put_flash(socket, :error, gettext("Messages sent too fast"))}
+                voice_failed(socket, gettext("Messages sent too fast"))
 
               {:error, :unauthorized} ->
-                {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+                voice_failed(socket, gettext("Unauthorized"))
 
               {:error, :invalid_reply} ->
-                {:noreply, put_flash(socket, :error, gettext("Could not send voice message"))}
+                voice_failed(socket, gettext("Could not send voice message"))
+
+              {:error, :invalid_content} ->
+                voice_failed(socket, gettext("Could not send voice message"))
 
               {:error, _changeset} ->
-                {:noreply, put_flash(socket, :error, gettext("Could not send voice message"))}
+                voice_failed(socket, gettext("Could not send voice message"))
             end
 
           _ ->
-            {:noreply, put_flash(socket, :error, gettext("Could not send voice message"))}
+            voice_failed(socket, gettext("Could not send voice message"))
         end
     end
+  end
+
+  defp voice_sent(socket) do
+    {:noreply,
+     socket
+     |> assign(:replying_to, nil)
+     |> push_event("voice:sent", %{})}
+  end
+
+  defp voice_failed(socket, message) do
+    {:noreply,
+     socket
+     |> put_flash(:error, message)
+     |> push_event("voice:failed", %{})}
   end
 end

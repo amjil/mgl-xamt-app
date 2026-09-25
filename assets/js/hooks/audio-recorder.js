@@ -128,6 +128,8 @@ export const AudioRecorder = {
     this.timerId = null
     this.deadlineAt = 0
     this._unmounted = false
+    this._awaitingAck = false
+    this._ackTimer = null
 
     this.chrome = this.el.querySelector("#voice-chrome")
     this.panel = this.el.querySelector("#voice-panel")
@@ -157,11 +159,14 @@ export const AudioRecorder = {
     this.recordBtn?.addEventListener("click", this._onClick)
     this.sendBtn?.addEventListener("click", this._onSend)
     this.discardBtn?.addEventListener("click", this._onDiscard)
+    this.handleEvent("voice:sent", () => this.onVoiceSent())
+    this.handleEvent("voice:failed", () => this.onVoiceFailed())
     this.setPanelState("idle")
   },
 
   destroyed() {
     this._unmounted = true
+    this.clearAckTimer()
     this.recordBtn?.removeEventListener("click", this._onClick)
     this.sendBtn?.removeEventListener("click", this._onSend)
     this.discardBtn?.removeEventListener("click", this._onDiscard)
@@ -438,6 +443,8 @@ export const AudioRecorder = {
 
   discardPending(opts = {}) {
     this.clearCountdown()
+    this.clearAckTimer()
+    this._awaitingAck = false
     if (this.previewEl) {
       this.previewEl.pause()
       this.previewEl.removeAttribute("src")
@@ -447,6 +454,42 @@ export const AudioRecorder = {
     this.pendingFile = null
     this.sending = false
     if (!opts.silent) this.resetVoiceUi()
+  },
+
+  onVoiceSent() {
+    if (this._unmounted) return
+    this._awaitingAck = false
+    this.clearAckTimer()
+    this.discardPending()
+  },
+
+  onVoiceFailed() {
+    if (this._unmounted) return
+    this._awaitingAck = false
+    this.clearAckTimer()
+    this.sending = false
+    this.setReviewBusy(false)
+    this.setPanelState("review")
+  },
+
+  clearAckTimer() {
+    if (this._ackTimer) {
+      window.clearTimeout(this._ackTimer)
+      this._ackTimer = null
+    }
+  },
+
+  awaitVoiceAck() {
+    this.clearAckTimer()
+    this._awaitingAck = true
+    this._ackTimer = window.setTimeout(() => {
+      if (!this._awaitingAck || this._unmounted) return
+      this._awaitingAck = false
+      this.sending = false
+      this.setReviewBusy(false)
+      this.setPanelState("review")
+      toast("error", this.el.dataset.micUploadError || "Could not upload voice message")
+    }, 30000)
   },
 
   revokePreview() {
@@ -493,8 +536,9 @@ export const AudioRecorder = {
       const pre = refsOf(input, "data-phx-preflighted-refs")
 
       if (active.length > 0 && active.every((ref) => done.includes(ref))) {
+        // Keep pendingFile until voice:sent — failed/cancelled submits can retry.
         this.el.requestSubmit()
-        this.discardPending()
+        this.awaitVoiceAck()
         return
       }
 

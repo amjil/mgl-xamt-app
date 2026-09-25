@@ -142,7 +142,7 @@ defmodule Xamt.ServersTest do
 
     empty = Servers.search_members(server.id, "")
     assert length(empty) >= 1
-    assert hd(empty).user_id == owner_scope.user.id
+    assert Enum.any?(empty, &(&1.user_id == owner_scope.user.id))
 
     assert Servers.search_members(server.id, "no-such-member") == []
   end

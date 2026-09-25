@@ -95,8 +95,9 @@ self.addEventListener("fetch", (event) => {
 // with assets/js/utils/offline-store.js.
 const OFFLINE_DB = "XamtOfflineDB";
 const OFFLINE_STORE = "pending_messages";
-const OFFLINE_DB_VERSION = 2;
+const OFFLINE_DB_VERSION = 3;
 const SYNC_TAG = "sync-messages";
+const CLAIM_LEASE_MS = 60000;
 
 self.addEventListener("sync", (event) => {
   if (event.tag === SYNC_TAG) {
@@ -108,7 +109,7 @@ async function flushOfflineMessages() {
   let sent = 0;
 
   for (;;) {
-    const msg = await takeNextPendingMessage();
+    const msg = await claimNextPendingMessage();
     if (!msg) return sent;
 
     try {
@@ -131,18 +132,21 @@ async function flushOfflineMessages() {
       });
 
       if (response.ok) {
+        await removePendingMessage(msg.id);
         sent += 1;
         continue;
       }
 
       if (shouldRetrySyncStatus(response.status)) {
-        await putPendingMessage(msg);
+        await releasePendingMessage(msg);
         throw new Error("Sync failed, will retry later: " + response.status);
       }
+
       // 4xx (other than 401/403/429): drop — retrying will not help
+      await removePendingMessage(msg.id);
     } catch (err) {
       if (String(err.message || "").includes("will retry later")) throw err;
-      await putPendingMessage(msg);
+      await releasePendingMessage(msg);
       console.error("Sync failed, will retry later:", err);
       throw err;
     }
@@ -159,10 +163,9 @@ function openOfflineDB() {
 
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
-      if (db.objectStoreNames.contains(OFFLINE_STORE)) {
-        db.deleteObjectStore(OFFLINE_STORE);
+      if (!db.objectStoreNames.contains(OFFLINE_STORE)) {
+        db.createObjectStore(OFFLINE_STORE, { keyPath: "id" });
       }
-      db.createObjectStore(OFFLINE_STORE, { keyPath: "id" });
     };
 
     req.onsuccess = () => resolve(req.result);
@@ -170,8 +173,10 @@ function openOfflineDB() {
   });
 }
 
-async function takeNextPendingMessage() {
+async function claimNextPendingMessage() {
   const db = await openOfflineDB();
+  const now = Date.now();
+
   return new Promise((resolve, reject) => {
     const tx = db.transaction(OFFLINE_STORE, "readwrite");
     const store = tx.objectStore(OFFLINE_STORE);
@@ -183,9 +188,17 @@ async function takeNextPendingMessage() {
         resolve(null);
         return;
       }
+
       const value = cursor.value;
-      cursor.delete();
-      resolve(value);
+      const claimedAt = value.claimed_at || 0;
+      if (value.status === "sending" && now - claimedAt < CLAIM_LEASE_MS) {
+        cursor.continue();
+        return;
+      }
+
+      const claimed = Object.assign({}, value, { status: "sending", claimed_at: now });
+      cursor.update(claimed);
+      resolve(claimed);
     };
 
     req.onerror = () => reject(req.error);
@@ -193,11 +206,32 @@ async function takeNextPendingMessage() {
   });
 }
 
-async function putPendingMessage(msg) {
+async function removePendingMessage(id) {
+  if (!id) return;
   const db = await openOfflineDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(OFFLINE_STORE, "readwrite");
-    tx.objectStore(OFFLINE_STORE).put(msg);
+    tx.objectStore(OFFLINE_STORE).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function releasePendingMessage(msg) {
+  if (!msg || !msg.id) return;
+  const db = await openOfflineDB();
+  const record = {
+    id: msg.id,
+    channel_id: msg.channel_id,
+    event: msg.event || "send_message",
+    payload: msg.payload || {},
+    csrf_token: msg.csrf_token || "",
+    timestamp: msg.timestamp || Date.now()
+  };
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(OFFLINE_STORE, "readwrite");
+    tx.objectStore(OFFLINE_STORE).put(record);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
