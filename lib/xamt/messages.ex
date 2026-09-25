@@ -7,6 +7,7 @@ defmodule Xamt.Messages do
   `toggle_reaction/3`, `get_message_for_user/2`, `search_server_messages/3`)
   over bare `get_message!/1` / `search_messages/2` from LiveViews and HTTP.
   Message HTML is scrubbed by `Xamt.Messages.HtmlSanitizer` before persist.
+  Gallery and audio payloads only accept same-origin `/uploads/...` paths.
   """
 
   import Ecto.Query, warn: false
@@ -28,11 +29,13 @@ defmodule Xamt.Messages do
     {content_html, mention_ids} = Mentions.prepare(raw_html, channel_id)
     attrs = put_sanitized_html(attrs, content_html)
     content = build_content(attrs)
+    type = content_type(attrs, content)
     reply_to_id = normalize_reply_to_id(attrs)
 
     with :ok <- RateLimiter.check_rate(user.id),
          :ok <- authorize_channel_perm(user.id, channel_id, :send_messages),
          :ok <- validate_reply_to(reply_to_id, channel_id),
+         :ok <- validate_media_content(content, type),
          {:ok, message} <-
            Repo.transact(fn ->
              with {:ok, message} <-
@@ -41,7 +44,7 @@ defmodule Xamt.Messages do
                       channel_id: channel_id,
                       user_id: user.id,
                       content: content,
-                      content_type: content_type(attrs, content),
+                      content_type: type,
                       content_html: content_html,
                       search_text: Search.normalize(index_text(content_html, content)),
                       reply_to_id: reply_to_id
@@ -70,15 +73,17 @@ defmodule Xamt.Messages do
       {content_html, mention_ids} = Mentions.prepare(raw_html, message.channel_id)
       attrs = put_sanitized_html(attrs, content_html)
       content = build_content(attrs, message.content)
+      type = content_type(attrs, content)
       previous_mention_ids = message.mentioned_user_ids || []
 
-      with {:ok, message} <-
+      with :ok <- validate_media_content(content, type),
+           {:ok, message} <-
              Repo.transact(fn ->
                with {:ok, message} <-
                       message
                       |> Message.changeset(%{
                         content: content,
-                        content_type: content_type(attrs, content),
+                        content_type: type,
                         content_html: content_html,
                         search_text: Search.normalize(index_text(content_html, content))
                       })
@@ -639,30 +644,37 @@ defmodule Xamt.Messages do
     end
   end
 
+  # Only same-origin upload paths may appear in gallery/audio payloads.
+  # Clients cannot inject arbitrary https:// media URLs via content maps.
+  @upload_path_re ~r|^/uploads/[A-Za-z0-9._-]+$|
+
   defp build_content(attrs, existing \\ %{}) do
-    case Map.get(attrs, "content") || Map.get(attrs, :content) do
-      map when is_map(map) ->
-        map
+    raw =
+      case Map.get(attrs, "content") || Map.get(attrs, :content) do
+        map when is_map(map) ->
+          map
 
-      _ ->
-        html =
-          Map.get(attrs, "content_html") || Map.get(attrs, :content_html) ||
-            Map.get(existing, "html")
+        _ ->
+          html =
+            Map.get(attrs, "content_html") || Map.get(attrs, :content_html) ||
+              Map.get(existing, "html")
 
-        json =
-          Map.get(attrs, "content_json") || Map.get(attrs, :content_json) ||
-            Map.get(existing, "json")
+          json =
+            Map.get(attrs, "content_json") || Map.get(attrs, :content_json) ||
+              Map.get(existing, "json")
 
-        type = content_type(attrs, existing)
+          type = content_type(attrs, existing)
 
-        %{
-          "type" => type,
-          "html" => html,
-          "json" => json
-        }
-        |> Enum.reject(fn {_k, v} -> is_nil(v) end)
-        |> Map.new()
-    end
+          %{
+            "type" => type,
+            "html" => html,
+            "json" => json
+          }
+          |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+          |> Map.new()
+      end
+
+    sanitize_media_content(raw, content_type(attrs, raw))
   end
 
   defp content_type(attrs, content) when is_map(content) do
@@ -671,6 +683,63 @@ defmodule Xamt.Messages do
       Map.get(content, "type") ||
       "rich_text"
   end
+
+  defp sanitize_media_content(content, "gallery") when is_map(content) do
+    images =
+      content
+      |> Map.get("images", [])
+      |> List.wrap()
+      |> Enum.map(&sanitize_gallery_image/1)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.take(10)
+
+    content
+    |> Map.take(["html", "json", "blocks"])
+    |> Map.merge(%{"type" => "gallery", "images" => images})
+  end
+
+  defp sanitize_media_content(content, "audio") when is_map(content) do
+    case Map.get(content, "url") do
+      url when is_binary(url) ->
+        if safe_upload_path?(url),
+          do: %{"type" => "audio", "url" => url},
+          else: %{"type" => "audio"}
+
+      _ ->
+        %{"type" => "audio"}
+    end
+  end
+
+  defp sanitize_media_content(content, type) when is_map(content) do
+    content
+    |> Map.drop(["images", "url"])
+    |> Map.put("type", type)
+  end
+
+  defp sanitize_gallery_image(%{"thumb" => thumb, "original" => original})
+       when is_binary(thumb) and is_binary(original) do
+    if safe_upload_path?(thumb) and safe_upload_path?(original) do
+      %{"thumb" => thumb, "original" => original}
+    end
+  end
+
+  defp sanitize_gallery_image(_), do: nil
+
+  def safe_upload_path?(url) when is_binary(url), do: Regex.match?(@upload_path_re, url)
+  def safe_upload_path?(_), do: false
+
+  defp validate_media_content(%{"type" => "gallery", "images" => images}, "gallery")
+       when is_list(images) and images != [],
+       do: :ok
+
+  defp validate_media_content(%{"type" => "audio", "url" => url}, "audio")
+       when is_binary(url),
+       do: :ok
+
+  defp validate_media_content(_content, type) when type in ["gallery", "audio"],
+    do: {:error, :invalid_content}
+
+  defp validate_media_content(_content, _type), do: :ok
 
   # Strip nested payload we do not need on the wire.
   # LiveView rendering only depends on `content_html` and `user`, except

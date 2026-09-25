@@ -74,6 +74,75 @@ defmodule Xamt.MessagesTest do
     assert Messages.excerpt(message) =~ "road trip"
   end
 
+  test "rejects gallery and audio payloads with external URLs", %{
+    scope: scope,
+    channel: channel
+  } do
+    assert {:error, :invalid_content} =
+             Messages.create_message(scope, channel.id, %{
+               "content_html" => "",
+               "content" => %{
+                 "type" => "gallery",
+                 "images" => [
+                   %{
+                     "thumb" => "https://evil.example/track.png",
+                     "original" => "https://evil.example/full.png"
+                   }
+                 ]
+               },
+               "content_type" => "gallery"
+             })
+
+    assert {:error, :invalid_content} =
+             Messages.create_message(scope, channel.id, %{
+               "content_html" => "🎤",
+               "content" => %{"type" => "audio", "url" => "https://cdn.evil/voice.webm"},
+               "content_type" => "audio"
+             })
+
+    assert {:error, :invalid_content} =
+             Messages.create_message(scope, channel.id, %{
+               "content_html" => "",
+               "content" => %{
+                 "type" => "gallery",
+                 "images" => [
+                   %{
+                     "thumb" => "/uploads/../etc/passwd",
+                     "original" => "/uploads/a.jpg"
+                   }
+                 ]
+               },
+               "content_type" => "gallery"
+             })
+
+    assert Messages.list_messages(channel.id) == []
+  end
+
+  test "strips external image URLs from mixed gallery payloads", %{
+    scope: scope,
+    channel: channel
+  } do
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "",
+        "content" => %{
+          "type" => "gallery",
+          "images" => [
+            %{
+              "thumb" => "https://evil.example/track.png",
+              "original" => "https://evil.example/full.png"
+            },
+            %{"thumb" => "/uploads/thumb_ok.jpg", "original" => "/uploads/ok.jpg"}
+          ]
+        },
+        "content_type" => "gallery"
+      })
+
+    assert message.content["images"] == [
+             %{"thumb" => "/uploads/thumb_ok.jpg", "original" => "/uploads/ok.jpg"}
+           ]
+  end
+
   test "stores a reply_to_id and preloads the parent", %{scope: scope, channel: channel} do
     {:ok, parent} =
       Messages.create_message(scope, channel.id, %{

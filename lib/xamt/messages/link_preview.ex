@@ -4,7 +4,9 @@ defmodule Xamt.Messages.LinkPreview do
 
   Provider routing is a host allowlist, not a substring search: YouTube and
   Bilibili become video cards, configured audiobook hosts become player
-  cards, and everything else stays an Open Graph article. Work runs under
+  cards, and everything else stays an Open Graph article. HTTP fetches never
+  auto-follow redirects: each `Location` hop is re-validated with the same
+  public-host checks as the initial URL (SSRF defense). Work runs under
   `Xamt.TaskSupervisor` so `create_message/3` is not blocked by slow or
   failing remote sites. Fetch failures are silent: the original message
   stays visible without a card.
@@ -419,7 +421,34 @@ defmodule Xamt.Messages.LinkPreview do
 
   defp stale_preview?(_, _), do: false
 
+  # Follow redirects manually so every hop is re-checked with `fetchable_url?/1`.
+  # Req's built-in redirect: true would otherwise let a public URL bounce to
+  # link-local / cloud-metadata addresses after the initial allowlist check.
   defp http_get(url, opts \\ []) do
+    follow? = Keyword.get(opts, :redirect, true)
+    hops = if follow?, do: Keyword.get(opts, :max_redirects, @max_redirects), else: 0
+    opts = Keyword.put(opts, :redirect, false)
+    http_get_following(url, opts, hops)
+  end
+
+  defp http_get_following(url, opts, hops) do
+    case http_get_once(url, opts) do
+      {:ok, %{status: status} = resp}
+      when status in [301, 302, 303, 307, 308] and hops > 0 ->
+        with [location | _] <- Req.Response.get_header(resp, "location"),
+             next when is_binary(next) <- expand_location(url, location),
+             true <- fetchable_url?(next) do
+          http_get_following(next, opts, hops - 1)
+        else
+          _ -> {:error, :unsafe_redirect}
+        end
+
+      other ->
+        other
+    end
+  end
+
+  defp http_get_once(url, opts) do
     accept =
       Keyword.get(opts, :accept, "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8")
 
@@ -428,8 +457,7 @@ defmodule Xamt.Messages.LinkPreview do
         receive_timeout: @receive_timeout,
         connect_options: [timeout: @receive_timeout],
         retry: false,
-        redirect: Keyword.get(opts, :redirect, true),
-        max_redirects: Keyword.get(opts, :max_redirects, @max_redirects),
+        redirect: false,
         redirect_log_level: false,
         headers: [
           {"accept", accept},

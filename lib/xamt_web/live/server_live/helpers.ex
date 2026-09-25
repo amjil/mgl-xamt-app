@@ -232,10 +232,18 @@ defmodule XamtWeb.ServerLive.Helpers do
   end
 
   def build_message_attrs(params, _images, replying_to) do
+    # Gallery/audio/poll must go through their dedicated upload/create paths.
+    # Never trust a client-claimed media content_type without server uploads.
+    content_type =
+      case params["content_type"] do
+        type when type in ["plain_text", "rich_text"] -> type
+        _ -> "rich_text"
+      end
+
     attrs = %{
       "content" => decode_json(params["content_json"]),
       "content_html" => params["content_html"] || "",
-      "content_type" => params["content_type"] || "rich_text"
+      "content_type" => content_type
     }
 
     if replying_to do
@@ -268,12 +276,7 @@ defmodule XamtWeb.ServerLive.Helpers do
 
   def normalize_gallery_image(_), do: nil
 
-  def safe_upload_url?(url) when is_binary(url) do
-    (String.starts_with?(url, "/uploads/") and not String.contains?(url, "..")) or
-      String.starts_with?(url, "https://")
-  end
-
-  def safe_upload_url?(_), do: false
+  def safe_upload_url?(url), do: Messages.safe_upload_path?(url)
 
   def gallery_count_attr(total) when total > 8, do: "overflow"
   def gallery_count_attr(total) when total in 1..8, do: to_string(total)
@@ -295,11 +298,7 @@ defmodule XamtWeb.ServerLive.Helpers do
   end
 
   def audio_src(%{content: %{"type" => "audio", "url" => url}}) when is_binary(url) do
-    cond do
-      String.starts_with?(url, "/uploads/") and not String.contains?(url, "..") -> url
-      String.starts_with?(url, "https://") -> url
-      true -> nil
-    end
+    if safe_upload_url?(url), do: url
   end
 
   def audio_src(_), do: nil

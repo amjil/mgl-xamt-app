@@ -169,6 +169,32 @@ defmodule XamtWeb.MessageApiControllerTest do
     assert message.content_html =~ "ok"
   end
 
+  test "ignores client-supplied gallery content on sync", %{conn: conn, channel: channel} do
+    conn =
+      conn
+      |> with_csrf()
+      |> post(~p"/api/messages/sync", %{
+        "channel_id" => channel.id,
+        "content_html" => "<p>looks like text</p>",
+        "content_type" => "gallery",
+        "content" => %{
+          "type" => "gallery",
+          "images" => [
+            %{
+              "thumb" => "https://evil.example/a.png",
+              "original" => "https://evil.example/b.png"
+            }
+          ]
+        }
+      })
+
+    assert %{"status" => "ok"} = json_response(conn, 200)
+    [message] = Messages.list_messages(channel.id)
+    assert message.content_type == "rich_text"
+    refute Map.has_key?(message.content, "images")
+    assert message.content_html =~ "looks like text"
+  end
+
   test "rejects cross-channel reply_to_id", %{
     conn: conn,
     scope: scope,

@@ -96,6 +96,92 @@ defmodule Xamt.Messages.LinkPreviewTest do
     assert Messages.get_message!(local.id).link_preview == nil
   end
 
+  test "does not follow redirects to private or link-local addresses", %{
+    scope: scope,
+    channel: channel
+  } do
+    plug = fn conn ->
+      case conn.request_path do
+        "/open" ->
+          conn
+          |> Plug.Conn.put_resp_header("location", "http://169.254.169.254/latest/meta-data/")
+          |> Plug.Conn.send_resp(302, "")
+
+        "/latest/meta-data/" ->
+          conn
+          |> Plug.Conn.put_resp_content_type("text/html")
+          |> Plug.Conn.send_resp(200, """
+          <html><head><meta property="og:title" content="SSRF"></head></html>
+          """)
+
+        _ ->
+          conn
+          |> Plug.Conn.put_resp_content_type("text/html")
+          |> Plug.Conn.send_resp(200, "<html></html>")
+      end
+    end
+
+    Application.put_env(:xamt, LinkPreview,
+      enabled: true,
+      async: false,
+      req_options: [plug: plug]
+    )
+
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => ~s(<p>https://example.com/open</p>),
+        "content" => %{"type" => "rich_text"}
+      })
+
+    assert Messages.get_message!(message.id).link_preview == nil
+  end
+
+  test "follows redirects only when the next hop stays public", %{
+    scope: scope,
+    channel: channel
+  } do
+    plug = fn conn ->
+      case conn.request_path do
+        "/from" ->
+          conn
+          |> Plug.Conn.put_resp_header("location", "https://example.com/to")
+          |> Plug.Conn.send_resp(302, "")
+
+        "/to" ->
+          conn
+          |> Plug.Conn.put_resp_content_type("text/html")
+          |> Plug.Conn.send_resp(200, """
+          <html>
+            <head>
+              <meta property="og:title" content="Redirected Title">
+            </head>
+          </html>
+          """)
+
+        _ ->
+          conn
+          |> Plug.Conn.put_resp_content_type("text/html")
+          |> Plug.Conn.send_resp(404, "")
+      end
+    end
+
+    Application.put_env(:xamt, LinkPreview,
+      enabled: true,
+      async: false,
+      req_options: [plug: plug]
+    )
+
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => ~s(<p>https://example.com/from</p>),
+        "content" => %{"type" => "rich_text"}
+      })
+
+    preview = Messages.get_message!(message.id).link_preview
+    assert preview["title"] == "Redirected Title"
+    assert preview["url"] == "https://example.com/from"
+  end
+
   test "clears a preview when the URL is edited out", %{scope: scope, channel: channel} do
     {:ok, message} =
       Messages.create_message(scope, channel.id, %{

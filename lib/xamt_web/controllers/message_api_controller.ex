@@ -40,6 +40,11 @@ defmodule XamtWeb.MessageApiController do
           |> put_status(:unprocessable_entity)
           |> json(%{status: "error", detail: "invalid_reply"})
 
+        {:error, :invalid_content} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{status: "error", detail: "invalid_content"})
+
         {:error, _changeset} ->
           conn
           |> put_status(:unprocessable_entity)
@@ -64,11 +69,18 @@ defmodule XamtWeb.MessageApiController do
   end
 
   defp message_attrs(params) do
+    # Offline sync is text-only. Structured gallery/audio content is ignored so
+    # clients cannot inject arbitrary media URLs without going through Uploads.
+    content_type =
+      case params["content_type"] do
+        type when type in ["plain_text", "rich_text"] -> type
+        _ -> "rich_text"
+      end
+
     %{
       "content_html" => params["content_html"],
       "content_json" => params["content_json"],
-      "content_type" => params["content_type"] || "rich_text",
-      "content" => params["content"],
+      "content_type" => content_type,
       "reply_to_id" => present_id(params["reply_to_id"])
     }
     |> Enum.reject(fn {_k, v} -> is_nil(v) end)
