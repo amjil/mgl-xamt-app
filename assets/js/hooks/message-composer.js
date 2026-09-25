@@ -458,6 +458,7 @@ export const MessageComposer = {
     this.ime?.emojiPickerEl?.removeEventListener("mgl-emoji-open", this._syncComposerEmojiExpanded)
     this.ime?.emojiPickerEl?.removeEventListener("mgl-emoji-close", this._syncComposerEmojiExpanded)
     if (this.ime && typeof this.ime.destroy === "function") this.ime.destroy()
+    if (this.editor && typeof this.editor.destroy === "function") this.editor.destroy()
   },
 
   clear() {

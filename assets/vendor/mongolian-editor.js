@@ -1425,9 +1425,10 @@ export function createMongolianEditor(containerSelector) {
         if (e.key === 'Backspace') handleBackspace(e);
     });
 
-    document.addEventListener('keydown', (e) => {
+    function onDocumentEscape(e) {
         if (e.key === 'Escape') deselectImage();
-    });
+    }
+    document.addEventListener('keydown', onDocumentEscape);
 
     editor.addEventListener('click', (e) => {
         const arrow = e.target.closest('.toggle-arrow');
@@ -1529,9 +1530,10 @@ export function createMongolianEditor(containerSelector) {
     editor.addEventListener('mousedown', handleResizeStart);
     editor.addEventListener('touchstart', handleResizeStart, { passive: false });
 
-    document.addEventListener('mousedown', (e) => {
+    function onDocumentMouseDown(e) {
         if (!editor.contains(e.target) && !toolbar.contains(e.target)) deselectImage();
-    });
+    }
+    document.addEventListener('mousedown', onDocumentMouseDown);
 
     document.addEventListener('mousemove', handleResizeMove);
     document.addEventListener('touchmove', handleResizeMove, { passive: false });
@@ -1569,12 +1571,26 @@ export function createMongolianEditor(containerSelector) {
 
     document.addEventListener('selectionchange', refreshToolbarState);
 
-    new MutationObserver(() => scheduleRenumber())
-        .observe(editor, { childList: true, subtree: true });
+    const observer = new MutationObserver(() => scheduleRenumber());
+    observer.observe(editor, { childList: true, subtree: true });
 
     hydrate(editor);
     renumberOrderedLists();
     refreshToolbarState();
+
+    function destroy() {
+        document.removeEventListener('keydown', onDocumentEscape);
+        document.removeEventListener('mousedown', onDocumentMouseDown);
+        document.removeEventListener('mousemove', handleResizeMove);
+        document.removeEventListener('touchmove', handleResizeMove);
+        document.removeEventListener('mouseup', handleResizeEnd);
+        document.removeEventListener('touchend', handleResizeEnd);
+        document.removeEventListener('touchcancel', handleResizeEnd);
+        document.removeEventListener('selectionchange', refreshToolbarState);
+        observer.disconnect();
+        resizing = null;
+        selectedImage = null;
+    }
 
     // ==========================================
     // 4. Public API
@@ -1590,6 +1606,7 @@ export function createMongolianEditor(containerSelector) {
         focus: () => {
             const block = editor.querySelector(':scope > .block-wrapper');
             if (block) placeCaretAtEnd(block);
-        }
+        },
+        destroy
     };
 }

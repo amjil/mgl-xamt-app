@@ -26,13 +26,15 @@ defmodule Xamt.Messages do
 
   def create_message(%Scope{user: user}, channel_id, attrs) when is_map(attrs) do
     raw_html = Map.get(attrs, "content_html") || Map.get(attrs, :content_html)
-    {content_html, mention_ids} = Mentions.prepare(raw_html, channel_id)
-    attrs = put_sanitized_html(attrs, content_html)
-    content = build_content(attrs)
-    type = content_type(attrs, content)
-    reply_to_id = normalize_reply_to_id(attrs)
 
-    with :ok <- RateLimiter.check_rate(user.id),
+    with :ok <- validate_html_size(raw_html),
+         {content_html, mention_ids} <- Mentions.prepare(raw_html, channel_id),
+         :ok <- validate_html_size(content_html),
+         attrs <- put_sanitized_html(attrs, content_html),
+         content <- build_content(attrs),
+         type <- content_type(attrs, content),
+         reply_to_id <- normalize_reply_to_id(attrs),
+         :ok <- RateLimiter.check_rate(user.id),
          :ok <- authorize_channel_perm(user.id, channel_id, :send_messages),
          :ok <- validate_reply_to(reply_to_id, channel_id),
          :ok <- validate_media_content(content, type),
@@ -70,13 +72,15 @@ defmodule Xamt.Messages do
         Map.get(attrs, "content_html") || Map.get(attrs, :content_html) ||
           message.content_html
 
-      {content_html, mention_ids} = Mentions.prepare(raw_html, message.channel_id)
-      attrs = put_sanitized_html(attrs, content_html)
-      content = build_content(attrs, message.content)
-      type = content_type(attrs, content)
       previous_mention_ids = message.mentioned_user_ids || []
 
-      with :ok <- validate_media_content(content, type),
+      with :ok <- validate_html_size(raw_html),
+           {content_html, mention_ids} <- Mentions.prepare(raw_html, message.channel_id),
+           :ok <- validate_html_size(content_html),
+           attrs <- put_sanitized_html(attrs, content_html),
+           content <- build_content(attrs, message.content),
+           type <- content_type(attrs, content),
+           :ok <- validate_media_content(content, type),
            {:ok, message} <-
              Repo.transact(fn ->
                with {:ok, message} <-
@@ -740,6 +744,12 @@ defmodule Xamt.Messages do
     do: {:error, :invalid_content}
 
   defp validate_media_content(_content, _type), do: :ok
+
+  defp validate_html_size(html) when is_binary(html) do
+    if String.length(html) <= Message.max_content_html(), do: :ok, else: {:error, :too_long}
+  end
+
+  defp validate_html_size(_), do: :ok
 
   # Strip nested payload we do not need on the wire.
   # LiveView rendering only depends on `content_html` and `user`, except

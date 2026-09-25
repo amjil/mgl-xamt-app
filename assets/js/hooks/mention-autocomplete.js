@@ -39,6 +39,7 @@ export function attachMentionAutocomplete(hook) {
   return () => {
     clearTimeout(state.timer)
     close(state)
+    detachPicker(state)
     hook.host.removeEventListener("input", onInput)
     hook.host.removeEventListener("keydown", onKeyDown, true)
     document.removeEventListener("pointerdown", onPointerDown, {capture: true})
@@ -179,7 +180,12 @@ function insertChip(hook, state, member) {
 }
 
 function ensurePicker(hook, state) {
-  if (state.picker) return state.picker
+  if (state.picker?.isConnected) return state.picker
+  const existing = document.getElementById(PICKER_ID)
+  if (existing) {
+    state.picker = existing
+    return existing
+  }
   const el = document.createElement("div")
   el.id = PICKER_ID
   el.className = "xamt-mention-picker mongol-text"
@@ -316,6 +322,12 @@ function close(state) {
     state.picker.hidden = true
     state.picker.innerHTML = ""
   }
+}
+
+function detachPicker(state) {
+  state.picker?.remove()
+  state.picker = null
+  document.getElementById(PICKER_ID)?.remove()
 }
 
 function textBeforeCaret(el) {

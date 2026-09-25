@@ -25,6 +25,12 @@ defmodule Xamt.Messages.Message do
     timestamps(type: :utc_datetime)
   end
 
+  # Caps stored HTML (and PubSub payloads). Check raw input first so
+  # Mentions / sanitizer never see a multi-megabyte paste.
+  @max_content_html 20_000
+
+  def max_content_html, do: @max_content_html
+
   @doc false
   def changeset(message, attrs) do
     message
@@ -39,6 +45,7 @@ defmodule Xamt.Messages.Message do
     ])
     |> validate_required([:channel_id, :user_id, :content])
     |> validate_inclusion(:content_type, ~w(plain_text rich_text audio gallery poll))
+    |> validate_length(:content_html, max: @max_content_html)
     |> touch_edited_at()
   end
 

@@ -195,6 +195,22 @@ defmodule XamtWeb.MessageApiControllerTest do
     assert message.content_html =~ "looks like text"
   end
 
+  test "rejects oversized HTML from the sync API", %{conn: conn, channel: channel} do
+    html = "<p>" <> String.duplicate("a", Xamt.Messages.Message.max_content_html() + 1) <> "</p>"
+
+    conn =
+      conn
+      |> with_csrf()
+      |> post(~p"/api/messages/sync", %{
+        "channel_id" => channel.id,
+        "content_html" => html,
+        "content_type" => "rich_text"
+      })
+
+    assert %{"status" => "error", "detail" => "too_long"} = json_response(conn, 422)
+    assert Messages.list_messages(channel.id) == []
+  end
+
   test "rejects cross-channel reply_to_id", %{
     conn: conn,
     scope: scope,

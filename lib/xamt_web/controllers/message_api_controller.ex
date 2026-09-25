@@ -45,6 +45,11 @@ defmodule XamtWeb.MessageApiController do
           |> put_status(:unprocessable_entity)
           |> json(%{status: "error", detail: "invalid_content"})
 
+        {:error, :too_long} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{status: "error", detail: "too_long"})
+
         {:error, _changeset} ->
           conn
           |> put_status(:unprocessable_entity)

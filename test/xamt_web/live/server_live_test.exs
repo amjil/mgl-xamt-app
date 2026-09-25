@@ -450,6 +450,11 @@ defmodule XamtWeb.ServerLiveTest do
     {:ok, view, html} = live(conn, ~p"/servers/#{public.slug}")
     assert html =~ "Join server"
     assert has_element?(view, "#join-server")
+
+    render_click(view, "send_message", %{"content_html" => "<p>nope</p>"})
+    render_click(view, "mention_search", %{"q" => "a"})
+    assert Messages.list_messages(hd(Channels.list_channels(public.id)).id) == []
+    assert has_element?(view, "#join-server")
   end
 
   test "replying sets the composer preview", %{

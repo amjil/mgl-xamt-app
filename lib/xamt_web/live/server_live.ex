@@ -163,6 +163,10 @@ defmodule XamtWeb.ServerLive do
     end
   end
 
+  def handle_event(_event, _params, %{assigns: %{member?: false}} = socket) do
+    {:noreply, socket}
+  end
+
   def handle_event("validate_upload", _params, socket) do
     {:noreply, socket}
   end
@@ -242,6 +246,12 @@ defmodule XamtWeb.ServerLive do
           {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
 
         {:error, :invalid_reply} ->
+          {:noreply, put_flash(socket, :error, gettext("Could not send message"))}
+
+        {:error, :too_long} ->
+          {:noreply, put_flash(socket, :error, gettext("Message is too long"))}
+
+        {:error, :invalid_content} ->
           {:noreply, put_flash(socket, :error, gettext("Could not send message"))}
 
         {:error, _changeset} ->
@@ -414,6 +424,9 @@ defmodule XamtWeb.ServerLive do
              socket
              |> assign(:editing_message_id, nil)
              |> push_event("composer:clear", %{})}
+
+          {:error, :too_long} ->
+            {:noreply, put_flash(socket, :error, gettext("Message is too long"))}
 
           {:error, _} ->
             {:noreply, put_flash(socket, :error, gettext("Could not update message"))}
@@ -841,6 +854,8 @@ defmodule XamtWeb.ServerLive do
   end
 
   @impl true
+  def handle_info(_msg, %{assigns: %{member?: false}} = socket), do: {:noreply, socket}
+
   def handle_info({:new_message, message}, socket) do
     active_channel = socket.assigns.active_channel
     user_id = socket.assigns.current_scope.user.id

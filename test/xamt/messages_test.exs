@@ -3,7 +3,7 @@ defmodule Xamt.MessagesTest do
 
   alias Xamt.Accounts.Scope
   alias Xamt.{Channels, Messages, Moderation, Servers}
-  alias Xamt.Messages.{RateLimiter, Reaction}
+  alias Xamt.Messages.{Message, RateLimiter, Reaction}
 
   setup do
     owner = Xamt.AccountsFixtures.creator_fixture()
@@ -141,6 +141,18 @@ defmodule Xamt.MessagesTest do
     assert message.content["images"] == [
              %{"thumb" => "/uploads/thumb_ok.jpg", "original" => "/uploads/ok.jpg"}
            ]
+  end
+
+  test "rejects oversized HTML before persist", %{scope: scope, channel: channel} do
+    html = "<p>" <> String.duplicate("a", Message.max_content_html() + 1) <> "</p>"
+
+    assert {:error, :too_long} =
+             Messages.create_message(scope, channel.id, %{
+               "content_html" => html,
+               "content" => %{"type" => "rich_text"}
+             })
+
+    assert Messages.list_messages(channel.id) == []
   end
 
   test "stores a reply_to_id and preloads the parent", %{scope: scope, channel: channel} do
