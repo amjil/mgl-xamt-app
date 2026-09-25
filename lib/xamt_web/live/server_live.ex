@@ -61,12 +61,7 @@ defmodule XamtWeb.ServerLive do
       end
     end
 
-    messages =
-      if channel do
-        Messages.list_messages(channel.id)
-      else
-        []
-      end
+    messages = visible_messages(scope, channel)
 
     unread_ids = Channels.get_unread_channel_ids(scope.user.id, server.id)
     current_member = Servers.get_member(server.id, scope.user.id)
@@ -526,7 +521,7 @@ defmodule XamtWeb.ServerLive do
         if socket.assigns.show_pinned_drawer do
           {:noreply, assign(socket, show_pinned_drawer: false)}
         else
-          messages = Messages.list_pinned_messages(channel.id)
+          messages = visible_pins(socket.assigns.current_scope, channel)
 
           {:noreply, assign(socket, show_pinned_drawer: true, pinned_messages: messages)}
         end
@@ -557,10 +552,11 @@ defmodule XamtWeb.ServerLive do
     channel = socket.assigns.active_channel
     oldest_id = socket.assigns[:oldest_message_id]
 
-    if not socket.assigns.has_more_messages or is_nil(oldest_id) do
+    if is_nil(channel) or not socket.assigns.has_more_messages or is_nil(oldest_id) do
       {:noreply, done_loading(socket, "load_older")}
     else
-      messages = Messages.list_messages(channel.id, before_id: oldest_id)
+      messages =
+        visible_messages(socket.assigns.current_scope, channel, before_id: oldest_id)
 
       socket =
         case messages do
@@ -1227,6 +1223,25 @@ defmodule XamtWeb.ServerLive do
     push_event(socket, "infinite_scroll:done", %{event: event})
   end
 
+  defp visible_messages(scope, channel), do: visible_messages(scope, channel, [])
+  defp visible_messages(_scope, nil, _opts), do: []
+
+  defp visible_messages(scope, channel, opts) do
+    case Messages.list_messages_for_user(scope, channel.id, opts) do
+      {:ok, messages} -> messages
+      {:error, _} -> []
+    end
+  end
+
+  defp visible_pins(_scope, nil), do: []
+
+  defp visible_pins(scope, channel) do
+    case Messages.list_pinned_messages_for_user(scope, channel.id) do
+      {:ok, messages} -> messages
+      {:error, _} -> []
+    end
+  end
+
   defp maybe_scroll_to_highlight(socket, %{"highlight" => id})
        when is_binary(id) and id != "" do
     push_event(socket, "messages:scroll_to", %{id: id})
@@ -1286,7 +1301,7 @@ defmodule XamtWeb.ServerLive do
         socket
       end
 
-    messages = Messages.list_messages(channel.id)
+    messages = visible_messages(scope, channel)
 
     socket
     |> assign(:active_channel, channel)
@@ -1457,7 +1472,7 @@ defmodule XamtWeb.ServerLive do
 
   defp maybe_refresh_pinned_list(socket) do
     if socket.assigns.show_pinned_drawer and socket.assigns.active_channel do
-      messages = Messages.list_pinned_messages(socket.assigns.active_channel.id)
+      messages = visible_pins(socket.assigns.current_scope, socket.assigns.active_channel)
       assign(socket, :pinned_messages, messages)
     else
       socket

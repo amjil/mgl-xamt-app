@@ -746,6 +746,40 @@ defmodule Xamt.MessagesTest do
              Messages.toggle_reaction(scope, message.id, hd(Reaction.emojis()))
   end
 
+  test "members without view_channel cannot list messages", %{
+    scope: scope,
+    channel: channel,
+    server: server
+  } do
+    {:ok, _} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>secret</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    muted = Xamt.AccountsFixtures.user_fixture()
+    muted_scope = Scope.for_user(muted)
+    {:ok, _} = Servers.join_server(muted_scope, server.id)
+    {:ok, _} = Servers.revoke_permission(scope, server.id, muted.id, :view_channel)
+
+    assert {:error, :unauthorized} = Messages.list_messages_for_user(muted_scope, channel.id)
+
+    assert {:error, :unauthorized} =
+             Messages.list_pinned_messages_for_user(muted_scope, channel.id)
+
+    assert {:ok, [_ | _]} = Messages.list_messages_for_user(scope, channel.id)
+  end
+
+  test "expired rate-limit windows are swept from ETS", %{owner: owner} do
+    RateLimiter.reset()
+    assert :ok = RateLimiter.check_rate(owner.id, limit: 5, window_seconds: 3)
+    :ets.insert(:xamt_rate_limits, {{owner.id, 1}, 9})
+    assert :ets.lookup(:xamt_rate_limits, {owner.id, 1}) == [{{owner.id, 1}, 9}]
+    RateLimiter.sweep()
+    assert :ets.lookup(:xamt_rate_limits, {owner.id, 1}) == []
+    RateLimiter.reset()
+  end
+
   test "members without send_messages cannot post", %{
     scope: scope,
     channel: channel,

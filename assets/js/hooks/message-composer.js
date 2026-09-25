@@ -14,7 +14,7 @@ import {
   toast,
 } from "../utils/offline-store.js"
 import { attachMentionAutocomplete, hydrateMentions } from "./mention-autocomplete.js"
-import { deleteAtomicIsland, insertUprightText, islandJustDeleted, isEmojiText, wrapEmojis } from "../utils/emoji.js"
+import { containsEmoji, deleteAtomicIsland, insertUprightText, islandJustDeleted, isEmojiText, wrapEmojis } from "../utils/emoji.js"
 
 function editorRoot(editorEl) {
   return editorEl?.querySelector?.(".editor-content") || editorEl
@@ -506,15 +506,28 @@ export const MessageComposer = {
   ejectLeakedEmojiText() {
     const root = this._root()
     if (!root) return
-    let leaked = false
+    let needsWrap = false
     for (const span of root.querySelectorAll(".xamt-emoji")) {
       const value = span.textContent || ""
       if (value && !isEmojiText(value)) {
-        leaked = true
+        needsWrap = true
         break
       }
     }
-    if (!leaked) return
+    if (!needsWrap) {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+      let node
+      while ((node = walker.nextNode())) {
+        if (node.parentElement?.closest(".xamt-emoji, .xamt-mention, .xamt-upright, code, pre")) {
+          continue
+        }
+        if (containsEmoji(node.data)) {
+          needsWrap = true
+          break
+        }
+      }
+    }
+    if (!needsWrap) return
     const sel = this.adapter?.getSelection?.()
     wrapEmojis(root)
     if (sel) this.adapter.setSelection(sel)

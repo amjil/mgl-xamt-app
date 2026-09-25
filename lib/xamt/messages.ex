@@ -4,8 +4,9 @@ defmodule Xamt.Messages do
 
   Authorization belongs here: prefer scope-taking entry points
   (`create_message/3`, `update_message/3`, `delete_message/3`,
-  `toggle_reaction/3`, `get_message_for_user/2`, `search_server_messages/3`)
-  over bare `get_message!/1` / `search_messages/2` from LiveViews and HTTP.
+  `toggle_reaction/3`, `get_message_for_user/2`, `list_messages_for_user/3`,
+  `list_pinned_messages_for_user/2`, `search_server_messages/3`)
+  over bare `get_message!/1` / `list_messages/2` from LiveViews and HTTP.
   Message HTML is scrubbed by `Xamt.Messages.HtmlSanitizer` before persist.
   Gallery and audio payloads only accept same-origin `/uploads/...` paths.
   """
@@ -173,6 +174,20 @@ defmodule Xamt.Messages do
       preload: [:user]
     )
     |> Repo.all()
+  end
+
+  @doc "Like `list_pinned_messages/1`, but requires `:view_channel`."
+  def list_pinned_messages_for_user(%Scope{user: user}, channel_id) do
+    with :ok <- authorize_channel_perm(user.id, channel_id, :view_channel) do
+      {:ok, list_pinned_messages(channel_id)}
+    end
+  end
+
+  @doc "Like `list_messages/2`, but requires `:view_channel`."
+  def list_messages_for_user(%Scope{user: user}, channel_id, opts \\ []) do
+    with :ok <- authorize_channel_perm(user.id, channel_id, :view_channel) do
+      {:ok, list_messages(channel_id, opts)}
+    end
   end
 
   def list_messages(channel_id, opts \\ []) do

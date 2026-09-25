@@ -4,11 +4,15 @@
  * `text-orientation: mixed`; wrap them in `.xamt-emoji` (horizontal-tb).
  */
 
-const EMOJI_SEQ =
-  /\p{Extended_Pictographic}(?:\uFE0F|\uFE0E)?(?:\u200D\p{Extended_Pictographic}(?:\uFE0F|\uFE0E)?)*/u
+const KEYCAP = "[0-9#*]\\uFE0F?\\u20E3"
+const EMOJI =
+  "\\p{Extended_Pictographic}(?:\\p{Emoji_Modifier}|\\uFE0F|\\uFE0E)*"
+const ZWJ_SEQ = `${EMOJI}(?:\\u200D(?:${EMOJI}|${KEYCAP}))*`
+const FLAG = "\\p{Regional_Indicator}{2}"
+const EMOJI_SEQ_SRC = `(?:${FLAG}|${ZWJ_SEQ}|${KEYCAP})`
 
-const ONLY_EMOJI = new RegExp(`^(?:${EMOJI_SEQ.source}|\\s)+$`, "u")
-const FIND_EMOJI = new RegExp(EMOJI_SEQ.source, "gu")
+const ONLY_EMOJI = new RegExp(`^(?:${EMOJI_SEQ_SRC}|\\s)+$`, "u")
+const FIND_EMOJI = new RegExp(EMOJI_SEQ_SRC, "gu")
 
 const SKIP_WRAP = ".xamt-emoji, .xamt-mention, .xamt-upright, code, pre"
 const ATOMIC_ISLAND = ".xamt-emoji, .xamt-mention"

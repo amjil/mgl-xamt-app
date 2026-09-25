@@ -16,6 +16,7 @@ defmodule Xamt.Messages.RateLimiter do
   @table :xamt_rate_limits
   @default_limit 5
   @default_window_seconds 3
+  @sweep_ms 30_000
 
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
@@ -38,7 +39,15 @@ defmodule Xamt.Messages.RateLimiter do
           @table
       end
 
+    schedule_sweep()
     {:ok, %{table: table}}
+  end
+
+  @impl true
+  def handle_info(:sweep, state) do
+    sweep()
+    schedule_sweep()
+    {:noreply, state}
   end
 
   @doc """
@@ -55,7 +64,8 @@ defmodule Xamt.Messages.RateLimiter do
       :ok
     else
       now = System.system_time(:second)
-      key = {user_id, div(now, window_seconds)}
+      expires_at = (div(now, window_seconds) + 1) * window_seconds
+      key = {user_id, expires_at}
 
       case :ets.update_counter(@table, key, {2, 1}, {key, 0}) do
         count when count <= limit -> :ok
@@ -68,6 +78,23 @@ defmodule Xamt.Messages.RateLimiter do
   def reset do
     if :ets.whereis(@table) != :undefined, do: :ets.delete_all_objects(@table)
     :ok
+  end
+
+  @doc false
+  def sweep do
+    if :ets.whereis(@table) != :undefined do
+      now = System.system_time(:second)
+
+      :ets.select_delete(@table, [
+        {{{:"$1", :"$2"}, :"$3"}, [{:<, :"$2", now}], [true]}
+      ])
+    end
+
+    :ok
+  end
+
+  defp schedule_sweep do
+    Process.send_after(self(), :sweep, @sweep_ms)
   end
 
   defp resolve_limits(opts) do

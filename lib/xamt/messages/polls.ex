@@ -79,6 +79,13 @@ defmodule Xamt.Messages.Polls do
   defp do_toggle_vote(poll, user_id, option_id) do
     result =
       Ecto.Multi.new()
+      |> Ecto.Multi.run(:lock, fn repo, _ ->
+        locked =
+          from(p in Poll, where: p.id == ^poll.id, lock: "FOR UPDATE")
+          |> repo.one()
+
+        if locked, do: {:ok, locked}, else: {:error, :not_found}
+      end)
       |> Ecto.Multi.run(:vote_op, fn repo, _ ->
         existing =
           repo.get_by(PollVote, user_id: user_id, poll_option_id: option_id)
@@ -86,7 +93,7 @@ defmodule Xamt.Messages.Polls do
         cond do
           existing ->
             with {:ok, _} <- repo.delete(existing) do
-              {:ok, {:removed, [option_id]}}
+              {:ok, :ok}
             end
 
           poll.allow_multiple ->
@@ -96,17 +103,9 @@ defmodule Xamt.Messages.Polls do
             switch_single_vote(repo, poll, user_id, option_id)
         end
       end)
-      |> Ecto.Multi.run(:update_counts, fn repo, %{vote_op: op} ->
-        case op do
-          {:removed, [id]} ->
-            bump_count(repo, id, -1)
-            {:ok, :ok}
-
-          {:added, added_id, removed_ids} ->
-            Enum.each(removed_ids, &bump_count(repo, &1, -1))
-            bump_count(repo, added_id, 1)
-            {:ok, :ok}
-        end
+      |> Ecto.Multi.run(:update_counts, fn repo, _ ->
+        recount_votes(repo, poll.id)
+        {:ok, :ok}
       end)
       |> Repo.transaction()
 
@@ -142,32 +141,26 @@ defmodule Xamt.Messages.Polls do
   end
 
   defp switch_single_vote(repo, poll, user_id, option_id) do
-    others =
-      from(v in PollVote,
-        where: v.poll_id == ^poll.id and v.user_id == ^user_id,
-        select: {v.id, v.poll_option_id}
-      )
-      |> repo.all()
-
-    removed_option_ids = Enum.map(others, fn {_id, oid} -> oid end)
-
-    if others != [] do
-      ids = Enum.map(others, fn {id, _} -> id end)
-
-      from(v in PollVote, where: v.id in ^ids)
-      |> repo.delete_all()
-    end
+    from(v in PollVote, where: v.poll_id == ^poll.id and v.user_id == ^user_id)
+    |> repo.delete_all()
 
     insert_vote(repo, poll.id, option_id, user_id)
-    |> case do
-      {:ok, {:added, added_id, _}} -> {:ok, {:added, added_id, removed_option_ids}}
-      other -> other
-    end
   end
 
-  defp bump_count(repo, option_id, delta) do
-    from(o in PollOption, where: o.id == ^option_id)
-    |> repo.update_all(inc: [votes_count: delta])
+  defp recount_votes(repo, poll_id) do
+    from(o in PollOption,
+      where: o.poll_id == ^poll_id,
+      update: [
+        set: [
+          votes_count:
+            fragment(
+              "(SELECT count(*) FROM poll_votes WHERE poll_option_id = ?)",
+              o.id
+            )
+        ]
+      ]
+    )
+    |> repo.update_all([])
   end
 
   @doc """
