@@ -74,7 +74,7 @@ defmodule Xamt.Messages.Search do
   """
   def search_server_messages(%Scope{user: user}, server_id, query, opts \\ [])
       when is_binary(server_id) do
-    if Xamt.Servers.member?(server_id, user.id) do
+    if Xamt.Servers.can?(server_id, user.id, :view_channel) do
       channel_ids =
         from(c in Channel, where: c.server_id == ^server_id, select: c.id)
         |> Repo.all()

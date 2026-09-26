@@ -64,6 +64,7 @@ defmodule Xamt.Channels do
         with {:ok, channel} <- Repo.delete(channel) do
           LastMessageCache.delete(channel.id)
           ChannelListCache.invalidate(channel.server_id)
+          Servers.broadcast_server(channel.server_id, {:channels_changed})
           {:ok, channel}
         end
     end
@@ -120,6 +121,7 @@ defmodule Xamt.Channels do
       ChannelListCache.put(server_id, refreshed)
       {:ok, refreshed}
     end)
+    |> tap_broadcast_channels(hd(ordered).server_id)
   end
 
   defp last_channel?(server_id) do
@@ -345,10 +347,18 @@ defmodule Xamt.Channels do
 
   defp tap_invalidate_channels({:ok, %Channel{} = channel}, server_id) do
     ChannelListCache.invalidate(server_id)
+    Servers.broadcast_server(server_id, {:channels_changed})
     {:ok, channel}
   end
 
   defp tap_invalidate_channels(other, _server_id), do: other
+
+  defp tap_broadcast_channels({:ok, result}, server_id) do
+    Servers.broadcast_server(server_id, {:channels_changed})
+    {:ok, result}
+  end
+
+  defp tap_broadcast_channels(other, _server_id), do: other
 
   defp normalize_datetime(%DateTime{} = dt), do: DateTime.truncate(dt, :second)
 

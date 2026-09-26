@@ -140,7 +140,7 @@ defmodule Xamt.Notifications.WebPushTest do
         username: "mia#{System.unique_integer() |> abs()}"
       })
 
-    {:ok, _} = Servers.join_server(Scope.for_user(user), server.id)
+    {:ok, _} = Servers.add_member(Scope.for_user(user), server.id)
     user
   end
 

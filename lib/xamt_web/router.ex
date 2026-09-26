@@ -38,6 +38,10 @@ defmodule XamtWeb.Router do
   scope "/", XamtWeb do
     pipe_through [:browser]
 
+    # Uploads are not in Plug.Static — this controller checks membership
+    # (or a public avatar/icon reference) before sending the file.
+    get "/uploads/:filename", UploadController, :show
+
     live_session :public,
       on_mount: [{XamtWeb.UserAuth, :mount_current_scope}] do
       live "/", HomeLive, :index

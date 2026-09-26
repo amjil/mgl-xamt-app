@@ -89,13 +89,22 @@ defmodule Xamt.Accounts.User do
   @doc """
   A user changeset for updating profile fields.
   """
-  def profile_changeset(user, attrs, opts \\ []) do
+  def profile_changeset(user, attrs, _opts \\ []) do
     user
-    |> cast(attrs, [:username, :display_name, :avatar, :bio, :status])
-    |> validate_username(Keyword.put_new(opts, :validate_unique, false))
+    |> cast(attrs, [:display_name, :bio])
+    |> put_safe_avatar(attrs)
     |> validate_length(:display_name, max: 100)
     |> validate_length(:bio, max: 500)
-    |> validate_inclusion(:status, ~w(online idle dnd offline), message: "is invalid")
+  end
+
+  defp put_safe_avatar(changeset, attrs) do
+    avatar = Map.get(attrs, "avatar") || Map.get(attrs, :avatar)
+
+    if is_binary(avatar) and Regex.match?(~r|^/uploads/[A-Za-z0-9._-]+$|, avatar) do
+      put_change(changeset, :avatar, avatar)
+    else
+      changeset
+    end
   end
 
   @doc """

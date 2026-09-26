@@ -44,14 +44,16 @@ defmodule XamtWeb.ServerLive.Helpers do
 
   # Flatten virtual date dividers into the message stream so sticky CSS can
   # push prior day labels when a newer divider scrolls into view (vertical-lr).
-  def with_date_dividers(messages, timezone_offset) do
+  def with_date_dividers(messages, timezone_offset, opts \\ []) do
+    skip_date = Keyword.get(opts, :skip_trailing_date)
+
     {items, _prev_date} =
       Enum.reduce(messages, {[], nil}, fn msg, {acc, prev_date} ->
         date = local_date(msg.inserted_at, timezone_offset)
 
         acc =
           if is_nil(prev_date) or prev_date != date do
-            [msg, date_divider(date) | acc]
+            [msg, date_divider(date, msg.id) | acc]
           else
             [msg | acc]
           end
@@ -59,7 +61,18 @@ defmodule XamtWeb.ServerLive.Helpers do
         {acc, date}
       end)
 
-    Enum.reverse(items)
+    items = Enum.reverse(items)
+
+    if skip_date do
+      skip = Date.to_iso8601(skip_date)
+
+      Enum.reject(items, fn
+        %{type: :date_divider, date: ^skip} -> true
+        _ -> false
+      end)
+    else
+      items
+    end
   end
 
   def needs_date_divider?(nil, _new_at, _offset), do: true
@@ -68,9 +81,9 @@ defmodule XamtWeb.ServerLive.Helpers do
     local_date(prev_at, offset) != local_date(new_at, offset)
   end
 
-  def date_divider(%Date{} = date) do
+  def date_divider(%Date{} = date, message_id \\ "start") do
     %{
-      id: "date-#{Date.to_iso8601(date)}",
+      id: "date-#{Date.to_iso8601(date)}-#{message_id}",
       type: :date_divider,
       date: Date.to_iso8601(date)
     }

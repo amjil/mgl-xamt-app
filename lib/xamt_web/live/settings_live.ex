@@ -43,10 +43,14 @@ defmodule XamtWeb.SettingsLive do
 
   def handle_event("save", %{"user" => params}, socket) do
     params =
-      case XamtWeb.Uploads.consume_image(socket, :avatar) do
-        url when is_binary(url) -> Map.put(params, "avatar", url)
-        _ -> params
-      end
+      params
+      |> Map.take(["display_name", "bio"])
+      |> then(fn kept ->
+        case XamtWeb.Uploads.consume_image(socket, :avatar) do
+          url when is_binary(url) -> Map.put(kept, "avatar", url)
+          _ -> kept
+        end
+      end)
 
     case Accounts.update_user_profile(socket.assigns.current_scope.user, params) do
       {:ok, user} ->

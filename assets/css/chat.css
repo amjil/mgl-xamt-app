@@ -601,6 +601,13 @@
   box-sizing: border-box;
 }
 
+.xamt-composer-muted {
+  margin: 0;
+  padding: 0.75rem 0.85rem;
+  color: var(--xamt-muted);
+  font-size: 0.92rem;
+}
+
 /* Poll mode: capped column width; scroll block-axis (physical right) for more fields. */
 .xamt-composer-wrap--poll {
   min-block-size: 12rem;

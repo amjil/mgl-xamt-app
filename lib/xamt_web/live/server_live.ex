@@ -52,19 +52,25 @@ defmodule XamtWeb.ServerLive do
         slug -> Channels.get_channel_by_slug!(server.id, slug)
       end
 
-    if connected?(socket) do
-      Enum.each(channels, &subscribe_channel/1)
+    current_member = Servers.get_member(server.id, scope.user.id)
+    can_view? = can_view_channel?(current_member)
 
-      if channel do
-        Presence.track_user(self(), channel_topic(channel), scope.user)
-        subscribe_typing(channel)
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(Xamt.PubSub, Servers.server_topic(server.id))
+
+      if can_view? do
+        Enum.each(channels, &subscribe_channel/1)
+
+        if channel do
+          Presence.track_user(self(), channel_topic(channel), scope.user)
+          subscribe_typing(channel)
+        end
       end
     end
 
     messages = visible_messages(scope, channel)
 
     unread_ids = Channels.get_unread_channel_ids(scope.user.id, server.id)
-    current_member = Servers.get_member(server.id, scope.user.id)
 
     socket =
       socket
@@ -83,7 +89,7 @@ defmodule XamtWeb.ServerLive do
       |> assign(:replying_to, nil)
       |> assign(:deleting_message, nil)
       |> assign(:composer_mode, :text)
-      |> assign(:poll_option_count, 2)
+      |> assign(:poll_form, empty_poll_form())
       |> assign(:poll_details, nil)
       |> assign(:channel_form, to_form(Channels.change_channel(%Channel{}), as: :channel))
       |> assign_member_permissions(current_member)
@@ -220,38 +226,46 @@ defmodule XamtWeb.ServerLive do
     scope = socket.assigns.current_scope
     channel = socket.assigns.active_channel
 
-    if Enum.any?(socket.assigns.uploads.media.entries, &(not &1.done?)) do
-      {:noreply, put_flash(socket, :error, gettext("Please wait for uploads to finish"))}
-    else
-      images = XamtWeb.Uploads.consume_gallery_images(socket, :media)
-      attrs = build_message_attrs(params, images, socket.assigns.replying_to)
+    cond do
+      is_nil(channel) ->
+        {:noreply, put_flash(socket, :error, gettext("Could not send message"))}
 
-      case Messages.create_message(scope, channel.id, attrs) do
-        {:ok, _message} ->
-          {:noreply,
-           socket
-           |> assign(:editing_message_id, nil)
-           |> assign(:replying_to, nil)
-           |> push_event("composer:clear", %{})}
+      not socket.assigns.can_send_messages? ->
+        {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
 
-        {:error, :rate_limited} ->
-          {:noreply, put_flash(socket, :error, gettext("Messages sent too fast"))}
+      Enum.any?(socket.assigns.uploads.media.entries, &(not &1.done?)) ->
+        {:noreply, put_flash(socket, :error, gettext("Please wait for uploads to finish"))}
 
-        {:error, :unauthorized} ->
-          {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+      true ->
+        images = XamtWeb.Uploads.consume_gallery_images(socket, :media)
+        attrs = build_message_attrs(params, images, socket.assigns.replying_to)
 
-        {:error, :invalid_reply} ->
-          {:noreply, put_flash(socket, :error, gettext("Could not send message"))}
+        case Messages.create_message(scope, channel.id, attrs) do
+          {:ok, _message} ->
+            {:noreply,
+             socket
+             |> assign(:editing_message_id, nil)
+             |> assign(:replying_to, nil)
+             |> push_event("composer:clear", %{})}
 
-        {:error, :too_long} ->
-          {:noreply, put_flash(socket, :error, gettext("Message is too long"))}
+          {:error, :rate_limited} ->
+            {:noreply, put_flash(socket, :error, gettext("Messages sent too fast"))}
 
-        {:error, :invalid_content} ->
-          {:noreply, put_flash(socket, :error, gettext("Could not send message"))}
+          {:error, :unauthorized} ->
+            {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
 
-        {:error, _changeset} ->
-          {:noreply, put_flash(socket, :error, gettext("Could not send message"))}
-      end
+          {:error, :invalid_reply} ->
+            {:noreply, put_flash(socket, :error, gettext("Could not send message"))}
+
+          {:error, :too_long} ->
+            {:noreply, put_flash(socket, :error, gettext("Message is too long"))}
+
+          {:error, :invalid_content} ->
+            {:noreply, put_flash(socket, :error, gettext("Could not send message"))}
+
+          {:error, _changeset} ->
+            {:noreply, put_flash(socket, :error, gettext("Could not send message"))}
+        end
     end
   end
 
@@ -259,55 +273,93 @@ defmodule XamtWeb.ServerLive do
     {:noreply,
      socket
      |> assign(:composer_mode, :poll)
-     |> assign(:poll_option_count, 2)
+     |> assign(:poll_form, empty_poll_form())
      |> assign(:editing_message_id, nil)}
   end
 
   def handle_event("cancel_poll_composer", _params, socket) do
-    {:noreply, assign(socket, :composer_mode, :text) |> assign(:poll_option_count, 2)}
+    {:noreply, socket |> assign(:composer_mode, :text) |> assign(:poll_form, empty_poll_form())}
+  end
+
+  def handle_event("validate_poll", %{"poll" => params}, socket) do
+    {:noreply, assign(socket, :poll_form, poll_form(normalize_poll_params(params)))}
   end
 
   def handle_event("add_poll_option", _params, socket) do
-    count = min(socket.assigns.poll_option_count + 1, 10)
-    {:noreply, assign(socket, :poll_option_count, count)}
+    params = poll_form_params(socket)
+    options = poll_options(params)
+
+    socket =
+      if length(options) < 10 do
+        assign(socket, :poll_form, poll_form(Map.put(params, "options", options ++ [""])))
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
-  def handle_event("remove_poll_option", _params, socket) do
-    count = max(socket.assigns.poll_option_count - 1, 2)
-    {:noreply, assign(socket, :poll_option_count, count)}
+  def handle_event("remove_poll_option", %{"index" => index}, socket) do
+    params = poll_form_params(socket)
+    options = poll_options(params)
+    {idx, _} = Integer.parse(to_string(index))
+
+    socket =
+      if idx >= 2 and idx < length(options) do
+        assign(
+          socket,
+          :poll_form,
+          poll_form(Map.put(params, "options", List.delete_at(options, idx)))
+        )
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   def handle_event("send_poll", %{"poll" => poll_params}, socket) do
     scope = socket.assigns.current_scope
     channel = socket.assigns.active_channel
+    poll_params = normalize_poll_params(poll_params)
 
-    attrs = %{
-      "question" => poll_params["question"],
-      "options" => List.wrap(poll_params["options"]),
-      "allow_multiple" => poll_params["allow_multiple"],
-      "results_open" => poll_params["results_open"],
-      "reply_to_id" => socket.assigns.replying_to && socket.assigns.replying_to.id
-    }
+    cond do
+      is_nil(channel) ->
+        {:noreply, put_flash(socket, :error, gettext("Could not send poll"))}
 
-    case Messages.create_poll_message(scope, channel.id, attrs) do
-      {:ok, _message} ->
-        {:noreply,
-         socket
-         |> assign(:composer_mode, :text)
-         |> assign(:poll_option_count, 2)
-         |> assign(:replying_to, nil)}
-
-      {:error, :rate_limited} ->
-        {:noreply, put_flash(socket, :error, gettext("Messages sent too fast"))}
-
-      {:error, :unauthorized} ->
+      not socket.assigns.can_send_messages? ->
         {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
 
-      {:error, :invalid_poll} ->
-        {:noreply, put_flash(socket, :error, gettext("Poll needs a question and 2–10 options"))}
+      true ->
+        attrs = %{
+          "question" => poll_params["question"],
+          "options" => poll_params["options"],
+          "allow_multiple" => poll_params["allow_multiple"],
+          "results_open" => poll_params["results_open"],
+          "reply_to_id" => socket.assigns.replying_to && socket.assigns.replying_to.id
+        }
 
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, gettext("Could not send poll"))}
+        case Messages.create_poll_message(scope, channel.id, attrs) do
+          {:ok, _message} ->
+            {:noreply,
+             socket
+             |> assign(:composer_mode, :text)
+             |> assign(:poll_form, empty_poll_form())
+             |> assign(:replying_to, nil)}
+
+          {:error, :rate_limited} ->
+            {:noreply, put_flash(socket, :error, gettext("Messages sent too fast"))}
+
+          {:error, :unauthorized} ->
+            {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+
+          {:error, :invalid_poll} ->
+            {:noreply,
+             put_flash(socket, :error, gettext("Poll needs a question and 2–10 options"))}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, gettext("Could not send poll"))}
+        end
     end
   end
 
@@ -563,7 +615,14 @@ defmodule XamtWeb.ServerLive do
           [first | _] = msgs ->
             offset = socket.assigns.timezone_offset
             {grouped, page_last, page_flags} = process_message_grouping(msgs, offset)
-            items = with_date_dividers(grouped, offset)
+
+            skip_date =
+              case socket.assigns[:oldest_message_info] do
+                %{time: %DateTime{} = time} -> local_date(time, offset)
+                _ -> nil
+              end
+
+            items = with_date_dividers(grouped, offset, skip_trailing_date: skip_date)
 
             socket
             |> assign(
@@ -662,20 +721,9 @@ defmodule XamtWeb.ServerLive do
   end
 
   def handle_event("delete_channel", %{"id" => id}, socket) do
-    active = socket.assigns.active_channel
-
     case Channels.delete_channel(socket.assigns.current_scope, id) do
       {:ok, _channel} ->
-        socket = refresh_channels(socket)
-
-        if active && active.id == id do
-          case List.first(socket.assigns.channels) do
-            nil -> {:noreply, socket}
-            next -> {:noreply, push_navigate(socket, to: channel_path(socket, next))}
-          end
-        else
-          {:noreply, socket}
-        end
+        {:noreply, socket}
 
       {:error, :last_channel} ->
         {:noreply, put_flash(socket, :error, gettext("A server needs at least one channel"))}
@@ -689,7 +737,7 @@ defmodule XamtWeb.ServerLive do
     direction = if direction == "up", do: :up, else: :down
 
     case Channels.move_channel(socket.assigns.current_scope, id, direction) do
-      {:ok, _} -> {:noreply, refresh_channels(socket)}
+      {:ok, _} -> {:noreply, socket}
       {:error, _} -> {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
     end
   end
@@ -698,8 +746,8 @@ defmodule XamtWeb.ServerLive do
     server = socket.assigns.server
 
     case Servers.kick_member(socket.assigns.current_scope, server.id, user_id) do
-      {:ok, member} ->
-        {:noreply, stream_delete(socket, :members, member)}
+      {:ok, _member} ->
+        {:noreply, socket}
 
       {:error, _} ->
         {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
@@ -710,8 +758,8 @@ defmodule XamtWeb.ServerLive do
     server = socket.assigns.server
 
     case Servers.change_role(socket.assigns.current_scope, server.id, user_id, role) do
-      {:ok, member} ->
-        {:noreply, stream_insert(socket, :members, Xamt.Repo.preload(member, :user))}
+      {:ok, _member} ->
+        {:noreply, socket}
 
       {:error, _} ->
         {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
@@ -852,47 +900,102 @@ defmodule XamtWeb.ServerLive do
   @impl true
   def handle_info(_msg, %{assigns: %{member?: false}} = socket), do: {:noreply, socket}
 
-  def handle_info({:new_message, message}, socket) do
-    active_channel = socket.assigns.active_channel
-    user_id = socket.assigns.current_scope.user.id
+  def handle_info({:member_removed, member}, socket) do
+    if member.user_id == socket.assigns.current_scope.user.id do
+      maybe_untrack_presence(socket)
+
+      {:noreply,
+       socket
+       |> put_flash(:error, gettext("You were removed from this server."))
+       |> push_navigate(to: ~p"/")}
+    else
+      {:noreply, stream_delete(socket, :members, member)}
+    end
+  end
+
+  def handle_info({:member_joined, member}, socket) do
+    {:noreply, stream_insert(socket, :members, ensure_member_user(member))}
+  end
+
+  def handle_info({:member_updated, member}, socket) do
+    member = ensure_member_user(member)
 
     socket =
-      cond do
-        active_channel && message.channel_id == active_channel.id ->
-          # Stay in the stream; IntersectionObserver advances the watermark
-          # only when the message actually enters the viewport.
-          {message, last_info} = tag_incoming_message(socket, message)
+      socket
+      |> stream_insert(:members, member)
+      |> maybe_refresh_own_membership(member)
 
-          socket
-          |> maybe_stream_date_divider(message)
-          |> stream_insert(:messages, message)
-          |> merge_polls([message])
-          |> assign(:last_message_info, last_info)
-          |> assign(
-            :header_flags,
-            Map.put(socket.assigns.header_flags, message.id, message.show_header)
-          )
-          |> assign(:last_message_at, message.inserted_at)
-          |> assign(:messages_empty?, false)
-          |> assign(:oldest_message_id, socket.assigns[:oldest_message_id] || message.id)
-          |> assign(
-            :oldest_message_info,
-            socket.assigns[:oldest_message_info] || oldest_message_info([message])
-          )
-          |> push_event("messages:scroll_bottom", %{})
+    {:noreply, socket}
+  end
 
-        message.user_id != user_id and server_channel?(socket, message.channel_id) ->
-          assign(
-            socket,
-            :unread_channels,
-            MapSet.put(socket.assigns.unread_channels, message.channel_id)
-          )
+  def handle_info({:channels_changed}, socket) do
+    previous_ids = MapSet.new(Enum.map(socket.assigns.channels, & &1.id))
+    socket = refresh_channels(socket) |> sync_channel_subscriptions(previous_ids)
 
-        true ->
-          socket
+    active = socket.assigns.active_channel
+    still_exists? = active && Enum.any?(socket.assigns.channels, &(&1.id == active.id))
+
+    socket =
+      if active && not still_exists? do
+        case List.first(socket.assigns.channels) do
+          nil ->
+            socket
+
+          next ->
+            push_navigate(socket, to: channel_path(socket, next))
+        end
+      else
+        socket
       end
 
     {:noreply, socket}
+  end
+
+  def handle_info({:new_message, message}, socket) do
+    if not socket.assigns.can_view_channel? do
+      {:noreply, socket}
+    else
+      active_channel = socket.assigns.active_channel
+      user_id = socket.assigns.current_scope.user.id
+
+      socket =
+        cond do
+          active_channel && message.channel_id == active_channel.id ->
+            # Stay in the stream; IntersectionObserver advances the watermark
+            # only when the message actually enters the viewport.
+            {message, last_info} = tag_incoming_message(socket, message)
+
+            socket
+            |> maybe_stream_date_divider(message)
+            |> stream_insert(:messages, message)
+            |> merge_polls([message])
+            |> assign(:last_message_info, last_info)
+            |> assign(
+              :header_flags,
+              Map.put(socket.assigns.header_flags, message.id, message.show_header)
+            )
+            |> assign(:last_message_at, message.inserted_at)
+            |> assign(:messages_empty?, false)
+            |> assign(:oldest_message_id, socket.assigns[:oldest_message_id] || message.id)
+            |> assign(
+              :oldest_message_info,
+              socket.assigns[:oldest_message_info] || oldest_message_info([message])
+            )
+            |> push_event("messages:scroll_bottom", %{})
+
+          message.user_id != user_id and server_channel?(socket, message.channel_id) ->
+            assign(
+              socket,
+              :unread_channels,
+              MapSet.put(socket.assigns.unread_channels, message.channel_id)
+            )
+
+          true ->
+            socket
+        end
+
+      {:noreply, socket}
+    end
   end
 
   def handle_info({:updated_message, message}, socket) do
@@ -1060,7 +1163,8 @@ defmodule XamtWeb.ServerLive do
       can_manage_channels?: false,
       can_kick_members?: false,
       can_manage_messages?: false,
-      can_send_messages?: false
+      can_send_messages?: false,
+      can_view_channel?: false
     )
   end
 
@@ -1075,8 +1179,15 @@ defmodule XamtWeb.ServerLive do
       can_manage_channels?: can_manage_channels?,
       can_kick_members?: Permissions.has_permission?(perms, :kick_members),
       can_manage_messages?: Permissions.has_permission?(perms, :manage_messages),
-      can_send_messages?: Permissions.has_permission?(perms, :send_messages)
+      can_send_messages?: Permissions.has_permission?(perms, :send_messages),
+      can_view_channel?: Permissions.has_permission?(perms, :view_channel)
     )
+  end
+
+  defp can_view_channel?(nil), do: false
+
+  defp can_view_channel?(member) do
+    Permissions.has_permission?(member.permissions, :view_channel)
   end
 
   defp assign_messages(socket, messages) do
@@ -1202,7 +1313,8 @@ defmodule XamtWeb.ServerLive do
     last_at = socket.assigns[:last_message_at]
 
     if needs_date_divider?(last_at, message.inserted_at, offset) do
-      stream_insert(socket, :messages, date_divider(local_date(message.inserted_at, offset)))
+      date = local_date(message.inserted_at, offset)
+      stream_insert(socket, :messages, date_divider(date, message.id))
     else
       socket
     end
@@ -1290,7 +1402,8 @@ defmodule XamtWeb.ServerLive do
     channel = Channels.get_channel_by_slug!(server.id, channel_slug)
 
     socket =
-      if (connected?(socket) and old_channel) && old_channel.id != channel.id do
+      if ((connected?(socket) and old_channel) && old_channel.id != channel.id) and
+           socket.assigns.can_view_channel? do
         Presence.untrack_user(self(), channel_topic(old_channel), scope.user)
         Presence.track_user(self(), channel_topic(channel), scope.user)
         TypingTracker.untrack_user(self(), old_channel, scope.user)
@@ -1311,7 +1424,7 @@ defmodule XamtWeb.ServerLive do
     |> assign(:replying_to, nil)
     |> assign(:deleting_message, nil)
     |> assign(:composer_mode, :text)
-    |> assign(:poll_option_count, 2)
+    |> assign(:poll_form, empty_poll_form())
     |> assign(:poll_details, nil)
     |> assign(:show_pinned_drawer, false)
     |> assign(:pinned_messages, [])
@@ -1374,11 +1487,8 @@ defmodule XamtWeb.ServerLive do
 
     case Channels.create_channel(socket.assigns.current_scope, server, params) do
       {:ok, channel} ->
-        if connected?(socket), do: subscribe_channel(channel)
-
         {:noreply,
          socket
-         |> assign(:channels, Channels.list_channels(server.id))
          |> put_flash(:info, gettext("Channel created"))
          |> push_patch(to: ~p"/servers/#{server.slug}/#{channel.slug}")}
 
@@ -1398,11 +1508,7 @@ defmodule XamtWeb.ServerLive do
     else
       case Channels.update_channel(socket.assigns.current_scope, channel.id, params) do
         {:ok, updated} ->
-          socket =
-            socket
-            |> refresh_channels()
-            |> maybe_replace_active_channel(updated)
-
+          socket = maybe_replace_active_channel(socket, updated)
           {:noreply, push_patch(socket, to: overlay_return_path(socket))}
 
         {:error, :unauthorized} ->
@@ -1426,9 +1532,155 @@ defmodule XamtWeb.ServerLive do
     end
   end
 
+  defp empty_poll_form, do: poll_form(empty_poll_params())
+
+  defp empty_poll_params do
+    %{
+      "question" => "",
+      "options" => ["", ""],
+      "allow_multiple" => "false",
+      "results_open" => "true"
+    }
+  end
+
+  defp poll_form(params), do: to_form(params, as: :poll)
+
+  defp poll_form_params(socket) do
+    case socket.assigns.poll_form do
+      %{params: params} when is_map(params) and params != %{} ->
+        normalize_poll_params(params)
+
+      %{source: source} when is_map(source) ->
+        normalize_poll_params(source)
+
+      _ ->
+        empty_poll_params()
+    end
+  end
+
+  defp normalize_poll_params(params) when is_map(params) do
+    options =
+      params
+      |> Map.get("options", [])
+      |> List.wrap()
+      |> Enum.map(&to_string/1)
+
+    %{
+      "question" => to_string(Map.get(params, "question") || ""),
+      "options" => options,
+      "allow_multiple" => truthy_param(Map.get(params, "allow_multiple")),
+      "results_open" => truthy_param(Map.get(params, "results_open"), "true")
+    }
+  end
+
+  defp poll_options(params), do: List.wrap(params["options"])
+
+  defp truthy_param(value, default \\ "false")
+  defp truthy_param("true", _default), do: "true"
+  defp truthy_param(true, _default), do: "true"
+  defp truthy_param("false", _default), do: "false"
+  defp truthy_param(false, _default), do: "false"
+  defp truthy_param(_, default), do: default
+
+  defp ensure_member_user(member) do
+    Xamt.Repo.preload(member, :user)
+  end
+
+  defp maybe_refresh_own_membership(socket, member) do
+    if member.user_id == socket.assigns.current_scope.user.id do
+      previous_view? = socket.assigns.can_view_channel?
+
+      socket
+      |> assign(:current_member, member)
+      |> assign_member_permissions(member)
+      |> sync_view_subscriptions(previous_view?)
+    else
+      socket
+    end
+  end
+
+  defp sync_view_subscriptions(socket, previous_view?) do
+    can_view? = socket.assigns.can_view_channel?
+
+    cond do
+      not connected?(socket) ->
+        socket
+
+      previous_view? and not can_view? ->
+        Enum.each(socket.assigns.channels, &unsubscribe_channel/1)
+        maybe_untrack_presence(socket)
+        unsubscribe_typing(socket.assigns.active_channel)
+        assign_messages(socket, [])
+
+      can_view? and not previous_view? ->
+        Enum.each(socket.assigns.channels, &subscribe_channel/1)
+
+        if channel = socket.assigns.active_channel do
+          Presence.track_user(
+            self(),
+            channel_topic(channel),
+            socket.assigns.current_scope.user
+          )
+
+          subscribe_typing(channel)
+        end
+
+        assign_messages(
+          socket,
+          visible_messages(socket.assigns.current_scope, socket.assigns.active_channel)
+        )
+
+      true ->
+        socket
+    end
+  end
+
+  defp sync_channel_subscriptions(socket, previous_ids) do
+    if connected?(socket) and socket.assigns.can_view_channel? do
+      current = socket.assigns.channels
+      current_ids = MapSet.new(Enum.map(current, & &1.id))
+
+      Enum.each(current, fn channel ->
+        if not MapSet.member?(previous_ids, channel.id) do
+          subscribe_channel(channel)
+        end
+      end)
+
+      Enum.each(previous_ids, fn id ->
+        if not MapSet.member?(current_ids, id) do
+          Phoenix.PubSub.unsubscribe(Xamt.PubSub, channel_topic_id(id))
+        end
+      end)
+    end
+
+    socket
+  end
+
+  defp maybe_untrack_presence(socket) do
+    case socket.assigns.active_channel do
+      nil ->
+        :ok
+
+      channel ->
+        Presence.untrack_user(
+          self(),
+          channel_topic(channel),
+          socket.assigns.current_scope.user
+        )
+
+        TypingTracker.untrack_user(self(), channel, socket.assigns.current_scope.user)
+    end
+  end
+
   defp subscribe_channel(%Channel{} = channel) do
     Phoenix.PubSub.subscribe(Xamt.PubSub, channel_topic(channel))
   end
+
+  defp unsubscribe_channel(%Channel{} = channel) do
+    Phoenix.PubSub.unsubscribe(Xamt.PubSub, channel_topic(channel))
+  end
+
+  defp channel_topic_id(id), do: "xamt:channel:#{id}"
 
   defp subscribe_typing(nil), do: :ok
 

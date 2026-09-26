@@ -117,8 +117,13 @@ defmodule XamtWeb.UserAuth do
   # function will clear the session to avoid fixation attacks. See the
   # renew_session function to customize this behaviour.
   defp create_or_extend_session(conn, user, params) do
+    old_token = get_session(conn, :user_token)
     token = Accounts.generate_user_session_token(user)
     remember_me = get_session(conn, :user_remember_me)
+
+    if is_binary(old_token) and old_token != token do
+      Accounts.delete_user_session_token(old_token)
+    end
 
     conn
     |> renew_session(user)
@@ -171,7 +176,9 @@ defmodule XamtWeb.UserAuth do
   end
 
   defp put_token_in_session(conn, token) do
-    put_session(conn, :user_token, token)
+    conn
+    |> put_session(:user_token, token)
+    |> put_session(:live_socket_id, "users_sessions:#{Base.url_encode64(token)}")
   end
 
   @doc """

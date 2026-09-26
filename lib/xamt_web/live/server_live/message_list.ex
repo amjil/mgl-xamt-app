@@ -62,7 +62,12 @@ defmodule XamtWeb.ServerLive.MessageList do
 
         <%= for {dom_id, message} <- @streams.messages do %>
           <%= if date_divider?(message) do %>
-            <div id={dom_id} class="xamt-date-divider" role="separator">
+            <div
+              id={dom_id}
+              class="xamt-date-divider"
+              data-date={message.date}
+              role="separator"
+            >
               <span class="xamt-date-divider__text">-- {message.date} --</span>
             </div>
           <% else %>

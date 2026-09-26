@@ -3,7 +3,7 @@ defmodule Xamt.ChannelsTest do
 
   alias Xamt.Accounts.Scope
   alias Xamt.{Channels, Messages, Servers}
-  alias Xamt.Channels.ChannelRead
+  alias Xamt.Channels.{ChannelRead, LastMessageCache}
 
   setup do
     owner = Xamt.AccountsFixtures.creator_fixture()
@@ -70,6 +70,18 @@ defmodule Xamt.ChannelsTest do
       })
 
     message
+  end
+
+  test "LastMessageCache.put keeps the newest timestamp", %{channel: channel} do
+    older = ~U[2026-09-19 10:00:00Z]
+    newer = ~U[2026-09-19 10:00:01Z]
+    old_id = Ecto.UUID.generate()
+    new_id = Ecto.UUID.generate()
+
+    LastMessageCache.put(channel.id, new_id, newer)
+    LastMessageCache.put(channel.id, old_id, older)
+
+    assert {^new_id, ^newer} = LastMessageCache.get(channel.id)
   end
 
   defp stamp(message, inserted_at) do

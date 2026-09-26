@@ -150,23 +150,67 @@ defmodule Xamt.Servers do
     end
   end
 
+  @doc """
+  Joins a **public** server. Private servers must go through `redeem_invite/2`.
+  """
   def join_server(%Scope{user: user}, server_id) do
     server = get_server!(server_id)
 
-    if member?(server.id, user.id) do
+    cond do
+      member?(server.id, user.id) ->
+        {:error, :already_member}
+
+      not Server.public?(server) ->
+        {:error, :unauthorized}
+
+      true ->
+        insert_and_broadcast_member(server.id, user.id)
+    end
+  end
+
+  @doc """
+  Inserts a member without a visibility check.
+
+  Used by invite redemption. Tests use this to place users on private servers.
+  Public discovery must go through `join_server/2`.
+  """
+  def add_member(%Scope{user: user}, server_id) do
+    if member?(server_id, user.id) do
       {:error, :already_member}
     else
-      now = DateTime.utc_now(:second)
-
-      %ServerMember{}
-      |> ServerMember.changeset(%{
-        server_id: server.id,
-        user_id: user.id,
-        role: "member",
-        joined_at: now
-      })
-      |> Repo.insert()
+      insert_and_broadcast_member(server_id, user.id)
     end
+  end
+
+  defp insert_and_broadcast_member(server_id, user_id) do
+    case insert_member(server_id, user_id) do
+      {:ok, member} ->
+        member = Repo.preload(member, :user)
+        broadcast_server(server_id, {:member_joined, member})
+        {:ok, member}
+
+      other ->
+        other
+    end
+  end
+
+  defp insert_member(server_id, user_id) do
+    now = DateTime.utc_now(:second)
+
+    %ServerMember{}
+    |> ServerMember.changeset(%{
+      server_id: server_id,
+      user_id: user_id,
+      role: "member",
+      joined_at: now
+    })
+    |> Repo.insert()
+  end
+
+  def server_topic(server_id) when is_binary(server_id), do: "xamt:server:#{server_id}"
+
+  def broadcast_server(server_id, message) when is_binary(server_id) do
+    Phoenix.PubSub.broadcast(Xamt.PubSub, server_topic(server_id), message)
   end
 
   @doc """
@@ -264,20 +308,31 @@ defmodule Xamt.Servers do
 
           true ->
             Repo.transact(fn ->
-              with {:ok, _member} <- join_server(scope, invite.server_id),
+              with {:ok, member} <- insert_member(invite.server_id, scope.user.id),
                    {1, _} <- bump_invite_uses(invite.id) do
-                {:ok, invite.server}
+                {:ok, {invite.server, member}}
               else
                 {:error, reason} -> {:error, reason}
                 _ -> {:error, :invalid}
               end
             end)
+            |> case do
+              {:ok, {server, member}} ->
+                member = Repo.preload(member, :user)
+                broadcast_server(server.id, {:member_joined, member})
+                {:ok, server}
+
+              {:error, reason} ->
+                {:error, reason}
+            end
         end
     end
   end
 
   defp bump_invite_uses(invite_id) do
-    from(i in Invite, where: i.id == ^invite_id)
+    from(i in Invite,
+      where: i.id == ^invite_id and (is_nil(i.max_uses) or i.uses < i.max_uses)
+    )
     |> Repo.update_all(inc: [uses: 1])
   end
 
@@ -372,7 +427,14 @@ defmodule Xamt.Servers do
   def kick_member(%Scope{user: actor}, server_id, user_id) do
     with :ok <- authorize_kick(server_id, actor.id, user_id),
          %ServerMember{} = member <- get_member(server_id, user_id) do
-      Repo.delete(member)
+      case Repo.delete(member) do
+        {:ok, deleted} ->
+          broadcast_server(server_id, {:member_removed, deleted})
+          {:ok, deleted}
+
+        other ->
+          other
+      end
     else
       nil -> {:error, :not_found}
       {:error, reason} -> {:error, reason}
@@ -390,6 +452,7 @@ defmodule Xamt.Servers do
         joined_at: member.joined_at
       })
       |> Repo.update()
+      |> tap_broadcast_member(server_id)
     else
       nil -> {:error, :not_found}
       {:error, reason} -> {:error, reason}
@@ -410,11 +473,20 @@ defmodule Xamt.Servers do
       member
       |> ServerMember.permissions_changeset(fun.(member.permissions))
       |> Repo.update()
+      |> tap_broadcast_member(server_id)
     else
       nil -> {:error, :not_found}
       {:error, reason} -> {:error, reason}
     end
   end
+
+  defp tap_broadcast_member({:ok, member}, server_id) do
+    member = Repo.preload(member, :user)
+    broadcast_server(server_id, {:member_updated, member})
+    {:ok, member}
+  end
+
+  defp tap_broadcast_member(other, _server_id), do: other
 
   defp authorize_kick(server_id, actor_id, target_id) do
     with :ok <- require_perm(server_id, actor_id, :kick_members) do

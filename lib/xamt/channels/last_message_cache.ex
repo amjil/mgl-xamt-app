@@ -20,7 +20,13 @@ defmodule Xamt.Channels.LastMessageCache do
 
   @impl true
   def init(_) do
-    :ets.new(@table, [:set, :public, :named_table, read_concurrency: true])
+    case :ets.whereis(@table) do
+      :undefined ->
+        :ets.new(@table, [:set, :public, :named_table, read_concurrency: true])
+
+      _tid ->
+        @table
+    end
 
     send(self(), :load_initial_data)
     {:ok, %{}}
@@ -48,7 +54,17 @@ defmodule Xamt.Channels.LastMessageCache do
   @doc "Updates the channel's latest message id and inserted_at."
   def put(channel_id, message_id, inserted_at)
       when is_binary(channel_id) and is_binary(message_id) do
-    :ets.insert(@table, {channel_id, message_id, inserted_at})
+    case :ets.lookup(@table, channel_id) do
+      [{^channel_id, _id, existing_at}] ->
+        if DateTime.compare(inserted_at, existing_at) != :lt do
+          :ets.insert(@table, {channel_id, message_id, inserted_at})
+        end
+
+      [] ->
+        :ets.insert(@table, {channel_id, message_id, inserted_at})
+    end
+
+    :ok
   end
 
   @doc "Removes a channel entry from the cache."

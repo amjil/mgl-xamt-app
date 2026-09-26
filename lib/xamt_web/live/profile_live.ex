@@ -16,6 +16,8 @@ defmodule XamtWeb.ProfileLive do
     else
       {:ok,
        socket
+       |> assign(:profile_user, nil)
+       |> assign(:role_ui, nil)
        |> put_flash(:error, gettext("User not found"))
        |> push_navigate(to: ~p"/")}
     end

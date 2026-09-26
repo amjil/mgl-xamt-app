@@ -195,7 +195,7 @@ defmodule Xamt.MessagesTest do
         username: "quoted#{System.unique_integer() |> abs()}"
       })
 
-    {:ok, _} = Servers.join_server(Scope.for_user(parent_author), server.id)
+    {:ok, _} = Servers.add_member(Scope.for_user(parent_author), server.id)
 
     {:ok, parent} =
       Messages.create_message(Scope.for_user(parent_author), channel.id, %{
@@ -397,7 +397,7 @@ defmodule Xamt.MessagesTest do
         username: "voter#{System.unique_integer() |> abs()}"
       })
 
-    {:ok, _} = Servers.join_server(Scope.for_user(member), server.id)
+    {:ok, _} = Servers.add_member(Scope.for_user(member), server.id)
     member_scope = Scope.for_user(member)
 
     {:ok, open_msg} =
@@ -614,7 +614,7 @@ defmodule Xamt.MessagesTest do
         display_name: "Bob"
       })
 
-    {:ok, _} = Servers.join_server(Scope.for_user(target), server.id)
+    {:ok, _} = Servers.add_member(Scope.for_user(target), server.id)
 
     html =
       ~s[<p>hey <span class="evil" onclick="alert(1)" data-mention-id="#{target.id}">@wrong</span></p>]
@@ -666,8 +666,8 @@ defmodule Xamt.MessagesTest do
     second =
       Xamt.AccountsFixtures.user_fixture(%{username: "two#{System.unique_integer() |> abs()}"})
 
-    {:ok, _} = Servers.join_server(Scope.for_user(first), server.id)
-    {:ok, _} = Servers.join_server(Scope.for_user(second), server.id)
+    {:ok, _} = Servers.add_member(Scope.for_user(first), server.id)
+    {:ok, _} = Servers.add_member(Scope.for_user(second), server.id)
 
     {:ok, message} =
       Messages.create_message(scope, channel.id, %{
@@ -759,7 +759,7 @@ defmodule Xamt.MessagesTest do
 
     muted = Xamt.AccountsFixtures.user_fixture()
     muted_scope = Scope.for_user(muted)
-    {:ok, _} = Servers.join_server(muted_scope, server.id)
+    {:ok, _} = Servers.add_member(muted_scope, server.id)
     {:ok, _} = Servers.revoke_permission(scope, server.id, muted.id, :view_channel)
 
     assert {:error, :unauthorized} = Messages.list_messages_for_user(muted_scope, channel.id)
@@ -767,6 +767,7 @@ defmodule Xamt.MessagesTest do
     assert {:error, :unauthorized} =
              Messages.list_pinned_messages_for_user(muted_scope, channel.id)
 
+    assert Messages.search_server_messages(muted_scope, server.id, "secret") == []
     assert {:ok, [_ | _]} = Messages.list_messages_for_user(scope, channel.id)
   end
 
@@ -787,7 +788,7 @@ defmodule Xamt.MessagesTest do
   } do
     muted = Xamt.AccountsFixtures.user_fixture()
     muted_scope = Scope.for_user(muted)
-    {:ok, _} = Servers.join_server(muted_scope, server.id)
+    {:ok, _} = Servers.add_member(muted_scope, server.id)
 
     {:ok, _} = Servers.revoke_permission(scope, server.id, muted.id, :send_messages)
 
@@ -806,7 +807,7 @@ defmodule Xamt.MessagesTest do
   } do
     author = Xamt.AccountsFixtures.user_fixture()
     author_scope = Scope.for_user(author)
-    {:ok, _} = Servers.join_server(author_scope, server.id)
+    {:ok, _} = Servers.add_member(author_scope, server.id)
 
     {:ok, message} =
       Messages.create_message(author_scope, channel.id, %{
@@ -838,7 +839,7 @@ defmodule Xamt.MessagesTest do
 
     author = Xamt.AccountsFixtures.user_fixture()
     author_scope = Scope.for_user(author)
-    {:ok, _} = Servers.join_server(author_scope, server.id)
+    {:ok, _} = Servers.add_member(author_scope, server.id)
 
     {:ok, message} =
       Messages.create_message(author_scope, channel.id, %{
@@ -886,7 +887,7 @@ defmodule Xamt.MessagesTest do
     server: server
   } do
     author = Xamt.AccountsFixtures.user_fixture()
-    {:ok, _} = Servers.join_server(Scope.for_user(author), server.id)
+    {:ok, _} = Servers.add_member(Scope.for_user(author), server.id)
 
     {:ok, message} =
       Messages.create_message(Scope.for_user(author), channel.id, %{

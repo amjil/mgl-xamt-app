@@ -82,13 +82,13 @@ defmodule Xamt.ServersTest do
     member: member,
     server: server
   } do
-    {:ok, _} = Servers.join_server(member_scope, server.id)
+    {:ok, _} = Servers.add_member(member_scope, server.id)
     assert {:ok, _} = Servers.kick_member(owner_scope, server.id, member.id)
     refute Servers.member?(server.id, member.id)
   end
 
   test "non-admins cannot create a channel", %{member_scope: member_scope, server: server} do
-    {:ok, _} = Servers.join_server(member_scope, server.id)
+    {:ok, _} = Servers.add_member(member_scope, server.id)
 
     assert {:error, :unauthorized} =
              Channels.create_channel(member_scope, server, %{"name" => "secret"})
@@ -132,7 +132,7 @@ defmodule Xamt.ServersTest do
     target =
       Xamt.AccountsFixtures.user_fixture(%{username: username, display_name: "MentionTarget"})
 
-    {:ok, _} = Servers.join_server(Scope.for_user(target), server.id)
+    {:ok, _} = Servers.add_member(Scope.for_user(target), server.id)
 
     by_username = Servers.search_members(server.id, username)
     assert Enum.any?(by_username, &(&1.user_id == target.id))
@@ -152,7 +152,7 @@ defmodule Xamt.ServersTest do
     member_scope: member_scope,
     server: server
   } do
-    {:ok, _} = Servers.join_server(member_scope, server.id)
+    {:ok, _} = Servers.add_member(member_scope, server.id)
 
     [owned] = Servers.list_servers_for_user(owner_scope)
     assert owned.id == server.id
@@ -171,7 +171,7 @@ defmodule Xamt.ServersTest do
     owner_member = Servers.get_member(server.id, owner_scope.user.id)
     assert owner_member.permissions == Permissions.owner_perms()
 
-    {:ok, joined} = Servers.join_server(member_scope, server.id)
+    {:ok, joined} = Servers.add_member(member_scope, server.id)
     assert joined.role == "member"
     assert joined.permissions == Permissions.default_member_perms()
   end
@@ -182,7 +182,7 @@ defmodule Xamt.ServersTest do
     member: member,
     server: server
   } do
-    {:ok, _} = Servers.join_server(member_scope, server.id)
+    {:ok, _} = Servers.add_member(member_scope, server.id)
 
     {:ok, promoted} = Servers.change_role(owner_scope, server.id, member.id, "admin")
     assert promoted.role == "admin"
@@ -198,7 +198,7 @@ defmodule Xamt.ServersTest do
     member: member,
     server: server
   } do
-    {:ok, _} = Servers.join_server(member_scope, server.id)
+    {:ok, _} = Servers.add_member(member_scope, server.id)
 
     assert {:error, :unauthorized} =
              Servers.kick_member(member_scope, server.id, owner_scope.user.id)
@@ -207,7 +207,7 @@ defmodule Xamt.ServersTest do
     assert Servers.can?(server.id, member.id, :kick_members)
 
     target = Xamt.AccountsFixtures.user_fixture()
-    {:ok, _} = Servers.join_server(Scope.for_user(target), server.id)
+    {:ok, _} = Servers.add_member(Scope.for_user(target), server.id)
 
     assert {:ok, _} = Servers.kick_member(member_scope, server.id, target.id)
     refute Servers.member?(server.id, target.id)
@@ -228,5 +228,42 @@ defmodule Xamt.ServersTest do
     scope = Scope.for_user(Xamt.AccountsFixtures.admin_fixture())
     assert {:ok, server} = Servers.create_server(scope, %{"name" => "Admin Hall"})
     assert server.name == "Admin Hall"
+  end
+
+  test "join_server refuses a private server", %{
+    member_scope: member_scope,
+    server: server
+  } do
+    assert {:error, :unauthorized} = Servers.join_server(member_scope, server.id)
+    refute Servers.member?(server.id, member_scope.user.id)
+  end
+
+  test "join_server accepts a public server", %{
+    owner_scope: owner_scope,
+    member_scope: member_scope
+  } do
+    {:ok, public} =
+      Servers.create_server(owner_scope, %{"name" => "Open Hall", "visibility" => "public"})
+
+    assert {:ok, member} = Servers.join_server(member_scope, public.id)
+    assert member.role == "member"
+    assert Servers.member?(public.id, member_scope.user.id)
+  end
+
+  test "kick_member broadcasts member_removed", %{
+    owner_scope: owner_scope,
+    member_scope: member_scope,
+    member: member,
+    server: server
+  } do
+    Phoenix.PubSub.subscribe(Xamt.PubSub, Servers.server_topic(server.id))
+    {:ok, _} = Servers.add_member(member_scope, server.id)
+
+    assert_receive {:member_joined, joined}
+    assert joined.user_id == member.id
+
+    assert {:ok, _} = Servers.kick_member(owner_scope, server.id, member.id)
+    assert_receive {:member_removed, removed}
+    assert removed.user_id == member.id
   end
 end

@@ -142,7 +142,7 @@ defmodule XamtWeb.HomeLiveTest do
     {:ok, server} = Servers.create_server(scope, %{"name" => "Closed Hall"})
 
     member = user_fixture()
-    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(member), server.id)
+    {:ok, _} = Servers.add_member(Accounts.Scope.for_user(member), server.id)
 
     {:ok, view, _html} = live(log_in_user(conn, member), ~p"/")
     refute has_element?(view, "#edit-server-#{server.id}")
@@ -155,7 +155,7 @@ defmodule XamtWeb.HomeLiveTest do
     {:ok, server} = Servers.create_server(scope, %{"name" => "Guarded Hall"})
 
     member = user_fixture()
-    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(member), server.id)
+    {:ok, _} = Servers.add_member(Accounts.Scope.for_user(member), server.id)
 
     {:ok, view, _html} = live(log_in_user(conn, member), ~p"/")
     html = render_click(view, "edit_server_request", %{"id" => server.id})

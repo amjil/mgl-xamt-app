@@ -251,8 +251,8 @@ defmodule XamtWeb.ServerLiveTest do
       |> put_connect_params(%{"timezone_offset" => -480})
       |> live(~p"/servers/#{server.slug}/#{channel.slug}")
 
-    assert has_element?(view, "#messages-date-2026-09-18")
-    assert has_element?(view, "#messages-date-2026-09-19")
+    assert has_element?(view, "[data-date='2026-09-18']")
+    assert has_element?(view, "[data-date='2026-09-19']")
     assert has_element?(view, ".xamt-date-divider__text", "-- 2026-09-18 --")
     assert has_element?(view, ".xamt-date-divider__text", "-- 2026-09-19 --")
   end
@@ -294,10 +294,10 @@ defmodule XamtWeb.ServerLiveTest do
     user: creator
   } do
     admin = admin_fixture()
-    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(admin), server.id)
+    {:ok, _} = Servers.add_member(Accounts.Scope.for_user(admin), server.id)
     admin_scope = Accounts.Scope.for_user(admin)
     regular = user_fixture()
-    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(regular), server.id)
+    {:ok, _} = Servers.add_member(Accounts.Scope.for_user(regular), server.id)
     regular_scope = Accounts.Scope.for_user(regular)
 
     {:ok, creator_msg} = post_html(scope, channel.id, "from creator")
@@ -348,7 +348,7 @@ defmodule XamtWeb.ServerLiveTest do
     scope: scope
   } do
     other = user_fixture()
-    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(other), server.id)
+    {:ok, _} = Servers.add_member(Accounts.Scope.for_user(other), server.id)
     other_scope = Accounts.Scope.for_user(other)
 
     {:ok, first} = post_html(scope, channel.id, "mine")
@@ -385,8 +385,8 @@ defmodule XamtWeb.ServerLiveTest do
 
     refute has_element?(view, "#msg-header-#{before_midnight.id}.xamt-message__header--spacer")
     refute has_element?(view, "#msg-header-#{after_midnight.id}.xamt-message__header--spacer")
-    assert has_element?(view, "#messages-date-2026-09-21")
-    assert has_element?(view, "#messages-date-2026-09-22")
+    assert has_element?(view, "[data-date='2026-09-21']")
+    assert has_element?(view, "[data-date='2026-09-22']")
   end
 
   test "a live incoming message continues the current group", %{
@@ -738,7 +738,7 @@ defmodule XamtWeb.ServerLiveTest do
     channel: channel
   } do
     member = user_fixture()
-    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(member), server.id)
+    {:ok, _} = Servers.add_member(Accounts.Scope.for_user(member), server.id)
     member_conn = log_in_user(build_conn(), member)
 
     {:ok, view, _html} = live(member_conn, ~p"/servers/#{server.slug}/#{channel.slug}")
@@ -849,7 +849,7 @@ defmodule XamtWeb.ServerLiveTest do
     channel: channel
   } do
     member = user_fixture()
-    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(member), server.id)
+    {:ok, _} = Servers.add_member(Accounts.Scope.for_user(member), server.id)
     member_conn = log_in_user(build_conn(), member)
 
     {:ok, view, _html} = live(member_conn, ~p"/servers/#{server.slug}/#{channel.slug}")
@@ -900,7 +900,7 @@ defmodule XamtWeb.ServerLiveTest do
   } do
     username = "pat#{System.unique_integer() |> abs()}"
     target = user_fixture(%{username: username, display_name: "Pat"})
-    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(target), server.id)
+    {:ok, _} = Servers.add_member(Accounts.Scope.for_user(target), server.id)
 
     {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
     html = render_hook(view, "mention_search", %{"q" => username})
@@ -914,7 +914,7 @@ defmodule XamtWeb.ServerLiveTest do
   } do
     username = "mia#{System.unique_integer() |> abs()}"
     mentioned = user_fixture(%{username: username, display_name: "Mia"})
-    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(mentioned), server.id)
+    {:ok, _} = Servers.add_member(Accounts.Scope.for_user(mentioned), server.id)
 
     {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
 
@@ -1182,7 +1182,7 @@ defmodule XamtWeb.ServerLiveTest do
       })
 
     member = user_fixture()
-    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(member), server.id)
+    {:ok, _} = Servers.add_member(Accounts.Scope.for_user(member), server.id)
     member_conn = log_in_user(build_conn(), member)
     {:ok, view, _html} = live(member_conn, ~p"/servers/#{server.slug}/#{channel.slug}")
 
@@ -1197,7 +1197,7 @@ defmodule XamtWeb.ServerLiveTest do
     channel: channel
   } do
     member = user_fixture()
-    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(member), server.id)
+    {:ok, _} = Servers.add_member(Accounts.Scope.for_user(member), server.id)
 
     {:ok, message} =
       Messages.create_message(Accounts.Scope.for_user(member), channel.id, %{
@@ -1229,7 +1229,7 @@ defmodule XamtWeb.ServerLiveTest do
     channel: channel
   } do
     member = user_fixture()
-    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(member), server.id)
+    {:ok, _} = Servers.add_member(Accounts.Scope.for_user(member), server.id)
 
     {:ok, message} =
       Messages.create_message(Accounts.Scope.for_user(member), channel.id, %{
@@ -1278,7 +1278,7 @@ defmodule XamtWeb.ServerLiveTest do
   } do
     member = user_fixture(%{username: unique_user_username(), display_name: "Typer One"})
 
-    {:ok, _} = Servers.join_server(Accounts.Scope.for_user(member), server.id)
+    {:ok, _} = Servers.add_member(Accounts.Scope.for_user(member), server.id)
     member_conn = log_in_user(build_conn(), member)
 
     {:ok, owner_view, _} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
@@ -1620,7 +1620,7 @@ defmodule XamtWeb.ServerLiveTest do
         username: "peek#{System.unique_integer() |> abs()}"
       })
 
-    {:ok, _} = Servers.join_server(Xamt.Accounts.Scope.for_user(member), server.id)
+    {:ok, _} = Servers.add_member(Xamt.Accounts.Scope.for_user(member), server.id)
 
     {:ok, message} =
       Messages.create_poll_message(scope, channel.id, %{

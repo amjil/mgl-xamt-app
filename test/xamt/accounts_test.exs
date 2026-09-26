@@ -693,4 +693,35 @@ defmodule Xamt.AccountsTest do
       assert "should be at most 50 character(s)" in errors_on(changeset).status_text
     end
   end
+
+  describe "update_user_profile/2" do
+    test "ignores username, status, and unsafe avatar URLs" do
+      user = user_fixture(%{display_name: "Old", username: "keepme"})
+      original = user.username
+
+      assert {:ok, updated} =
+               Accounts.update_user_profile(user, %{
+                 "username" => "hijacked",
+                 "display_name" => "New Neighbor",
+                 "bio" => "Writes in Mongolian.",
+                 "status" => "dnd",
+                 "avatar" => "https://evil.example/track.gif"
+               })
+
+      assert updated.username == original
+      assert updated.display_name == "New Neighbor"
+      assert updated.bio == "Writes in Mongolian."
+      assert updated.status == user.status
+      assert updated.avatar == user.avatar
+    end
+
+    test "accepts a same-origin upload avatar" do
+      user = user_fixture()
+
+      assert {:ok, updated} =
+               Accounts.update_user_profile(user, %{"avatar" => "/uploads/avatar-ok.webp"})
+
+      assert updated.avatar == "/uploads/avatar-ok.webp"
+    end
+  end
 end
