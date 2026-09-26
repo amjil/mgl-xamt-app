@@ -443,6 +443,33 @@ defmodule Xamt.MessagesTest do
     assert message.content["html"] == message.content_html
   end
 
+  test "rejects blank rich text", %{scope: scope, channel: channel} do
+    assert {:error, :invalid_content} =
+             Messages.create_message(scope, channel.id, %{
+               "content_html" => "<p></p>",
+               "content" => %{"type" => "rich_text"}
+             })
+
+    assert {:error, :invalid_content} =
+             Messages.create_message(scope, channel.id, %{
+               "content_html" => "   ",
+               "content" => %{"type" => "plain_text"},
+               "content_type" => "plain_text"
+             })
+
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>keep me</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    assert {:error, :invalid_content} =
+             Messages.update_message(scope, message.id, %{
+               "content_html" => "<p></p>",
+               "content" => %{"type" => "rich_text"}
+             })
+  end
+
   test "rejects reply_to_id from another channel", %{
     scope: scope,
     channel: channel,
@@ -461,6 +488,23 @@ defmodule Xamt.MessagesTest do
                "content_html" => "<p>sneaky reply</p>",
                "content" => %{"type" => "rich_text"},
                "reply_to_id" => foreign.id
+             })
+  end
+
+  test "rejects reply_to_id of a deleted parent", %{scope: scope, channel: channel} do
+    {:ok, parent} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>gone soon</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    {:ok, _} = Messages.delete_message(scope, parent.id)
+
+    assert {:error, :invalid_reply} =
+             Messages.create_message(scope, channel.id, %{
+               "content_html" => "<p>reply to tombstone</p>",
+               "content" => %{"type" => "rich_text"},
+               "reply_to_id" => parent.id
              })
   end
 

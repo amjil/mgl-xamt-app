@@ -176,8 +176,7 @@ defmodule XamtWeb.HomeLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="xamt-page-inner">
-      <Layouts.flash_group flash={@flash} current_scope={@current_scope} />
+    <Layouts.home flash={@flash} current_scope={@current_scope}>
       <div class="xamt-home">
         <header class="xamt-home__hero">
           <span class="xamt-ornament" aria-hidden="true"></span>
@@ -403,23 +402,16 @@ defmodule XamtWeb.HomeLive do
               phx-hook="MongolianIME"
               class="xamt-textarea mongol-input"
             />
-            <div class="xamt-field">
-              <label>
-                <span class="xamt-field__label mongol-text">{gettext("Visibility")}</span>
-                <select
-                  name={@server_form[:visibility].name}
-                  id="server-settings-visibility"
-                  class="xamt-select"
-                >
-                  <option value="private" selected={@editing_server.visibility == "private"}>
-                    {gettext("Private — invite only")}
-                  </option>
-                  <option value="public" selected={@editing_server.visibility == "public"}>
-                    {gettext("Public — anyone can find and join")}
-                  </option>
-                </select>
-              </label>
-            </div>
+            <.input
+              field={@server_form[:visibility]}
+              id="server-settings-visibility"
+              type="select"
+              label={gettext("Visibility")}
+              options={[
+                {gettext("Private — invite only"), "private"},
+                {gettext("Public — anyone can find and join"), "public"}
+              ]}
+            />
             <div class="xamt-form__actions">
               <button
                 type="submit"
@@ -482,7 +474,7 @@ defmodule XamtWeb.HomeLive do
           </ul>
         </div>
       </.drawer>
-    </div>
+    </Layouts.home>
     """
   end
 

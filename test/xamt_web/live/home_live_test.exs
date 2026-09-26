@@ -13,6 +13,7 @@ defmodule XamtWeb.HomeLiveTest do
   test "regular users do not see the create server control", %{conn: conn} do
     {:ok, view, html} = live(log_in_user(conn, user_fixture()), ~p"/")
 
+    assert has_element?(view, "#flash-group")
     refute has_element?(view, "#toggle-create-server")
     refute has_element?(view, "#create-server-form")
     assert html =~ "Join a public server or wait for an invite"
@@ -107,6 +108,7 @@ defmodule XamtWeb.HomeLiveTest do
     view |> element("#edit-server-#{server.id}") |> render_click()
     assert has_element?(view, "#edit-server-drawer")
     assert has_element?(view, "#edit-server-form")
+    assert has_element?(view, "#server-settings-visibility")
 
     view
     |> form("#edit-server-form", %{

@@ -69,6 +69,37 @@ defmodule XamtWeb.Layouts do
   end
 
   @doc """
+  Home and settings pages: page chrome without the auth shell.
+  Flash stays here so templates never call `<.flash_group>`.
+  """
+  attr :flash, :map, required: true
+  attr :current_scope, :map, default: nil
+  slot :inner_block, required: true
+
+  def home(assigns) do
+    ~H"""
+    <div class="xamt-page-inner">
+      <.flash_group flash={@flash} current_scope={@current_scope} />
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  @doc """
+  Chat shell without auth chrome. Flash is rendered here, not in the LiveView.
+  """
+  attr :flash, :map, required: true
+  attr :current_scope, :map, default: nil
+  slot :inner_block, required: true
+
+  def chat(assigns) do
+    ~H"""
+    <.flash_group flash={@flash} current_scope={@current_scope} />
+    {render_slot(@inner_block)}
+    """
+  end
+
+  @doc """
   Shows the flash group with standard titles and content.
 
   ## Examples

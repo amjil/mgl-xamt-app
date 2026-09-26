@@ -8,7 +8,8 @@ defmodule XamtWeb.Endpoint do
     store: :cookie,
     key: "_xamt_key",
     signing_salt: "SshzUNs1",
-    same_site: "Lax"
+    same_site: "Lax",
+    secure: Application.compile_env(:xamt, :secure_cookies, false)
   ]
 
   socket "/live", Phoenix.LiveView.Socket,

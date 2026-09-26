@@ -131,9 +131,7 @@ defmodule XamtWeb.SettingsLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="xamt-page-inner">
-      <Layouts.flash_group flash={@flash} current_scope={@current_scope} />
-
+    <Layouts.home flash={@flash} current_scope={@current_scope}>
       <section class="xamt-stack" id="settings-panel">
         <div class="xamt-auth-intro">
           <span class="xamt-ornament" aria-hidden="true"></span>
@@ -324,7 +322,7 @@ defmodule XamtWeb.SettingsLive do
           </.link>
         </nav>
       </section>
-    </div>
+    </Layouts.home>
     """
   end
 end

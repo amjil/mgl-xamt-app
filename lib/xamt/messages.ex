@@ -39,6 +39,7 @@ defmodule Xamt.Messages do
          :ok <- authorize_channel_perm(user.id, channel_id, :send_messages),
          :ok <- validate_reply_to(reply_to_id, channel_id),
          :ok <- validate_media_content(content, type),
+         :ok <- validate_text_body(type, content_html),
          {:ok, message} <-
            Repo.transact(fn ->
              with {:ok, message} <-
@@ -82,6 +83,7 @@ defmodule Xamt.Messages do
            content <- build_content(attrs, message.content),
            type <- content_type(attrs, content),
            :ok <- validate_media_content(content, type),
+           :ok <- validate_text_body(type, content_html),
            {:ok, message} <-
              Repo.transact(fn ->
                with {:ok, message} <-
@@ -760,6 +762,16 @@ defmodule Xamt.Messages do
 
   defp validate_media_content(_content, _type), do: :ok
 
+  defp validate_text_body(type, html) when type in ["rich_text", "plain_text"] do
+    if String.trim(plain_text(html)) == "" do
+      {:error, :invalid_content}
+    else
+      :ok
+    end
+  end
+
+  defp validate_text_body(_type, _html), do: :ok
+
   defp validate_html_size(html) when is_binary(html) do
     if String.length(html) <= Message.max_content_html(), do: :ok, else: {:error, :too_long}
   end
@@ -835,7 +847,7 @@ defmodule Xamt.Messages do
   defp validate_reply_to(reply_to_id, channel_id) when is_binary(reply_to_id) do
     case Repo.one(
            from(m in Message,
-             where: m.id == ^reply_to_id,
+             where: m.id == ^reply_to_id and is_nil(m.deleted_at),
              select: m.channel_id
            )
          ) do

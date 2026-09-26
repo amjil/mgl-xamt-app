@@ -22,7 +22,8 @@ config :xamt, :scopes,
 
 config :xamt,
   ecto_repos: [Xamt.Repo],
-  generators: [timestamp_type: :utc_datetime, binary_id: true]
+  generators: [timestamp_type: :utc_datetime, binary_id: true],
+  secure_cookies: false
 
 # Remote candidate backend for mgl-web-ime. Dev defaults to http://dev1:3003;
 # set XAMT_IME_BASE_URL to override, or empty / "local" for the bundled dictionary.

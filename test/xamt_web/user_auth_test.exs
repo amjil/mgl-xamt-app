@@ -79,9 +79,13 @@ defmodule XamtWeb.UserAuthTest do
       assert get_session(conn, :user_token) == conn.cookies[@remember_me_cookie]
       assert get_session(conn, :user_remember_me) == true
 
-      assert %{value: signed_token, max_age: max_age} = conn.resp_cookies[@remember_me_cookie]
+      assert %{value: signed_token, max_age: max_age, secure: secure} =
+               conn.resp_cookies[@remember_me_cookie]
+
       assert signed_token != get_session(conn, :user_token)
       assert max_age == @remember_me_cookie_max_age
+      # Production sets :secure_cookies true; tests keep Secure off for HTTP.
+      assert secure == Application.get_env(:xamt, :secure_cookies, false)
     end
 
     test "writes a cookie if remember_me was set in previous session", %{conn: conn, user: user} do
