@@ -1,6 +1,8 @@
 defmodule XamtWeb.UserSettingsController do
   use XamtWeb, :controller
 
+  import Phoenix.Component, only: [to_form: 2]
+
   alias Xamt.Accounts
   alias XamtWeb.UserAuth
 
@@ -33,7 +35,7 @@ defmodule XamtWeb.UserSettingsController do
         |> redirect(to: ~p"/users/settings")
 
       changeset ->
-        render(conn, :edit, email_changeset: %{changeset | action: :insert})
+        render(conn, :edit, email_form: to_form(%{changeset | action: :insert}, as: :user))
     end
   end
 
@@ -49,7 +51,7 @@ defmodule XamtWeb.UserSettingsController do
         |> UserAuth.log_in_user(user)
 
       {:error, changeset} ->
-        render(conn, :edit, password_changeset: changeset)
+        render(conn, :edit, password_form: to_form(changeset, as: :user))
     end
   end
 
@@ -71,7 +73,7 @@ defmodule XamtWeb.UserSettingsController do
     user = conn.assigns.current_scope.user
 
     conn
-    |> assign(:email_changeset, Accounts.change_user_email(user))
-    |> assign(:password_changeset, Accounts.change_user_password(user))
+    |> assign(:email_form, to_form(Accounts.change_user_email(user), as: :user))
+    |> assign(:password_form, to_form(Accounts.change_user_password(user), as: :user))
   end
 end

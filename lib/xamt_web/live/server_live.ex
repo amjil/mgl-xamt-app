@@ -101,7 +101,7 @@ defmodule XamtWeb.ServerLive do
       |> assign(:mobile_panel, :messages)
       |> assign(:mobile_search?, false)
       |> assign(:unread_channels, MapSet.new(unread_ids))
-      |> assign(:search_q, "")
+      |> assign_search("")
       |> assign(:search_results, nil)
       |> assign(:highlight_id, Map.get(params, "highlight"))
       |> assign(:lightbox_images, nil)
@@ -360,6 +360,9 @@ defmodule XamtWeb.ServerLive do
 
         {:noreply, socket}
 
+      {:error, :rate_limited} ->
+        {:noreply, put_flash(socket, :error, gettext("Too many attempts. Try again shortly."))}
+
       {:error, _} ->
         {:noreply, put_flash(socket, :error, gettext("Could not cast vote"))}
     end
@@ -423,8 +426,14 @@ defmodule XamtWeb.ServerLive do
 
   def handle_event("toggle_reaction", %{"id" => id, "emoji" => emoji}, socket) do
     case Messages.toggle_reaction(socket.assigns.current_scope, id, emoji) do
-      {:ok, _summary} -> {:noreply, socket}
-      {:error, _} -> {:noreply, put_flash(socket, :error, gettext("Could not react"))}
+      {:ok, _summary} ->
+        {:noreply, socket}
+
+      {:error, :rate_limited} ->
+        {:noreply, put_flash(socket, :error, gettext("Too many attempts. Try again shortly."))}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, gettext("Could not react"))}
     end
   end
 
@@ -838,8 +847,9 @@ defmodule XamtWeb.ServerLive do
       end
 
     {:noreply,
-     assign(socket,
-       search_q: q,
+     socket
+     |> assign_search(q)
+     |> assign(
        search_results: results,
        mobile_search?: q != "" or socket.assigns.mobile_search?
      )}
@@ -848,7 +858,8 @@ defmodule XamtWeb.ServerLive do
   def handle_event("clear_search", _params, socket) do
     {:noreply,
      socket
-     |> assign(search_q: "", search_results: nil, mobile_search?: false)
+     |> assign_search("")
+     |> assign(search_results: nil, mobile_search?: false)
      |> push_event("search:dismiss", %{})}
   end
 
@@ -856,7 +867,7 @@ defmodule XamtWeb.ServerLive do
     {:noreply,
      socket
      |> assign(:search_results, nil)
-     |> assign(:search_q, "")
+     |> assign_search("")
      |> assign(:mobile_search?, false)
      |> push_event("search:dismiss", %{})
      |> focus_message(id)}
@@ -1340,6 +1351,12 @@ defmodule XamtWeb.ServerLive do
   defp around_opts(%{"highlight" => id}) when is_binary(id) and id != "", do: [around_id: id]
   defp around_opts(_), do: []
 
+  defp assign_search(socket, q) do
+    socket
+    |> assign(:search_q, q)
+    |> assign(:search_form, to_form(%{"q" => q || ""}))
+  end
+
   defp latest_window?(_channel, []), do: true
   defp latest_window?(nil, _), do: true
 
@@ -1524,7 +1541,7 @@ defmodule XamtWeb.ServerLive do
     |> assign(:show_pinned_drawer, false)
     |> assign(:pinned_messages, [])
     |> assign(:mobile_panel, :messages)
-    |> assign(:search_q, "")
+    |> assign_search("")
     |> assign(:search_results, nil)
     |> assign(:highlight_id, Map.get(params, "highlight"))
     |> assign_messages(messages)

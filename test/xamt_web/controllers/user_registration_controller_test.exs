@@ -13,6 +13,8 @@ defmodule XamtWeb.UserRegistrationControllerTest do
       assert response =~ "Register"
       assert response =~ ~p"/login"
       assert response =~ ~p"/register"
+      assert response =~ ~s(id="user-registration-form")
+      assert response =~ ~s(id="user_display_name")
     end
 
     test "redirects if already logged in", %{conn: conn} do

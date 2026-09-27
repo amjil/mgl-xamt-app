@@ -463,7 +463,8 @@ defmodule Xamt.Messages do
   re-streaming the message.
   """
   def toggle_vote(%Scope{user: user}, poll_id, option_id) do
-    with {:ok, poll} <- fetch_poll(poll_id),
+    with :ok <- RateLimiter.check_rate({:vote, user.id}, interaction_rate_opts(:vote)),
+         {:ok, poll} <- fetch_poll(poll_id),
          {:ok, message} <- fetch_message(poll.message_id),
          :ok <- authorize_channel_perm(user.id, message.channel_id, :view_channel) do
       if match?(%DateTime{}, message.deleted_at) do
@@ -537,7 +538,8 @@ defmodule Xamt.Messages do
   can re-insert the stream item without another query.
   """
   def toggle_reaction(%Scope{user: user}, message_id, emoji) do
-    with {:ok, message} <- fetch_message(message_id),
+    with :ok <- RateLimiter.check_rate({:reaction, user.id}, interaction_rate_opts(:reaction)),
+         {:ok, message} <- fetch_message(message_id),
          :ok <- authorize_channel_perm(user.id, message.channel_id, :view_channel) do
       if match?(%DateTime{}, message.deleted_at) do
         {:error, :deleted}
@@ -935,4 +937,17 @@ defmodule Xamt.Messages do
   end
 
   def channel_topic(channel_id), do: "xamt:channel:#{channel_id}"
+
+  # Reactions / votes share the message limiter ETS but use their own keys so
+  # a tap-happy reactor cannot exhaust the send-message quota.
+  defp interaction_rate_opts(kind) when kind in [:reaction, :vote] do
+    conf = Application.get_env(:xamt, RateLimiter, [])
+    fallback_limit = Keyword.get(conf, :limit, 20)
+    fallback_window = Keyword.get(conf, :window_seconds, 3)
+
+    [
+      limit: Keyword.get(conf, :"#{kind}_limit", fallback_limit),
+      window_seconds: Keyword.get(conf, :"#{kind}_window_seconds", fallback_window)
+    ]
+  end
 end

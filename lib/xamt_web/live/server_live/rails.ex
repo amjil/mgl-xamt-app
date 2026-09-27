@@ -275,7 +275,8 @@ defmodule XamtWeb.ServerLive.Rails do
       >
         <.icon name="hero-bookmark-square" class="size-5" />
       </button>
-      <form
+      <.form
+        for={@search_form}
         id="channel-search"
         phx-change="search"
         phx-submit="search"
@@ -300,7 +301,7 @@ defmodule XamtWeb.ServerLive.Rails do
         <label class="xamt-search__field">
           <span class="sr-only">{gettext("Search")}</span>
           <textarea
-            name="q"
+            name={@search_form[:q].name}
             id="channel-search-q"
             rows="1"
             placeholder={gettext("Search")}
@@ -310,7 +311,7 @@ defmodule XamtWeb.ServerLive.Rails do
             virtualkeyboardpolicy="manual"
             autocomplete="off"
             wrap="off"
-          >{@search_q}</textarea>
+          >{@search_form[:q].value}</textarea>
         </label>
         <button
           :if={@search_results}
@@ -322,7 +323,7 @@ defmodule XamtWeb.ServerLive.Rails do
         >
           <.icon name="hero-x-mark" class="size-4" />
         </button>
-      </form>
+      </.form>
       <button
         type="button"
         id="mobile-nav-members"

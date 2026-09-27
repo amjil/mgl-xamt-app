@@ -11,6 +11,8 @@ defmodule XamtWeb.UserSettingsControllerTest do
       conn = get(conn, ~p"/users/settings")
       response = html_response(conn, 200)
       assert response =~ "Settings"
+      assert response =~ ~s(id="update_email")
+      assert response =~ ~s(id="update_password")
     end
 
     test "redirects if user is not logged in" do

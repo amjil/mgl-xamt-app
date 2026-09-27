@@ -15,27 +15,23 @@
     </.header>
 
     <.form
-      :let={f}
-      for={@changeset}
+      for={@form}
       action={~p"/register"}
       id="user-registration-form"
       class="xamt-form xamt-form--vertical"
     >
-      <label class="xamt-label">
-        <span class="xamt-field__label mongol-text">{gettext("Display name")}</span>
-        <input
-          type="text"
-          name="user[display_name]"
-          id="user_display_name"
-          value={f[:display_name].value}
-          class="xamt-input mongol-input"
-          autocomplete="nickname"
-        />
-        <mgl-ime target="#user_display_name" profile="auto" keyboard="auto"></mgl-ime>
-      </label>
+      <.input
+        field={@form[:display_name]}
+        id="user_display_name"
+        type="text"
+        label={gettext("Display name")}
+        class="xamt-input mongol-input"
+        autocomplete="nickname"
+      />
+      <mgl-ime target="#user_display_name" profile="auto" keyboard="auto"></mgl-ime>
 
       <.input
-        field={f[:username]}
+        field={@form[:username]}
         type="text"
         label={gettext("Username")}
         class="xamt-input xamt-input--latin"
@@ -44,7 +40,7 @@
         required
       />
       <.input
-        field={f[:email]}
+        field={@form[:email]}
         type="email"
         label={gettext("Email")}
         autocomplete="email"
@@ -52,14 +48,14 @@
         required
       />
       <.input
-        field={f[:password]}
+        field={@form[:password]}
         type="password"
         label={gettext("Password")}
         autocomplete="new-password"
         required
       />
       <.input
-        field={f[:password_confirmation]}
+        field={@form[:password_confirmation]}
         type="password"
         label={gettext("Confirm password")}
         autocomplete="new-password"

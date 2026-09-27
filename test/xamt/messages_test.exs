@@ -252,6 +252,29 @@ defmodule Xamt.MessagesTest do
     assert {:ok, %{}} = Messages.toggle_reaction(scope, message.id, hd(Reaction.emojis()))
   end
 
+  test "rate-limits rapid reactions", %{scope: scope, channel: channel} do
+    previous = Application.get_env(:xamt, RateLimiter)
+
+    Application.put_env(:xamt, RateLimiter,
+      limit: :infinity,
+      reaction_limit: 1,
+      reaction_window_seconds: 60
+    )
+
+    on_exit(fn -> Application.put_env(:xamt, RateLimiter, previous) end)
+    RateLimiter.reset()
+
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>react burst</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    emoji = hd(Reaction.emojis())
+    assert {:ok, _} = Messages.toggle_reaction(scope, message.id, emoji)
+    assert {:error, :rate_limited} = Messages.toggle_reaction(scope, message.id, emoji)
+  end
+
   test "rejects reactions from users outside the server", %{
     scope: scope,
     channel: channel
@@ -361,6 +384,31 @@ defmodule Xamt.MessagesTest do
     assert payload2.poll.selected_option_ids == [opt_b.id]
     assert Enum.find(payload2.poll.options, &(&1.id == opt_a.id)).votes_count == 0
     assert Enum.find(payload2.poll.options, &(&1.id == opt_b.id)).votes_count == 1
+  end
+
+  test "rate-limits rapid poll votes", %{scope: scope, channel: channel} do
+    previous = Application.get_env(:xamt, RateLimiter)
+
+    Application.put_env(:xamt, RateLimiter,
+      limit: :infinity,
+      vote_limit: 1,
+      vote_window_seconds: 60
+    )
+
+    on_exit(fn -> Application.put_env(:xamt, RateLimiter, previous) end)
+    RateLimiter.reset()
+
+    {:ok, message} =
+      Messages.create_poll_message(scope, channel.id, %{
+        "question" => "Burst",
+        "options" => ["A", "B"]
+      })
+
+    poll = Messages.poll_summary([message.id])[message.id]
+    [opt_a, opt_b] = poll.options
+
+    assert {:ok, _} = Messages.toggle_vote(scope, poll.id, opt_a.id)
+    assert {:error, :rate_limited} = Messages.toggle_vote(scope, poll.id, opt_b.id)
   end
 
   test "rejects votes on deleted messages and from outsiders", %{

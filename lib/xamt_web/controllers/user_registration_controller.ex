@@ -1,6 +1,8 @@
 defmodule XamtWeb.UserRegistrationController do
   use XamtWeb, :controller
 
+  import Phoenix.Component, only: [to_form: 2]
+
   alias Xamt.Accounts
   alias Xamt.Accounts.User
   alias Xamt.SiteSettings
@@ -8,8 +10,7 @@ defmodule XamtWeb.UserRegistrationController do
   plug :require_registration_enabled
 
   def new(conn, _params) do
-    changeset = Accounts.change_user_registration(%User{})
-    render(conn, :new, changeset: changeset)
+    render(conn, :new, form: registration_form())
   end
 
   def create(conn, %{"user" => user_params}) do
@@ -17,7 +18,7 @@ defmodule XamtWeb.UserRegistrationController do
       {:error, :rate_limited} ->
         conn
         |> put_flash(:error, gettext("Too many attempts. Try again shortly."))
-        |> render(:new, changeset: Accounts.change_user_registration(%User{}, user_params))
+        |> render(:new, form: registration_form(user_params))
 
       :ok ->
         case Accounts.register_user(user_params) do
@@ -33,9 +34,13 @@ defmodule XamtWeb.UserRegistrationController do
             |> redirect(to: ~p"/login")
 
           {:error, %Ecto.Changeset{} = changeset} ->
-            render(conn, :new, changeset: changeset)
+            render(conn, :new, form: to_form(changeset, as: :user))
         end
     end
+  end
+
+  defp registration_form(attrs \\ %{}) do
+    to_form(Accounts.change_user_registration(%User{}, attrs), as: :user)
   end
 
   defp require_registration_enabled(conn, _opts) do
