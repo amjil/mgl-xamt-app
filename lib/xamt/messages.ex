@@ -194,18 +194,38 @@ defmodule Xamt.Messages do
 
   def list_messages(channel_id, opts \\ []) do
     limit = Keyword.get(opts, :limit, @default_limit)
-    before_id = Keyword.get(opts, :before_id)
-    before_time = Keyword.get(opts, :before_time)
 
-    from(m in Message, where: m.channel_id == ^channel_id)
-    |> apply_pagination(before_id, before_time)
-    |> with_assoc_joins()
-    |> order_by([m], desc: m.inserted_at, desc: m.id)
-    |> limit(^limit)
-    |> Repo.all()
-    |> Enum.map(&attach_mention_ids/1)
-    |> Enum.reverse()
+    case Keyword.get(opts, :around_id) do
+      id when is_binary(id) and id != "" ->
+        list_messages_around(channel_id, id, limit)
+
+      _ ->
+        before_id = Keyword.get(opts, :before_id)
+        before_time = Keyword.get(opts, :before_time)
+
+        from(m in Message, where: m.channel_id == ^channel_id)
+        |> apply_pagination(before_id, before_time)
+        |> fetch_message_page(limit)
+    end
   end
+
+  @doc """
+  True when `message` is not the newest row in the channel.
+
+  Used by the chat LiveView to avoid inserting live messages into a
+  historical window (which would open a gap in the stream).
+  """
+  def has_newer_messages?(channel_id, %Message{id: id, inserted_at: inserted_at}) do
+    Repo.exists?(
+      from(m in Message,
+        where:
+          m.channel_id == ^channel_id and
+            (m.inserted_at > ^inserted_at or (m.inserted_at == ^inserted_at and m.id > ^id))
+      )
+    )
+  end
+
+  def has_newer_messages?(_channel_id, _), do: false
 
   def get_message!(id) do
     from(m in Message, where: m.id == ^id)
@@ -633,6 +653,45 @@ defmodule Xamt.Messages do
   # Reload after insert/update/delete so PubSub payloads include nested
   # `reply_to.user` (the quote chip renders "replied to @someone").
   defp preload_message!(%Message{id: id}), do: get_message!(id)
+
+  defp fetch_message_page(query, limit) do
+    query
+    |> with_assoc_joins()
+    |> order_by([m], desc: m.inserted_at, desc: m.id)
+    |> limit(^limit)
+    |> Repo.all()
+    |> Enum.map(&attach_mention_ids/1)
+    |> Enum.reverse()
+  end
+
+  # If the target is already in the latest page, keep that page so jumping
+  # to a recent hit does not hide newer messages. Otherwise load a page
+  # that ends at the target so search / reply / highlight can scroll to it.
+  defp list_messages_around(channel_id, around_id, limit) do
+    latest = list_messages(channel_id, limit: limit)
+
+    if Enum.any?(latest, &(&1.id == around_id)) do
+      latest
+    else
+      case Repo.one(
+             from(m in Message,
+               where: m.id == ^around_id and m.channel_id == ^channel_id,
+               select: {m.id, m.inserted_at}
+             )
+           ) do
+        {id, ts} ->
+          from(m in Message, where: m.channel_id == ^channel_id)
+          |> where(
+            [m],
+            m.inserted_at < ^ts or (m.inserted_at == ^ts and m.id <= ^id)
+          )
+          |> fetch_message_page(limit)
+
+        nil ->
+          latest
+      end
+    end
+  end
 
   defp apply_pagination(query, before_id, before_time) do
     cond do

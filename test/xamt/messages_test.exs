@@ -443,6 +443,43 @@ defmodule Xamt.MessagesTest do
     assert message.content["html"] == message.content_html
   end
 
+  test "list_messages around_id returns a page ending at an old message", %{
+    scope: scope,
+    channel: channel
+  } do
+    previous = Application.get_env(:xamt, RateLimiter)
+    Application.put_env(:xamt, RateLimiter, limit: :infinity, window_seconds: 3)
+    on_exit(fn -> Application.put_env(:xamt, RateLimiter, previous) end)
+
+    {:ok, oldest} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>anchor-old</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    stamp_message(oldest, DateTime.add(now, -3600, :second))
+
+    for i <- 1..54 do
+      {:ok, _} =
+        Messages.create_message(scope, channel.id, %{
+          "content_html" => "<p>later-#{i}</p>",
+          "content" => %{"type" => "rich_text"}
+        })
+    end
+
+    latest = Messages.list_messages(channel.id, limit: 50)
+    refute Enum.any?(latest, &(&1.id == oldest.id))
+
+    around = Messages.list_messages(channel.id, around_id: oldest.id, limit: 50)
+    assert List.last(around).id == oldest.id
+    assert Messages.has_newer_messages?(channel.id, List.last(around))
+
+    recent = Messages.list_messages(channel.id, around_id: List.last(latest).id, limit: 50)
+    assert Enum.map(recent, & &1.id) == Enum.map(latest, & &1.id)
+    refute Messages.has_newer_messages?(channel.id, List.last(recent))
+  end
+
   test "rejects blank rich text", %{scope: scope, channel: channel} do
     assert {:error, :invalid_content} =
              Messages.create_message(scope, channel.id, %{
@@ -974,5 +1011,11 @@ defmodule Xamt.MessagesTest do
     after
       0 -> n
     end
+  end
+
+  defp stamp_message(message, inserted_at) do
+    message
+    |> Ecto.Changeset.change(inserted_at: inserted_at, updated_at: inserted_at)
+    |> Repo.update!()
   end
 end

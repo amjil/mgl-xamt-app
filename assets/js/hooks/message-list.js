@@ -29,7 +29,13 @@ export const MessageList = {
     this._atLatest = true
     this._scrollTimer = null
 
-    this._onJump = () => this.scrollToLatest(true)
+    this._onJump = () => {
+      if (this.el.dataset.viewingLatest === "false") {
+        this.pushEvent("jump_latest", {})
+      } else {
+        this.scrollToLatest(true)
+      }
+    }
     this.jumpBtn?.addEventListener("click", this._onJump)
 
     this._onScroll = () => {
@@ -56,6 +62,7 @@ export const MessageList = {
     })
 
     this.handleEvent("messages:scroll_to", ({id}) => this.highlightMessage(id))
+    this.handleEvent("messages:scroll_latest", () => this.scrollToLatest(true))
     this.highlightFromDataset()
   },
 

@@ -466,6 +466,8 @@ defmodule Xamt.Messages.LinkPreview do
       ]
       |> Keyword.merge(req_options())
 
+    {url, req_opts} = maybe_pin_peer(url, req_opts)
+
     req_opts =
       if Keyword.has_key?(req_opts, :plug) do
         req_opts
@@ -473,7 +475,84 @@ defmodule Xamt.Messages.LinkPreview do
         Keyword.put(req_opts, :into, &collect_limited/2)
       end
 
-    Req.get(url, req_opts)
+    case url do
+      :unsafe -> {:error, :unsafe_url}
+      url -> Req.get(url, req_opts)
+    end
+  end
+
+  # Resolve once and connect to that public IP with the original Host / SNI.
+  # DNS rebinding between `fetchable_url?/1` and the TCP connect cannot then
+  # steer the request at a private address.
+  defp maybe_pin_peer(url, req_opts) do
+    if Keyword.has_key?(req_opts, :plug) do
+      {url, req_opts}
+    else
+      case pinned_peer(url) do
+        {:ok, pinned_url, host_header, sni_host} ->
+          headers = [{"host", host_header} | Keyword.get(req_opts, :headers, [])]
+          connect = Keyword.get(req_opts, :connect_options, [])
+
+          connect =
+            if sni_host do
+              Keyword.put(connect, :transport_opts,
+                verify: :verify_peer,
+                cacerts: :public_key.cacerts_get(),
+                server_name_indication: String.to_charlist(sni_host)
+              )
+            else
+              connect
+            end
+
+          {pinned_url,
+           req_opts
+           |> Keyword.put(:headers, headers)
+           |> Keyword.put(:connect_options, connect)}
+
+        :unsafe ->
+          {:unsafe, req_opts}
+      end
+    end
+  end
+
+  @doc false
+  def pinned_peer(url) when is_binary(url) do
+    case URI.parse(url) do
+      %URI{scheme: scheme, host: host} = uri
+      when scheme in ["http", "https"] and is_binary(host) ->
+        host = String.downcase(host)
+
+        cond do
+          blocked_host?(host) ->
+            :unsafe
+
+          true ->
+            case public_addrs(host) do
+              {:ok, [ip | _]} ->
+                pinned = %{uri | host: ip_to_host(ip)} |> URI.to_string()
+                sni = if scheme == "https", do: host
+                {:ok, pinned, request_host_header(host, uri), sni}
+
+              _ ->
+                :unsafe
+            end
+        end
+
+      _ ->
+        :unsafe
+    end
+  end
+
+  defp ip_to_host(ip), do: ip |> :inet.ntoa() |> List.to_string()
+
+  defp request_host_header(host, %URI{scheme: scheme, port: port}) do
+    default = if(scheme == "https", do: 443, else: 80)
+
+    if port in [nil, default] do
+      host
+    else
+      "#{host}:#{port}"
+    end
   end
 
   defp collect_limited({:data, chunk}, {req, resp}) do
@@ -805,17 +884,22 @@ defmodule Xamt.Messages.LinkPreview do
     end
   end
 
-  defp public_dns?(host) do
+  defp public_dns?(host), do: match?({:ok, _}, public_addrs(host))
+
+  defp public_addrs(host) do
     host_c = String.to_charlist(host)
 
     case :inet.getaddrs(host_c, :inet) do
       {:ok, addrs} when addrs != [] ->
-        Enum.all?(addrs, &public_ip?/1)
+        if Enum.all?(addrs, &public_ip?/1), do: {:ok, addrs}, else: :error
 
       _ ->
         case :inet.getaddrs(host_c, :inet6) do
-          {:ok, addrs} when addrs != [] -> Enum.all?(addrs, &public_ip?/1)
-          _ -> false
+          {:ok, addrs} when addrs != [] ->
+            if Enum.all?(addrs, &public_ip?/1), do: {:ok, addrs}, else: :error
+
+          _ ->
+            :error
         end
     end
   end

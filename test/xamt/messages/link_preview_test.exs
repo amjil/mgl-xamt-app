@@ -96,6 +96,14 @@ defmodule Xamt.Messages.LinkPreviewTest do
     assert Messages.get_message!(local.id).link_preview == nil
   end
 
+  test "pinned_peer refuses private and link-local literals" do
+    assert LinkPreview.pinned_peer("http://127.0.0.1/secret") == :unsafe
+    assert LinkPreview.pinned_peer("http://192.168.1.10/x") == :unsafe
+    assert LinkPreview.pinned_peer("http://169.254.169.254/latest/meta-data/") == :unsafe
+    assert LinkPreview.pinned_peer("http://10.0.0.8/admin") == :unsafe
+    assert LinkPreview.pinned_peer("not-a-url") == :unsafe
+  end
+
   test "does not follow redirects to private or link-local addresses", %{
     scope: scope,
     channel: channel

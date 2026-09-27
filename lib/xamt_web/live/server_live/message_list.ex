@@ -50,6 +50,7 @@ defmodule XamtWeb.ServerLive.MessageList do
         phx-hook="MessageList"
         data-highlight={@highlight_id}
         data-channel-id={@active_channel && @active_channel.id}
+        data-viewing-latest={to_string(@viewing_latest?)}
       >
         <div
           :if={@has_more_messages}

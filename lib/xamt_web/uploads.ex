@@ -45,6 +45,34 @@ defmodule XamtWeb.Uploads do
     List.first(consume(socket, name, &audio_ext/1))
   end
 
+  @doc """
+  Removes files previously persisted under `/uploads/...`.
+
+  Used when `consume_*` succeeded but the following write (message, profile)
+  failed, so the disk copy is not left orphaned.
+  """
+  def delete_stored(entries) when is_list(entries) do
+    Enum.each(entries, &delete_stored/1)
+  end
+
+  def delete_stored(%{"thumb" => thumb, "original" => original}) do
+    delete_stored(thumb)
+    delete_stored(original)
+  end
+
+  def delete_stored(url) when is_binary(url) do
+    name = Path.basename(url)
+
+    if String.starts_with?(url, "/uploads/") and Xamt.Uploads.safe_filename?(name) do
+      dest = Path.join([:code.priv_dir(:xamt), "static", "uploads", name])
+      File.rm(dest)
+    end
+
+    :ok
+  end
+
+  def delete_stored(_), do: :ok
+
   defp persist_gallery_image(path, uuid, ext) do
     uploads_dir = Path.join([:code.priv_dir(:xamt), "static", "uploads"])
     File.mkdir_p!(uploads_dir)

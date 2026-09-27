@@ -62,6 +62,10 @@ defmodule XamtWeb.SettingsLive do
          |> put_flash(:info, gettext("Profile updated"))}
 
       {:error, changeset} ->
+        if url = params["avatar"] do
+          XamtWeb.Uploads.delete_stored(url)
+        end
+
         {:noreply, assign(socket, form: to_form(changeset, as: :user))}
     end
   end

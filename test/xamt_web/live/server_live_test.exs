@@ -581,6 +581,44 @@ defmodule XamtWeb.ServerLiveTest do
     assert has_element?(view, "#message-list[data-highlight='#{message.id}']")
   end
 
+  test "highlight, search, and quote jump load a message outside the latest page", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    {oldest, reply} = seed_history_with_reply(scope, channel.id)
+
+    {:ok, highlighted, _html} =
+      live(conn, ~p"/servers/#{server.slug}/#{channel.slug}?highlight=#{oldest.id}")
+
+    assert has_element?(highlighted, "[data-message-id='#{oldest.id}']")
+    assert has_element?(highlighted, "#message-list[data-highlight='#{oldest.id}']")
+    assert has_element?(highlighted, "#message-list[data-viewing-latest='false']")
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    refute has_element?(view, "[data-message-id='#{oldest.id}']")
+    assert has_element?(view, "[data-message-id='#{reply.id}']")
+    assert has_element?(view, "#message-list[data-viewing-latest='true']")
+
+    view |> form("#channel-search", %{q: "anchor-old"}) |> render_change()
+    view |> element("#search-hit-#{oldest.id}") |> render_click()
+
+    assert has_element?(view, "[data-message-id='#{oldest.id}']")
+    assert has_element?(view, "#message-list[data-highlight='#{oldest.id}']")
+    assert has_element?(view, "#message-list[data-viewing-latest='false']")
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    view |> element("#quote-#{reply.id}") |> render_click()
+    assert has_element?(view, "[data-message-id='#{oldest.id}']")
+    assert has_element?(view, "#message-list[data-highlight='#{oldest.id}']")
+
+    render_click(view, "jump_latest", %{})
+    refute has_element?(view, "[data-message-id='#{oldest.id}']")
+    assert has_element?(view, "[data-message-id='#{reply.id}']")
+    assert has_element?(view, "#message-list[data-viewing-latest='true']")
+  end
+
   test "channel admin menu is always reachable", %{
     conn: conn,
     server: server,
@@ -1676,6 +1714,29 @@ defmodule XamtWeb.ServerLiveTest do
       "content_html" => "<p>#{text}</p>",
       "content" => %{"type" => "rich_text"}
     })
+  end
+
+  defp seed_history_with_reply(scope, channel_id) do
+    previous = Application.get_env(:xamt, Xamt.Messages.RateLimiter)
+    Application.put_env(:xamt, Xamt.Messages.RateLimiter, limit: :infinity, window_seconds: 3)
+    on_exit(fn -> Application.put_env(:xamt, Xamt.Messages.RateLimiter, previous) end)
+
+    {:ok, oldest} = post_html(scope, channel_id, "anchor-old")
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    stamp(oldest, DateTime.add(now, -3600, :second))
+
+    for i <- 1..54 do
+      {:ok, _} = post_html(scope, channel_id, "later-#{i}")
+    end
+
+    {:ok, reply} =
+      Messages.create_message(scope, channel_id, %{
+        "content_html" => "<p>reply-to-old</p>",
+        "content" => %{"type" => "rich_text"},
+        "reply_to_id" => oldest.id
+      })
+
+    {oldest, reply}
   end
 
   defp stamp(message, inserted_at) do

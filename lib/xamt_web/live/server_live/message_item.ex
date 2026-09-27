@@ -91,12 +91,10 @@ defmodule XamtWeb.ServerLive.MessageItem do
           <button
             :if={@message.reply_to}
             type="button"
+            id={"quote-#{@message.id}"}
             class="xamt-quote"
-            phx-click={
-              JS.dispatch("xamt:highlight",
-                detail: %{target_id: "messages-#{@message.reply_to_id}"}
-              )
-            }
+            phx-click="jump_to_message"
+            phx-value-id={@message.reply_to_id}
             title={gettext("Jump to the quoted message")}
           >
             <span class="xamt-quote__mark" aria-hidden="true">↳</span>

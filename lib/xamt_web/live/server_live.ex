@@ -68,7 +68,7 @@ defmodule XamtWeb.ServerLive do
       end
     end
 
-    messages = visible_messages(scope, channel)
+    messages = visible_messages(scope, channel, around_opts(params))
 
     unread_ids = Channels.get_unread_channel_ids(scope.user.id, server.id)
 
@@ -248,23 +248,9 @@ defmodule XamtWeb.ServerLive do
              |> assign(:replying_to, nil)
              |> push_event("composer:clear", %{})}
 
-          {:error, :rate_limited} ->
-            {:noreply, put_flash(socket, :error, gettext("Messages sent too fast"))}
-
-          {:error, :unauthorized} ->
-            {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
-
-          {:error, :invalid_reply} ->
-            {:noreply, put_flash(socket, :error, gettext("Could not send message"))}
-
-          {:error, :too_long} ->
-            {:noreply, put_flash(socket, :error, gettext("Message is too long"))}
-
-          {:error, :invalid_content} ->
-            {:noreply, put_flash(socket, :error, gettext("Could not send message"))}
-
-          {:error, _changeset} ->
-            {:noreply, put_flash(socket, :error, gettext("Could not send message"))}
+          error ->
+            XamtWeb.Uploads.delete_stored(images)
+            {:noreply, message_write_error(socket, error)}
         end
     end
   end
@@ -472,11 +458,9 @@ defmodule XamtWeb.ServerLive do
              |> assign(:editing_message_id, nil)
              |> push_event("composer:clear", %{})}
 
-          {:error, :too_long} ->
-            {:noreply, put_flash(socket, :error, gettext("Message is too long"))}
-
-          {:error, _} ->
-            {:noreply, put_flash(socket, :error, gettext("Could not update message"))}
+          error ->
+            XamtWeb.Uploads.delete_stored(new_images)
+            {:noreply, message_write_error(socket, error, gettext("Could not update message"))}
         end
     end
   end
@@ -868,33 +852,34 @@ defmodule XamtWeb.ServerLive do
      |> push_event("search:dismiss", %{})}
   end
 
-  def handle_event("open_search_result", %{"id" => id} = params, socket) do
-    channel_id = params["channel-id"] || params["channel_id"]
-    active = socket.assigns.active_channel
+  def handle_event("open_search_result", %{"id" => id}, socket) do
+    {:noreply,
+     socket
+     |> assign(:search_results, nil)
+     |> assign(:search_q, "")
+     |> assign(:mobile_search?, false)
+     |> push_event("search:dismiss", %{})
+     |> focus_message(id)}
+  end
+
+  def handle_event("jump_to_message", %{"id" => id}, socket) do
+    {:noreply, focus_message(socket, id)}
+  end
+
+  def handle_event("jump_latest", _params, socket) do
+    channel = socket.assigns.active_channel
 
     socket =
-      socket
-      |> assign(:search_results, nil)
-      |> assign(:search_q, "")
-      |> assign(:mobile_search?, false)
-      |> push_event("search:dismiss", %{})
+      if socket.assigns[:viewing_latest?] or is_nil(channel) do
+        push_event(socket, "messages:scroll_latest", %{})
+      else
+        socket
+        |> assign(:highlight_id, nil)
+        |> assign_messages(visible_messages(socket.assigns.current_scope, channel))
+        |> push_event("messages:scroll_latest", %{})
+      end
 
-    cond do
-      is_nil(channel_id) or (active && active.id == channel_id) ->
-        {:noreply, push_event(socket, "messages:scroll_to", %{id: id})}
-
-      true ->
-        case Enum.find(socket.assigns.channels, &(&1.id == channel_id)) do
-          nil ->
-            {:noreply, socket}
-
-          channel ->
-            {:noreply,
-             push_patch(socket,
-               to: ~p"/servers/#{socket.assigns.server.slug}/#{channel.slug}?highlight=#{id}"
-             )}
-        end
-    end
+    {:noreply, socket}
   end
 
   @impl true
@@ -960,7 +945,8 @@ defmodule XamtWeb.ServerLive do
 
       socket =
         cond do
-          active_channel && message.channel_id == active_channel.id ->
+          active_channel && message.channel_id == active_channel.id &&
+              socket.assigns[:viewing_latest?] != false ->
             # Stay in the stream; IntersectionObserver advances the watermark
             # only when the message actually enters the viewport.
             {message, last_info} = tag_incoming_message(socket, message)
@@ -975,6 +961,7 @@ defmodule XamtWeb.ServerLive do
               Map.put(socket.assigns.header_flags, message.id, message.show_header)
             )
             |> assign(:last_message_at, message.inserted_at)
+            |> assign(:last_message_id, message.id)
             |> assign(:messages_empty?, false)
             |> assign(:oldest_message_id, socket.assigns[:oldest_message_id] || message.id)
             |> assign(
@@ -982,6 +969,9 @@ defmodule XamtWeb.ServerLive do
               socket.assigns[:oldest_message_info] || oldest_message_info([message])
             )
             |> push_event("messages:scroll_bottom", %{})
+
+          active_channel && message.channel_id == active_channel.id ->
+            push_event(socket, "messages:scroll_bottom", %{})
 
           message.user_id != user_id and server_channel?(socket, message.channel_id) ->
             assign(
@@ -1200,10 +1190,10 @@ defmodule XamtWeb.ServerLive do
         _ -> nil
       end
 
-    last_at =
+    {last_id, last_at} =
       case List.last(grouped) do
-        %{inserted_at: at} -> at
-        _ -> nil
+        %{id: id, inserted_at: at} -> {id, at}
+        _ -> {nil, nil}
       end
 
     items = Helpers.with_date_dividers(grouped, offset)
@@ -1212,10 +1202,12 @@ defmodule XamtWeb.ServerLive do
     |> assign(:oldest_message_id, oldest_id)
     |> assign(:oldest_message_info, Helpers.oldest_message_info(grouped))
     |> assign(:last_message_at, last_at)
+    |> assign(:last_message_id, last_id)
     |> assign(:last_message_info, last_info)
     |> assign(:header_flags, flags)
     |> assign(:has_more_messages, length(messages) >= @message_page_size)
     |> assign(:messages_empty?, messages == [])
+    |> assign(:viewing_latest?, latest_window?(socket.assigns[:active_channel], grouped))
     |> assign(:reactions, Messages.reaction_summary(Enum.map(messages, & &1.id)))
     |> assign_polls(messages)
     |> stream(:messages, items, reset: true)
@@ -1345,6 +1337,103 @@ defmodule XamtWeb.ServerLive do
     end
   end
 
+  defp around_opts(%{"highlight" => id}) when is_binary(id) and id != "", do: [around_id: id]
+  defp around_opts(_), do: []
+
+  defp latest_window?(_channel, []), do: true
+  defp latest_window?(nil, _), do: true
+
+  defp latest_window?(channel, messages) do
+    not Messages.has_newer_messages?(channel.id, List.last(messages))
+  end
+
+  defp focus_message(socket, id) when is_binary(id) and id != "" do
+    active = socket.assigns.active_channel
+
+    case Messages.get_message_for_user(socket.assigns.current_scope, id) do
+      {:ok, message} ->
+        cond do
+          active && message.channel_id == active.id && message_in_window?(socket, message) ->
+            socket
+            |> assign(:highlight_id, id)
+            |> push_event("messages:scroll_to", %{id: id})
+
+          active && message.channel_id == active.id ->
+            socket
+            |> assign(:highlight_id, id)
+            |> assign_messages(
+              visible_messages(socket.assigns.current_scope, active, around_id: id)
+            )
+            |> push_event("messages:scroll_to", %{id: id})
+
+          true ->
+            case Enum.find(socket.assigns.channels, &(&1.id == message.channel_id)) do
+              nil ->
+                socket
+
+              channel ->
+                push_patch(socket,
+                  to: ~p"/servers/#{socket.assigns.server.slug}/#{channel.slug}?highlight=#{id}"
+                )
+            end
+        end
+
+      {:error, _} ->
+        socket
+    end
+  end
+
+  defp focus_message(socket, _), do: socket
+
+  defp message_in_window?(socket, message) do
+    oldest = socket.assigns[:oldest_message_info]
+    last_id = socket.assigns[:last_message_id]
+    last_at = socket.assigns[:last_message_at]
+
+    cond do
+      is_nil(oldest) or is_nil(oldest.id) ->
+        false
+
+      socket.assigns[:viewing_latest?] != false ->
+        not older_than_oldest?(message, oldest)
+
+      true ->
+        not older_than_oldest?(message, oldest) and
+          not newer_than_latest_loaded?(message, last_id, last_at)
+    end
+  end
+
+  defp older_than_oldest?(message, %{id: id, time: time}) do
+    DateTime.compare(message.inserted_at, time) == :lt or
+      (DateTime.compare(message.inserted_at, time) == :eq and message.id < id)
+  end
+
+  defp newer_than_latest_loaded?(message, last_id, last_at)
+       when is_binary(last_id) and not is_nil(last_at) do
+    DateTime.compare(message.inserted_at, last_at) == :gt or
+      (DateTime.compare(message.inserted_at, last_at) == :eq and message.id > last_id)
+  end
+
+  defp newer_than_latest_loaded?(_message, _last_id, _last_at), do: true
+
+  defp message_write_error(socket, error), do: message_write_error(socket, error, nil)
+
+  defp message_write_error(socket, error, fallback) do
+    cond do
+      error == {:error, :rate_limited} ->
+        put_flash(socket, :error, gettext("Messages sent too fast"))
+
+      error == {:error, :unauthorized} ->
+        put_flash(socket, :error, gettext("Unauthorized"))
+
+      error == {:error, :too_long} ->
+        put_flash(socket, :error, gettext("Message is too long"))
+
+      true ->
+        put_flash(socket, :error, fallback || gettext("Could not send message"))
+    end
+  end
+
   defp visible_pins(_scope, nil), do: []
 
   defp visible_pins(scope, channel) do
@@ -1360,6 +1449,12 @@ defmodule XamtWeb.ServerLive do
   end
 
   defp maybe_scroll_to_highlight(socket, _), do: socket
+
+  defp maybe_focus_highlight(socket, %{"highlight" => id}) when is_binary(id) and id != "" do
+    focus_message(socket, id)
+  end
+
+  defp maybe_focus_highlight(socket, _), do: socket
 
   defp maybe_push_composer_reset(socket, _params) do
     push_event(socket, "composer:clear", %{})
@@ -1387,7 +1482,7 @@ defmodule XamtWeb.ServerLive do
       if current && current.slug == channel_slug do
         socket
         |> assign(:highlight_id, Map.get(params, "highlight"))
-        |> maybe_scroll_to_highlight(params)
+        |> maybe_focus_highlight(params)
       else
         switch_channel(socket, channel_slug, params)
       end
@@ -1414,7 +1509,7 @@ defmodule XamtWeb.ServerLive do
         socket
       end
 
-    messages = visible_messages(scope, channel)
+    messages = visible_messages(scope, channel, around_opts(params))
 
     socket
     |> assign(:active_channel, channel)
@@ -1887,20 +1982,9 @@ defmodule XamtWeb.ServerLive do
               {:ok, _message} ->
                 voice_sent(socket)
 
-              {:error, :rate_limited} ->
-                voice_failed(socket, gettext("Messages sent too fast"))
-
-              {:error, :unauthorized} ->
-                voice_failed(socket, gettext("Unauthorized"))
-
-              {:error, :invalid_reply} ->
-                voice_failed(socket, gettext("Could not send voice message"))
-
-              {:error, :invalid_content} ->
-                voice_failed(socket, gettext("Could not send voice message"))
-
-              {:error, _changeset} ->
-                voice_failed(socket, gettext("Could not send voice message"))
+              error ->
+                XamtWeb.Uploads.delete_stored(url)
+                voice_failed(socket, voice_write_error(error))
             end
 
           _ ->
@@ -1915,6 +1999,10 @@ defmodule XamtWeb.ServerLive do
      |> assign(:replying_to, nil)
      |> push_event("voice:sent", %{})}
   end
+
+  defp voice_write_error({:error, :rate_limited}), do: gettext("Messages sent too fast")
+  defp voice_write_error({:error, :unauthorized}), do: gettext("Unauthorized")
+  defp voice_write_error(_), do: gettext("Could not send voice message")
 
   defp voice_failed(socket, message) do
     {:noreply,
