@@ -18,18 +18,26 @@ defmodule XamtWeb.InviteLive do
 
   @impl true
   def handle_event("accept", _params, socket) do
-    case Servers.redeem_invite(socket.assigns.current_scope, socket.assigns.code) do
-      {:ok, server} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, gettext("Joined %{name}", name: server.name))
-         |> push_navigate(to: ~p"/servers/#{server.slug}")}
+    user_id = socket.assigns.current_scope.user.id
 
-      {:error, :not_found} ->
-        {:noreply, assign(socket, invite: nil, usable?: false)}
+    case Xamt.AuthRateLimit.check(:invite, user_id) do
+      {:error, :rate_limited} ->
+        {:noreply, put_flash(socket, :error, gettext("Too many attempts. Try again shortly."))}
 
-      {:error, _} ->
-        {:noreply, assign(socket, :usable?, false)}
+      :ok ->
+        case Servers.redeem_invite(socket.assigns.current_scope, socket.assigns.code) do
+          {:ok, server} ->
+            {:noreply,
+             socket
+             |> put_flash(:info, gettext("Joined %{name}", name: server.name))
+             |> push_navigate(to: ~p"/servers/#{server.slug}")}
+
+          {:error, :not_found} ->
+            {:noreply, assign(socket, invite: nil, usable?: false)}
+
+          {:error, _} ->
+            {:noreply, assign(socket, :usable?, false)}
+        end
     end
   end
 

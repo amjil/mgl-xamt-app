@@ -48,6 +48,11 @@ defmodule Xamt.AccountsFixtures do
       |> valid_user_attributes()
       |> Accounts.register_user()
 
+    {:ok, user} =
+      user
+      |> User.confirm_changeset()
+      |> Repo.update()
+
     maybe_set_global_role(user, global_role)
   end
 

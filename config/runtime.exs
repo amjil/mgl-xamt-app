@@ -56,8 +56,12 @@ if config_env() == :prod do
 
   maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
+  # TLS on by default. Set DATABASE_SSL=false only for a local Postgres
+  # that does not speak TLS (docker-compose on a private network).
+  use_db_ssl? = System.get_env("DATABASE_SSL", "true") not in ~w(false 0)
+
   config :xamt, Xamt.Repo,
-    # ssl: true,
+    ssl: use_db_ssl?,
     url: database_url,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
     # For machines with several cores, consider starting multiple pools of `pool_size`

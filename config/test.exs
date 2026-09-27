@@ -29,6 +29,12 @@ config :xamt, Xamt.Mailer, adapter: Swoosh.Adapters.Test
 # Avoid flaky failures when fixtures create many messages in one window
 config :xamt, Xamt.Messages.RateLimiter, limit: :infinity
 
+config :xamt, Xamt.AuthRateLimit,
+  login: [limit: :infinity, window_seconds: 60],
+  magic_link: [limit: :infinity, window_seconds: 60],
+  register: [limit: :infinity, window_seconds: 60],
+  invite: [limit: :infinity, window_seconds: 60]
+
 # SQL sandbox owns connections per test; GenServers must not warm from Repo.
 config :xamt, :ets_cache_warmup, false
 

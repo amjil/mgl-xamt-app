@@ -32,7 +32,7 @@ defmodule XamtWeb.UserRegistrationControllerTest do
 
   describe "POST /users/register" do
     @tag :capture_log
-    test "creates account and logs in", %{conn: conn} do
+    test "creates an unconfirmed account and asks to check email", %{conn: conn} do
       email = unique_user_email()
 
       conn =
@@ -40,8 +40,13 @@ defmodule XamtWeb.UserRegistrationControllerTest do
           "user" => valid_user_attributes(email: email)
         })
 
-      assert get_session(conn, :user_token)
-      assert redirected_to(conn) == ~p"/"
+      refute get_session(conn, :user_token)
+      assert redirected_to(conn) == ~p"/login"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Check your email"
+
+      user = Accounts.get_user_by_email(email)
+      assert user
+      refute user.confirmed_at
     end
 
     test "render errors for invalid data", %{conn: conn} do

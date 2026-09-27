@@ -4,7 +4,6 @@ defmodule XamtWeb.UserRegistrationController do
   alias Xamt.Accounts
   alias Xamt.Accounts.User
   alias Xamt.SiteSettings
-  alias XamtWeb.UserAuth
 
   plug :require_registration_enabled
 
@@ -14,14 +13,28 @@ defmodule XamtWeb.UserRegistrationController do
   end
 
   def create(conn, %{"user" => user_params}) do
-    case Accounts.register_user(user_params) do
-      {:ok, user} ->
+    case Xamt.AuthRateLimit.check(:register, Xamt.AuthRateLimit.client_key(conn)) do
+      {:error, :rate_limited} ->
         conn
-        |> put_flash(:info, "Welcome to Xamt!")
-        |> UserAuth.log_in_user(user)
+        |> put_flash(:error, gettext("Too many attempts. Try again shortly."))
+        |> render(:new, changeset: Accounts.change_user_registration(%User{}, user_params))
 
-      {:error, %Ecto.Changeset{} = changeset} ->
-        render(conn, :new, changeset: changeset)
+      :ok ->
+        case Accounts.register_user(user_params) do
+          {:ok, user} ->
+            {:ok, _} =
+              Accounts.deliver_login_instructions(user, &url(~p"/users/log-in/#{&1}"))
+
+            conn
+            |> put_flash(
+              :info,
+              gettext("Check your email to confirm your account before logging in.")
+            )
+            |> redirect(to: ~p"/login")
+
+          {:error, %Ecto.Changeset{} = changeset} ->
+            render(conn, :new, changeset: changeset)
+        end
     end
   end
 

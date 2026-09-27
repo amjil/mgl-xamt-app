@@ -147,6 +147,19 @@ defmodule XamtWeb.UserSessionControllerTest do
       assert response =~ "Log in"
       assert response =~ "Invalid email or password"
     end
+
+    test "rejects an unconfirmed password account", %{conn: conn} do
+      {:ok, user} = Accounts.register_user(valid_user_attributes())
+      refute user.confirmed_at
+
+      conn =
+        post(conn, ~p"/users/log-in?mode=password", %{
+          "user" => %{"email" => user.email, "password" => valid_user_password()}
+        })
+
+      refute get_session(conn, :user_token)
+      assert html_response(conn, 200) =~ "Invalid email or password"
+    end
   end
 
   describe "POST /users/log-in - magic link" do

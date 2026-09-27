@@ -32,6 +32,13 @@ config :xamt, :ime_base_url, nil
 # Message send rate limit (ETS sliding window). Tests override limit.
 config :xamt, Xamt.Messages.RateLimiter, limit: 5, window_seconds: 3
 
+# Auth endpoints share the same ETS limiter with separate keys.
+config :xamt, Xamt.AuthRateLimit,
+  login: [limit: 10, window_seconds: 60],
+  magic_link: [limit: 5, window_seconds: 60],
+  register: [limit: 5, window_seconds: 60],
+  invite: [limit: 10, window_seconds: 60]
+
 # Audiobook shares on these hosts unfurl as a player card. Replace the
 # placeholder host when the audiobook app domain is real.
 config :xamt, Xamt.Messages.LinkPreview,

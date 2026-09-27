@@ -92,7 +92,7 @@ defmodule Xamt.AccountsTest do
       assert user.email == email
       assert user.username == username
       assert user.hashed_password
-      assert user.confirmed_at
+      refute user.confirmed_at
       assert user.status == "offline"
       assert user.global_role == "user"
     end
@@ -368,14 +368,16 @@ defmodule Xamt.AccountsTest do
       assert {:error, :not_found} = Accounts.login_user_by_magic_link(encoded_token)
     end
 
-    test "raises when unconfirmed user has password set" do
-      user = unconfirmed_user_fixture()
-      {1, nil} = Repo.update_all(User, set: [hashed_password: "hashed"])
-      {encoded_token, _hashed_token} = generate_user_magic_link_token(user)
+    test "confirms an unconfirmed user who already has a password" do
+      {:ok, user} = Accounts.register_user(valid_user_attributes())
+      refute user.confirmed_at
+      {encoded_token, hashed_token} = generate_user_magic_link_token(user)
 
-      assert_raise RuntimeError, ~r/magic link log in is not allowed/, fn ->
-        Accounts.login_user_by_magic_link(encoded_token)
-      end
+      assert {:ok, {confirmed, [%{token: ^hashed_token}]}} =
+               Accounts.login_user_by_magic_link(encoded_token)
+
+      assert confirmed.id == user.id
+      assert confirmed.confirmed_at
     end
   end
 

@@ -61,7 +61,6 @@ defmodule Xamt.Accounts.User do
     |> validate_registration_email(opts)
     |> validate_username(opts)
     |> validate_password(opts)
-    |> maybe_confirm_on_register()
   end
 
   @doc """
@@ -69,6 +68,7 @@ defmodule Xamt.Accounts.User do
 
   Same as `registration_changeset/3`, but allows assigning a `global_role`.
   Keep this out of the public register form so users cannot escalate themselves.
+  Operators confirm the account immediately so the person can sign in.
   """
   def admin_registration_changeset(user, attrs, opts \\ []) do
     user
@@ -76,6 +76,7 @@ defmodule Xamt.Accounts.User do
     |> cast(attrs, [:global_role])
     |> validate_required([:global_role])
     |> validate_inclusion(:global_role, @global_roles)
+    |> maybe_confirm_on_register()
   end
 
   defp maybe_confirm_on_register(changeset) do
