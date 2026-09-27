@@ -824,7 +824,7 @@ label:has(> input, > textarea, > select) > * {
   padding: 1rem 0.75rem;
 }
 
-/* Vertical-lr paper slip: flex column = avatar | name | @user | email | edit, left → right */
+/* Vertical-lr paper slip: flex column = identity | email | edit, left → right */
 .xamt-admin-user {
   writing-mode: vertical-lr;
   -webkit-writing-mode: vertical-lr;
@@ -846,6 +846,14 @@ label:has(> input, > textarea, > select) > * {
     border-color 180ms ease,
     box-shadow 180ms ease,
     background-color 180ms ease;
+}
+
+/* vertical-lr: row = top→bottom so avatar, name, @id share one column */
+.xamt-admin-user__identity {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.55rem;
 }
 
 .xamt-admin-user:hover {

@@ -101,11 +101,13 @@ defmodule XamtWeb.AdminUsersLive do
             ]}
           >
             <% role_ui = RoleHelper.get_role_ui_config(user) %>
-            <.avatar user={user} id={"admin-user-avatar-#{user.id}"} class="xamt-avatar" />
-            <p class={["xamt-admin-user__name mongol-text", role_ui.color_class]}>
-              {display_name(user)}
-            </p>
-            <p class="xamt-admin-user__username">@{user.username}</p>
+            <div class="xamt-admin-user__identity">
+              <.avatar user={user} id={"admin-user-avatar-#{user.id}"} class="xamt-avatar" />
+              <p class={["xamt-admin-user__name mongol-text", role_ui.color_class]}>
+                {display_name(user)}
+              </p>
+              <p class="xamt-admin-user__username">@{user.username}</p>
+            </div>
             <p class="xamt-admin-user__email">{user.email}</p>
             <div :if={role_ui.label} class={["xamt-role-badge", role_ui.bg_class]}>
               <.icon name={role_ui.icon} class="w-3 h-3 shrink-0" />
