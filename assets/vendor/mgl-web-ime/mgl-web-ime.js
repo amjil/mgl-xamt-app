@@ -638,9 +638,24 @@ var ImeCore = class {
     this.setState({ enabled: false });
   }
   setMode(mode) {
-    this.cancelComposition();
+    if (mode === "latin") {
+      this._dismissForLatin();
+    }
     this.setState({ mode });
     this.emit("mgl-ime-mode-change", { mode });
+  }
+  /**
+   * Shift / ABC → English: close the candidate panel and keep any already
+   * inserted preview. Do not fetch next-word suggestions.
+   */
+  _dismissForLatin() {
+    const preview = this.state.preview;
+    const hadComp = this.state.composing || this.state.previewLen > 0;
+    this._session.next();
+    this.setState(clearCompositionFields(this.state));
+    if (hadComp) {
+      this.emit("mgl-ime-composition-end", { text: preview, cancelled: false });
+    }
   }
   setProfile(profile) {
     this.setState({ profile });
@@ -704,6 +719,10 @@ var ImeCore = class {
     void this.queryCandidates(preview || buffer, "typing");
   }
   async queryCandidates(input, trigger = "typing") {
+    if (this.state.mode === "latin") {
+      this.setState(withCandidates(this.state, []));
+      return;
+    }
     const gen = this._session.next();
     if (!input) {
       this.setState(withCandidates(this.state, []));
@@ -714,16 +733,20 @@ var ImeCore = class {
         trigger,
         composition: this.state.composition
       });
-      if (this._session.isStale(gen)) return;
+      if (this._session.isStale(gen) || this.state.mode === "latin") return;
       this.setState(withCandidates(this.state, list));
       this.emit("mgl-ime-candidates", { candidates: list, trigger });
     } catch {
-      if (this._session.isStale(gen)) return;
+      if (this._session.isStale(gen) || this.state.mode === "latin") return;
       const fallback = previewFromBuffer(this.state.composition) || input;
       this.setState(withCandidates(this.state, fallback ? [fallback] : []));
     }
   }
   async queryNextWords(word) {
+    if (this.state.mode === "latin") {
+      this.setState(withCandidates(this.state, []));
+      return;
+    }
     const gen = this._session.next();
     if (!word || !this.provider.getNextWords) {
       this.setState(withCandidates(this.state, []));
@@ -731,11 +754,11 @@ var ImeCore = class {
     }
     try {
       const list = await this.provider.getNextWords(word);
-      if (this._session.isStale(gen)) return;
+      if (this._session.isStale(gen) || this.state.mode === "latin") return;
       this.setState(withCandidates(this.state, list));
       this.emit("mgl-ime-candidates", { candidates: list, trigger: "commit" });
     } catch {
-      if (this._session.isStale(gen)) return;
+      if (this._session.isStale(gen) || this.state.mode === "latin") return;
       this.setState(withCandidates(this.state, []));
     }
   }
@@ -877,6 +900,9 @@ var ImeCore = class {
       return this._showSuffixes();
     }
     if (latinMode && key && /^[\x20-\x7E]$/.test(key)) {
+      if (this.state.candidates.length) {
+        this.setState(clearCompositionFields(this.state));
+      }
       this.adapter.insertText(key);
       return true;
     }
@@ -1072,9 +1098,6 @@ function measureCaretRect(range, fallbackEl) {
     }
     const union = range.getBoundingClientRect();
     if (union.width || union.height) return union;
-    if (!range.collapsed) return fallbackEl?.getBoundingClientRect?.() ?? union;
-    const sel = typeof window !== "undefined" ? window.getSelection() : null;
-    const saved = sel?.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
     try {
       const mirror = range.cloneRange();
       const span = document.createElement("span");
@@ -1082,13 +1105,6 @@ function measureCaretRect(range, fallbackEl) {
       mirror.insertNode(span);
       const r = span.getBoundingClientRect();
       span.parentNode?.removeChild(span);
-      if (saved && sel) {
-        try {
-          sel.removeAllRanges();
-          sel.addRange(saved);
-        } catch {
-        }
-      }
       if (r.width || r.height || r.top || r.left) return r;
     } catch {
     }
@@ -4044,10 +4060,26 @@ function resolvePopupKeys(key, ctx, opts = {}) {
   }
   return list.map((k) => ({ text: k.text, display: k.text }));
 }
-function popupIndexFromDx(dx, count, itemWidth = 36) {
+function popupIndexFromDx(dx, count, itemWidth = 36, anchor = 0) {
   if (!count) return 0;
   const offset = Math.trunc(dx / itemWidth);
-  return Math.max(0, Math.min(count - 1, offset));
+  return Math.max(0, Math.min(count - 1, anchor + offset));
+}
+function popupIndexFromClientX(rects, clientX) {
+  if (!rects?.length) return 0;
+  let best = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < rects.length; i++) {
+    const r = rects[i];
+    if (clientX >= r.left && clientX <= r.right) return i;
+    const cx = (r.left + r.right) / 2;
+    const dist = Math.abs(clientX - cx);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = i;
+    }
+  }
+  return best;
 }
 
 // src/utils/popup-position.js
@@ -4415,9 +4447,12 @@ function buildTemplate2() {
       padding-bottom: env(safe-area-inset-bottom, 0);
       user-select: none;
       -webkit-user-select: none;
-      touch-action: manipulation;
+      -webkit-touch-callout: none;
+      /* none: sliding after long-press must not be taken as a page scroll */
+      touch-action: none;
     }
     :host([visible]) { display: block; }
+    :host([popup-open]) { z-index: 10020; }
     .wrap {
       background: var(--bg);
       border-top: 1px solid var(--border);
@@ -4448,6 +4483,7 @@ function buildTemplate2() {
       padding: 0 2px;
       position: relative;
       box-sizing: border-box;
+      touch-action: none;
     }
     button.key.action {
       background: var(--key-action);
@@ -4521,6 +4557,7 @@ function buildTemplate2() {
       height: 36px;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
+      touch-action: pan-x;
       scrollbar-width: none;
     }
     .emoji-cats::-webkit-scrollbar { display: none; }
@@ -4603,7 +4640,16 @@ var MglKeyboard = class extends Base2 {
     this._popup = this.shadowRoot.querySelector(".popup");
     this.getEditingContext = null;
     this._press = null;
+    this._pressBound = false;
     this._needsRender = false;
+    this._boundMove = (e) => this._onPointerMove(e);
+    this._boundUp = (e) => this._onPointerUp(e);
+    this._boundCancel = (e) => this._onPointerCancel(e);
+    this._boundTouchMove = (e) => {
+      if (!this._press) return;
+      if (e.cancelable) e.preventDefault();
+    };
+    this._onContextMenu = (e) => e.preventDefault();
     this._vk = new VirtualKeyboard({
       onEvent: (ev) => {
         this.dispatchEvent(
@@ -4652,9 +4698,11 @@ var MglKeyboard = class extends Base2 {
     );
   }
   connectedCallback() {
+    this.addEventListener("contextmenu", this._onContextMenu);
     this.render();
   }
   disconnectedCallback() {
+    this.removeEventListener("contextmenu", this._onContextMenu);
     this._cancelPress();
   }
   _emitKeyValue(value) {
@@ -4687,6 +4735,15 @@ var MglKeyboard = class extends Base2 {
     this._popup.removeAttribute("open");
     this._popup.innerHTML = "";
     this._popup.setAttribute("aria-hidden", "true");
+    this.removeAttribute("popup-open");
+  }
+  /** Visible mobile candidate bar, if any. */
+  _candidateBarRect() {
+    const el = document.querySelector("mgl-candidates[visible]");
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    if (!r.height || r.bottom <= 0) return null;
+    return r;
   }
   /**
    * @param {HTMLElement} btn
@@ -4704,18 +4761,23 @@ var MglKeyboard = class extends Base2 {
       this._popup.appendChild(el);
     });
     const rect = btn.getBoundingClientRect();
+    this.setAttribute("popup-open", "");
     this._popup.setAttribute("open", "");
     this._popup.setAttribute("aria-hidden", "false");
     const pRect = this._popup.getBoundingClientRect();
     const vw = window.innerWidth;
-    let left = rect.left;
-    if (rect.left + rect.width / 2 > vw / 2) {
-      left = rect.right - pRect.width;
-    }
+    const rightAligned = rect.left + rect.width / 2 > vw / 2;
+    let left = rightAligned ? rect.right - pRect.width : rect.left;
     left = Math.max(8, Math.min(left, vw - pRect.width - 8));
-    const top = Math.max(8, rect.top - pRect.height - 10);
+    let top = rect.top - pRect.height - 10;
+    const cand = this._candidateBarRect();
+    if (cand && top + pRect.height > cand.top - 8) {
+      top = cand.top - pRect.height - 8;
+    }
+    top = Math.max(8, top);
     this._popup.style.left = `${left}px`;
     this._popup.style.top = `${top}px`;
+    if (this._press) this._press.rightAligned = rightAligned;
   }
   /** @param {number} selected */
   _updatePopupSelection(selected) {
@@ -4723,9 +4785,26 @@ var MglKeyboard = class extends Base2 {
       el.classList.toggle("selected", i === selected);
     });
   }
+  _bindPressListeners() {
+    if (this._pressBound) return;
+    this._pressBound = true;
+    document.addEventListener("pointermove", this._boundMove, { passive: false });
+    document.addEventListener("pointerup", this._boundUp);
+    document.addEventListener("pointercancel", this._boundCancel);
+    document.addEventListener("touchmove", this._boundTouchMove, { passive: false });
+  }
+  _unbindPressListeners() {
+    if (!this._pressBound) return;
+    this._pressBound = false;
+    document.removeEventListener("pointermove", this._boundMove);
+    document.removeEventListener("pointerup", this._boundUp);
+    document.removeEventListener("pointercancel", this._boundCancel);
+    document.removeEventListener("touchmove", this._boundTouchMove);
+  }
   _cancelPress() {
     if (this._press?.timer) clearTimeout(this._press.timer);
     if (this._press?.btn) this._press.btn.classList.remove("pressed");
+    this._unbindPressListeners();
     this._press = null;
     this._hidePopup();
     this._flushRender();
@@ -4738,9 +4817,9 @@ var MglKeyboard = class extends Base2 {
   _onPointerDown(e, key, btn) {
     if (e.button != null && e.button !== 0) return;
     e.preventDefault();
+    this._cancelPress();
     btn.setPointerCapture?.(e.pointerId);
     btn.classList.add("pressed");
-    this._cancelPress();
     this._press = {
       key,
       btn,
@@ -4750,10 +4829,12 @@ var MglKeyboard = class extends Base2 {
       dx: 0,
       popup: false,
       selected: 0,
+      rightAligned: false,
       /** @type {import("../keyboard/popup-candidates.js").PopupKey[]} */
       popupKeys: [],
       timer: null
     };
+    this._bindPressListeners();
     if (key.type === "action") {
       this._vk.press(key);
       this._needsRender = true;
@@ -4767,18 +4848,31 @@ var MglKeyboard = class extends Base2 {
       if (!popupKeys.length) return;
       this._press.popup = true;
       this._press.popupKeys = popupKeys;
-      this._press.selected = 0;
       this._showPopup(btn, popupKeys, !!key.mongol, 0);
+      this._press.selected = this._popupIndexFromPointer(this._press.startX);
+      this._updatePopupSelection(this._press.selected);
     }, LONG_PRESS_MS);
+  }
+  /** @param {number} clientX */
+  _popupIndexFromPointer(clientX) {
+    const p = this._press;
+    if (!p?.popupKeys?.length) return 0;
+    const rects = [...this._popup.children].map((el) => el.getBoundingClientRect());
+    if (rects.length) return popupIndexFromClientX(rects, clientX);
+    const anchor = p.rightAligned ? p.popupKeys.length - 1 : 0;
+    return popupIndexFromDx(clientX - p.startX, p.popupKeys.length, 36, anchor);
   }
   /**
    * @param {PointerEvent} e
    */
   _onPointerMove(e) {
     const p = this._press;
-    if (!p || !p.popup) return;
+    if (!p) return;
+    if (p.pointerId != null && e.pointerId !== p.pointerId) return;
+    if (e.cancelable) e.preventDefault();
     p.dx = e.clientX - p.startX;
-    const idx = popupIndexFromDx(p.dx, p.popupKeys.length);
+    if (!p.popup) return;
+    const idx = this._popupIndexFromPointer(e.clientX);
     if (idx !== p.selected) {
       p.selected = idx;
       this._updatePopupSelection(idx);
@@ -4790,6 +4884,7 @@ var MglKeyboard = class extends Base2 {
   _onPointerUp(e) {
     const p = this._press;
     if (!p) return;
+    if (p.pointerId != null && e.pointerId != null && e.pointerId !== p.pointerId) return;
     if (p.timer) clearTimeout(p.timer);
     if (p.popup && p.popupKeys.length) {
       const chosen = p.popupKeys[p.selected] ?? p.popupKeys[0];
@@ -4804,9 +4899,22 @@ var MglKeyboard = class extends Base2 {
       p.btn.releasePointerCapture?.(e.pointerId);
     } catch {
     }
+    this._unbindPressListeners();
     this._press = null;
     this._hidePopup();
     this._flushRender();
+  }
+  /**
+   * Browser stole the gesture (scroll / system). Abort — do not insert.
+   * @param {PointerEvent} [e]
+   */
+  _onPointerCancel(e) {
+    const p = this._press;
+    if (!p) return;
+    if (e && p.pointerId != null && e.pointerId != null && e.pointerId !== p.pointerId) {
+      return;
+    }
+    this._cancelPress();
   }
   _renderEmojiPanel() {
     const panel = document.createElement("div");
@@ -4940,9 +5048,6 @@ var MglKeyboard = class extends Base2 {
           btn.appendChild(label);
         }
         btn.addEventListener("pointerdown", (ev) => this._onPointerDown(ev, key, btn));
-        btn.addEventListener("pointermove", (ev) => this._onPointerMove(ev));
-        btn.addEventListener("pointerup", (ev) => this._onPointerUp(ev));
-        btn.addEventListener("pointercancel", () => this._cancelPress());
         rowEl.appendChild(btn);
       });
       this._wrap.appendChild(rowEl);
