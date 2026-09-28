@@ -209,13 +209,13 @@ defmodule Xamt.AccountsTest do
         Accounts.change_user_password(
           %User{},
           %{
-            "password" => "new valid password"
+            "password" => "new valid pass1!"
           },
           hash_password: false
         )
 
       assert changeset.valid?
-      assert get_change(changeset, :password) == "new valid password"
+      assert get_change(changeset, :password) == "new valid pass1!"
       assert is_nil(get_change(changeset, :hashed_password))
     end
   end
@@ -228,14 +228,31 @@ defmodule Xamt.AccountsTest do
     test "validates password", %{user: user} do
       {:error, changeset} =
         Accounts.update_user_password(user, %{
-          password: "not valid",
+          password: "short",
           password_confirmation: "another"
         })
 
-      assert %{
-               password: ["should be at least 12 character(s)"],
-               password_confirmation: ["does not match password"]
-             } = errors_on(changeset)
+      errors = errors_on(changeset)
+      assert "should be at least 8 character(s)" in errors.password
+      assert errors.password_confirmation == ["does not match password"]
+    end
+
+    test "validates password composition", %{user: user} do
+      {:error, letters_only} =
+        Accounts.update_user_password(user, %{password: "abcdefgh"})
+
+      assert "must include a number" in errors_on(letters_only).password
+      assert "must include a symbol" in errors_on(letters_only).password
+
+      {:error, no_letter} =
+        Accounts.update_user_password(user, %{password: "1234567!"})
+
+      assert "must include an English letter" in errors_on(no_letter).password
+
+      {:error, no_symbol} =
+        Accounts.update_user_password(user, %{password: "abcdefg1"})
+
+      assert "must include a symbol" in errors_on(no_symbol).password
     end
 
     test "validates maximum values for password for security", %{user: user} do
@@ -250,12 +267,17 @@ defmodule Xamt.AccountsTest do
     test "updates the password", %{user: user} do
       {:ok, {user, expired_tokens}} =
         Accounts.update_user_password(user, %{
-          password: "new valid password"
+          password: "new valid pass1!"
         })
 
       assert expired_tokens == []
       assert is_nil(user.password)
-      assert Accounts.get_user_by_email_and_password(user.email, "new valid password")
+      assert Accounts.get_user_by_email_and_password(user.email, "new valid pass1!")
+    end
+
+    test "accepts an 8-character mixed password", %{user: user} do
+      {:ok, {user, _}} = Accounts.update_user_password(user, %{password: "Abcdef1!"})
+      assert Accounts.get_user_by_email_and_password(user.email, "Abcdef1!")
     end
 
     test "deletes all tokens for the given user", %{user: user} do
@@ -263,7 +285,7 @@ defmodule Xamt.AccountsTest do
 
       {:ok, {_, _}} =
         Accounts.update_user_password(user, %{
-          password: "new valid password"
+          password: "new valid pass1!"
         })
 
       refute Repo.get_by(UserToken, user_id: user.id)
@@ -570,7 +592,7 @@ defmodule Xamt.AccountsTest do
       admin = admin_fixture()
       user = user_fixture()
       token = Accounts.generate_user_session_token(user)
-      new_password = "a brand new secret"
+      new_password = "a brand new secret1!"
 
       assert {:ok, updated} =
                Accounts.update_user_as_admin(Scope.for_user(admin), user, %{

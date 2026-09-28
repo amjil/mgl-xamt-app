@@ -202,6 +202,13 @@ msgstr ""
 msgid "Password"
 msgstr ""
 
+#: lib/xamt_web/controllers/user_registration_html/new.html.heex:60
+#: lib/xamt_web/controllers/user_settings_html/edit.html.heex:61
+#: lib/xamt_web/live/admin_user_live.ex:191
+#, elixir-autogen, elixir-format
+msgid "At least 8 characters, with English letters, a number, and a symbol."
+msgstr ""
+
 #: lib/xamt_web/live/settings_live.ex:58
 #, elixir-autogen, elixir-format
 msgid "Profile updated"

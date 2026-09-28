@@ -233,14 +233,16 @@ defmodule Xamt.Accounts.User do
     |> validate_password(opts)
   end
 
+  @password_min_length 8
+  @password_max_length 72
+
   defp validate_password(changeset, opts) do
     changeset
     |> validate_required([:password])
-    |> validate_length(:password, min: 12, max: 72)
-    # Examples of additional password validation:
-    # |> validate_format(:password, ~r/[a-z]/, message: "at least one lower case character")
-    # |> validate_format(:password, ~r/[A-Z]/, message: "at least one upper case character")
-    # |> validate_format(:password, ~r/[!?@#$%^&*_0-9]/, message: "at least one digit or punctuation character")
+    |> validate_length(:password, min: @password_min_length, max: @password_max_length)
+    |> validate_format(:password, ~r/[A-Za-z]/, message: "must include an English letter")
+    |> validate_format(:password, ~r/[0-9]/, message: "must include a number")
+    |> validate_format(:password, ~r/[[:punct:]]/, message: "must include a symbol")
     |> maybe_hash_password(opts)
   end
 

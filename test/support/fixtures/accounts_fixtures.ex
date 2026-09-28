@@ -12,7 +12,7 @@ defmodule Xamt.AccountsFixtures do
 
   def unique_user_email, do: "user#{System.unique_integer()}@example.com"
   def unique_user_username, do: "user#{System.unique_integer() |> abs()}"
-  def valid_user_password, do: "hello world!!"
+  def valid_user_password, do: "hello world1!"
 
   def valid_user_attributes(attrs \\ %{}) do
     password = valid_user_password()

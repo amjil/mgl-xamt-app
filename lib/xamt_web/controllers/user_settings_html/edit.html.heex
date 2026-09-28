@@ -53,8 +53,13 @@
         label={gettext("New password")}
         autocomplete="new-password"
         spellcheck="false"
+        minlength="8"
+        maxlength="72"
         required
       />
+      <p class="xamt-muted mongol-text">
+        {gettext("At least 8 characters, with English letters, a number, and a symbol.")}
+      </p>
       <.input
         field={@password_form[:password_confirmation]}
         type="password"

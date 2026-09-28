@@ -110,3 +110,12 @@ msgstr ""
 
 msgid "must be equal to %{number}"
 msgstr ""
+
+msgid "must include an English letter"
+msgstr ""
+
+msgid "must include a number"
+msgstr ""
+
+msgid "must include a symbol"
+msgstr ""

@@ -3,7 +3,7 @@ alias Xamt.Accounts.{Scope, User}
 alias Xamt.Repo
 alias Xamt.Servers
 
-demo_password = "hello world!!"
+demo_password = "hello world1!"
 
 {:ok, user} =
   Accounts.register_user(%{

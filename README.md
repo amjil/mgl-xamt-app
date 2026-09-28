@@ -35,7 +35,7 @@ Demo account (from seeds):
 
 - email: `demo@xamt.local`
 - username: `demo`
-- password: `hello world!!`
+- password: `hello world1!`
 - role: `creator` (can create servers)
 - server: `/servers/mongol-bichig/general`
 

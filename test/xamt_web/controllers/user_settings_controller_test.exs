@@ -37,8 +37,8 @@ defmodule XamtWeb.UserSettingsControllerTest do
         put(conn, ~p"/users/settings", %{
           "action" => "update_password",
           "user" => %{
-            "password" => "new valid password",
-            "password_confirmation" => "new valid password"
+            "password" => "new valid pass1!",
+            "password_confirmation" => "new valid pass1!"
           }
         })
 
@@ -49,7 +49,7 @@ defmodule XamtWeb.UserSettingsControllerTest do
       assert Phoenix.Flash.get(new_password_conn.assigns.flash, :info) =~
                "Password updated successfully"
 
-      assert Accounts.get_user_by_email_and_password(user.email, "new valid password")
+      assert Accounts.get_user_by_email_and_password(user.email, "new valid pass1!")
     end
 
     test "does not update password on invalid data", %{conn: conn} do
@@ -57,14 +57,14 @@ defmodule XamtWeb.UserSettingsControllerTest do
         put(conn, ~p"/users/settings", %{
           "action" => "update_password",
           "user" => %{
-            "password" => "too short",
+            "password" => "short",
             "password_confirmation" => "does not match"
           }
         })
 
       response = html_response(old_password_conn, 200)
       assert response =~ "Settings"
-      assert response =~ "should be at least 12 character(s)"
+      assert response =~ "should be at least 8 character(s)"
       assert response =~ "does not match password"
 
       assert get_session(old_password_conn, :user_token) == get_session(conn, :user_token)

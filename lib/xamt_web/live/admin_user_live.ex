@@ -183,8 +183,13 @@ defmodule XamtWeb.AdminUserLive do
             label={if(@live_action == :edit, do: gettext("New password"), else: gettext("Password"))}
             class="xamt-input xamt-input--latin"
             autocomplete="new-password"
+            minlength="8"
+            maxlength="72"
             required={@live_action == :new}
           />
+          <p class="xamt-muted mongol-text">
+            {gettext("At least 8 characters, with English letters, a number, and a symbol.")}
+          </p>
           <.input
             field={@form[:password_confirmation]}
             type="password"
