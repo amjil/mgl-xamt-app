@@ -7,7 +7,7 @@
 
 import { containsEmoji, emojiRichText } from "./emoji.js"
 
-const SKIP_AUTO_IDS = new Set(["channel-search-q"])
+const SKIP_AUTO_IDS = new Set(["global-search-q"])
 
 export function desktopEmojiEnabled(ime) {
   return Boolean(ime && ime.keyboardMode !== "virtual")

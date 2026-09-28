@@ -524,37 +524,33 @@ defmodule XamtWeb.ServerLiveTest do
     channel: channel,
     scope: scope
   } do
-    {:ok, _message} =
+    {:ok, message} =
       Messages.create_message(scope, channel.id, %{
         "content_html" => "<p>unique-needle</p>",
         "content" => %{"type" => "rich_text"}
       })
 
     {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
-    view |> form("#channel-search", %{q: "unique-needle"}) |> render_change()
-    assert has_element?(view, "#search-results")
+    view |> element("#mobile-nav-search") |> render_click()
+    view |> form("#global-search-form", %{q: "unique-needle"}) |> render_change()
+    assert has_element?(view, "#global-search-hit-#{message.id}")
     assert render(view) =~ "unique-needle"
   end
 
-  test "mobile search toggle opens the field and keeps it in the toolbar", %{
+  test "toolbar search opens the global palette", %{
     conn: conn,
     server: server,
     channel: channel
   } do
     {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
 
-    refute has_element?(view, "#channel-search.is-open")
-    assert has_element?(view, "#channel-search-q")
+    refute has_element?(view, "#channel-search")
+    refute has_element?(view, "#search-palette")
     assert has_element?(view, "#mobile-nav-search")
 
     view |> element("#mobile-nav-search") |> render_click()
-
-    assert has_element?(view, "#channel-search.is-open")
-    assert has_element?(view, "#channel-search-q")
-    assert has_element?(view, ".xamt-mobile-toolbar #channel-search-q")
-
-    view |> element("#mobile-nav-search") |> render_click()
-    refute has_element?(view, "#channel-search.is-open")
+    assert has_element?(view, "#search-palette")
+    assert has_element?(view, "#global-search-q")
   end
 
   test "search finds a message in another channel and patches to it", %{
@@ -572,11 +568,12 @@ defmodule XamtWeb.ServerLiveTest do
       })
 
     {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
-    view |> form("#channel-search", %{q: "unique-needle"}) |> render_change()
-    assert has_element?(view, "#search-hit-#{message.id}")
+    view |> element("#mobile-nav-search") |> render_click()
+    view |> form("#global-search-form", %{q: "unique-needle"}) |> render_change()
+    assert has_element?(view, "#global-search-hit-#{message.id}")
     assert render(view) =~ "second"
 
-    view |> element("#search-hit-#{message.id}") |> render_click()
+    view |> element("#global-search-hit-#{message.id}") |> render_click()
     assert_patch(view, ~p"/servers/#{server.slug}/#{other.slug}?highlight=#{message.id}")
     assert has_element?(view, "#message-list[data-highlight='#{message.id}']")
   end
@@ -601,8 +598,9 @@ defmodule XamtWeb.ServerLiveTest do
     assert has_element?(view, "[data-message-id='#{reply.id}']")
     assert has_element?(view, "#message-list[data-viewing-latest='true']")
 
-    view |> form("#channel-search", %{q: "anchor-old"}) |> render_change()
-    view |> element("#search-hit-#{oldest.id}") |> render_click()
+    view |> element("#mobile-nav-search") |> render_click()
+    view |> form("#global-search-form", %{q: "anchor-old"}) |> render_change()
+    view |> element("#global-search-hit-#{oldest.id}") |> render_click()
 
     assert has_element?(view, "[data-message-id='#{oldest.id}']")
     assert has_element?(view, "#message-list[data-highlight='#{oldest.id}']")
@@ -1707,6 +1705,58 @@ defmodule XamtWeb.ServerLiveTest do
     view |> element("#unpin-message-#{message.id}") |> render_click()
     assert has_element?(view, "#pinned-messages-empty")
     refute has_element?(view, "#pinned-msg-#{message.id}")
+  end
+
+  test "bookmark toggle stars a message and lists it on /saved", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>star-me-please</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    assert has_element?(view, "#bookmark-message-#{message.id}")
+    refute has_element?(view, "#bookmark-message-#{message.id}.is-active")
+
+    view |> element("#bookmark-message-#{message.id}") |> render_click()
+    assert has_element?(view, "#bookmark-message-#{message.id}.is-active")
+
+    {:ok, saved, _html} = live(conn, ~p"/saved")
+    assert has_element?(saved, "#saved-msg-#{message.id}")
+    assert has_element?(saved, "#saved-jump-#{message.id}")
+  end
+
+  test "Cmd+K palette searches across channels", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>palette-needle</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+    assert has_element?(view, "#search-palette-root")
+    refute has_element?(view, "#search-palette")
+
+    render_click(view, "open_search")
+    assert has_element?(view, "#search-palette")
+    assert has_element?(view, "#global-search-form")
+
+    view |> form("#global-search-form", %{q: "palette-needle"}) |> render_change()
+    assert has_element?(view, "#global-search-hit-#{message.id}")
+
+    view |> element("#global-search-hit-#{message.id}") |> render_click()
+    refute has_element?(view, "#search-palette")
+    assert has_element?(view, "#message-list[data-highlight='#{message.id}']")
   end
 
   defp post_html(scope, channel_id, text) do

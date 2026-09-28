@@ -114,14 +114,14 @@ export const MongolianIME = {
     instances.set(this.el, ime)
 
     this.handleEvent("search:focus", () => {
-      if (this.el.id !== "channel-search-q") return
+      if (this.el.id !== "global-search-q") return
       if (ime.keyboardMode === "virtual") suppressSystemKeyboard(this.el)
       this.el.focus({preventScroll: true})
       if (ime.keyboardMode === "virtual") ime.showKeyboard()
     })
 
     this.handleEvent("search:dismiss", () => {
-      if (this.el.id !== "channel-search-q") return
+      if (this.el.id !== "global-search-q") return
       dismissOwnedIme()
     })
 

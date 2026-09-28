@@ -176,7 +176,13 @@ defmodule XamtWeb.HomeLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.home flash={@flash} current_scope={@current_scope}>
+    <Layouts.home
+      flash={@flash}
+      current_scope={@current_scope}
+      show_search={@show_search}
+      global_search_query={@global_search_query}
+      global_search_results={@global_search_results}
+    >
       <div class="xamt-home">
         <header class="xamt-home__hero">
           <span class="xamt-ornament" aria-hidden="true"></span>
@@ -192,15 +198,27 @@ defmodule XamtWeb.HomeLive do
           <section class="xamt-home__panel">
             <div class="xamt-home__toolbar">
               <h2 class="xamt-section-title mongol-text">{gettext("Your servers")}</h2>
-              <button
-                :if={@can_create_server?}
-                type="button"
-                id="toggle-create-server"
-                class="xamt-btn xamt-btn--soft mongol-text"
-                phx-click="toggle_create"
-              >
-                {gettext("Create server")}
-              </button>
+              <div class="xamt-home__toolbar-actions">
+                <button
+                  type="button"
+                  id="home-open-search"
+                  class="xamt-btn xamt-btn--soft"
+                  phx-click="open_search"
+                >
+                  <.icon name="hero-magnifying-glass" class="size-4" />
+                  <span>{gettext("Search")}</span>
+                  <kbd class="xamt-search-palette__kbd xamt-search-palette__kbd--inline">⌘K</kbd>
+                </button>
+                <button
+                  :if={@can_create_server?}
+                  type="button"
+                  id="toggle-create-server"
+                  class="xamt-btn xamt-btn--soft mongol-text"
+                  phx-click="toggle_create"
+                >
+                  {gettext("Create server")}
+                </button>
+              </div>
             </div>
 
             <ul class="xamt-server-list">

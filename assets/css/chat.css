@@ -528,8 +528,7 @@
   gap: 0.35rem;
 }
 
-.xamt-mobile-nav__btn,
-.xamt-search__toggle {
+.xamt-mobile-nav__btn {
   display: none;
 }
 
@@ -1909,7 +1908,7 @@ html.xamt-desktop-ime .xamt-composer__emoji {
     flex: 0 0 auto;
   }
 
-  .xamt-search {
+  .xamt-search-entry {
     margin-inline-start: auto;
   }
 
@@ -1976,31 +1975,7 @@ html.xamt-desktop-ime .xamt-composer__emoji {
   }
 
   /* Composer: hide the toolbar so the chat column uses the full width. */
-  body.mgl-ime-mobile-open:not(:has(.xamt-search.is-open)) .xamt-mobile-toolbar {
-    display: none;
-  }
-
-  /* Search lives in the toolbar. `display: none` would also hide the
-     position:fixed input, which is why the field vanished under the IME. */
-  body.mgl-ime-mobile-open:has(.xamt-search.is-open) .xamt-mobile-toolbar {
-    position: absolute;
-    width: 0;
-    height: 0;
-    overflow: visible;
-    padding: 0;
-    border: 0;
-    pointer-events: none;
-  }
-
-  body.mgl-ime-mobile-open:has(.xamt-search.is-open) .xamt-mobile-toolbar > :not(.xamt-search) {
-    display: none;
-  }
-
-  body.mgl-ime-mobile-open:has(.xamt-search.is-open) .xamt-search {
-    pointer-events: auto;
-  }
-
-  body.mgl-ime-mobile-open:has(.xamt-search.is-open) .xamt-search__toggle {
+  body.mgl-ime-mobile-open .xamt-mobile-toolbar {
     display: none;
   }
 
@@ -2017,15 +1992,14 @@ html.xamt-desktop-ime .xamt-composer__emoji {
     box-sizing: border-box;
   }
 
-  .xamt-mobile-nav__btn,
-  .xamt-search__toggle {
+  .xamt-mobile-nav__btn {
     display: grid;
     min-width: 2.75rem;
     min-height: 2.75rem;
     flex: 0 0 auto;
   }
 
-  .xamt-search {
+  .xamt-search-entry {
     margin-inline-start: auto;
   }
 
@@ -2039,70 +2013,6 @@ html.xamt-desktop-ime .xamt-composer__emoji {
     -webkit-writing-mode: vertical-lr;
     text-orientation: mixed;
     min-width: 0;
-  }
-
-  .xamt-search__toggle {
-    border: 1px solid var(--xamt-line);
-    background: var(--xamt-bg-2);
-  }
-
-  .xamt-search:not(.is-open) .xamt-search__field {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-  }
-
-  .xamt-search.is-open .xamt-search__field {
-    position: fixed;
-    top: var(--xamt-safe-top);
-    left: calc(var(--xamt-safe-left) + var(--xamt-toolbar-w) + 0.4rem);
-    z-index: calc(var(--xamt-z-drawer) + 1);
-    display: block;
-    padding: 0.15rem;
-    border-radius: 0.65rem;
-    background: color-mix(in srgb, var(--xamt-bg-2) 94%, var(--xamt-shade));
-    box-shadow: var(--xamt-shadow);
-  }
-
-  /* Vertical-lr: inline-size is the physical height of the field. */
-  .xamt-search.is-open .xamt-search__field {
-    max-block-size: 2.35rem;
-    overflow: hidden;
-  }
-
-  .xamt-search.is-open .xamt-search__field .xamt-input {
-    inline-size: min(22rem, calc(var(--xamt-vh) - var(--xamt-ime-kb) - 1rem));
-    max-inline-size: min(22rem, calc(var(--xamt-vh) - var(--xamt-ime-kb) - 1rem));
-    block-size: 2.35rem;
-    max-block-size: 2.35rem;
-    resize: none;
-    overflow-x: hidden;
-    overflow-y: hidden;
-    overscroll-behavior: none;
-    caret-color: var(--xamt-accent);
-  }
-
-  .xamt-search.is-open #clear-search {
-    position: fixed;
-    top: var(--xamt-safe-top);
-    left: calc(var(--xamt-safe-left) + var(--xamt-toolbar-w) + 3.1rem);
-    z-index: calc(var(--xamt-z-drawer) + 1);
-  }
-
-  .xamt-search-results {
-    top: 0.12rem;
-    bottom: auto;
-    max-inline-size: min(16rem, calc(var(--xamt-vh) - var(--xamt-ime-kb) - 1rem));
-  }
-
-  body.mgl-ime-mobile-open .xamt-search.is-open .xamt-search__field {
-    left: calc(var(--xamt-safe-left) + 0.4rem);
-  }
-
-  body.mgl-ime-mobile-open .xamt-search.is-open #clear-search {
-    left: calc(var(--xamt-safe-left) + 3.1rem);
   }
 
   .xamt-rail--servers,

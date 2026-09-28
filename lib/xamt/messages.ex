@@ -5,13 +5,16 @@ defmodule Xamt.Messages do
   Authorization belongs here: prefer scope-taking entry points
   (`create_message/3`, `update_message/3`, `delete_message/3`,
   `toggle_reaction/3`, `get_message_for_user/2`, `list_messages_for_user/3`,
-  `list_pinned_messages_for_user/2`, `search_server_messages/3`)
+  `list_pinned_messages_for_user/2`, `search_server_messages/3`,
+  `search_user_messages/2`, `toggle_bookmark/2`, `list_user_bookmarks/1`)
   over bare `get_message!/1` / `list_messages/2` from LiveViews and HTTP.
   Message HTML is scrubbed by `Xamt.Messages.HtmlSanitizer` before persist.
   Gallery and audio payloads only accept same-origin `/uploads/...` paths.
   """
 
   import Ecto.Query, warn: false
+
+  import Xamt.Servers.Permissions, only: [has_perm: 2]
 
   alias Xamt.Accounts.Scope
   alias Xamt.Accounts.User
@@ -21,7 +24,7 @@ defmodule Xamt.Messages do
   alias Xamt.Repo
   alias Xamt.Servers.Permissions
   alias Xamt.Servers.ServerMember
-  alias Xamt.Messages.{Mentions, Message, Polls, RateLimiter, Reactions, Search}
+  alias Xamt.Messages.{Bookmark, Mentions, Message, Polls, RateLimiter, Reactions, Search}
 
   @default_limit 50
 
@@ -188,7 +191,7 @@ defmodule Xamt.Messages do
   @doc "Like `list_messages/2`, but requires `:view_channel`."
   def list_messages_for_user(%Scope{user: user}, channel_id, opts \\ []) do
     with :ok <- authorize_channel_perm(user.id, channel_id, :view_channel) do
-      {:ok, list_messages(channel_id, opts)}
+      {:ok, attach_bookmark_flags(list_messages(channel_id, opts), user.id)}
     end
   end
 
@@ -332,6 +335,91 @@ defmodule Xamt.Messages do
   defdelegate search_messages(channel_ids, query, opts), to: Search
   defdelegate search_server_messages(scope, server_id, query), to: Search
   defdelegate search_server_messages(scope, server_id, query, opts), to: Search
+  defdelegate search_user_messages(scope, query), to: Search
+  defdelegate search_user_messages(scope, query, opts), to: Search
+
+  @doc """
+  Toggles a personal bookmark on a message the user can view.
+
+  Bookmarks are private: they are not broadcast. Deleted messages cannot be
+  saved. Returns the message with `is_bookmarked_by_me` set to the new state.
+  """
+  def toggle_bookmark(%Scope{user: user} = scope, message_id) when is_binary(message_id) do
+    with {:ok, message} <- get_message_for_user(scope, message_id),
+         :ok <- bookmarkable?(message) do
+      case Repo.get_by(Bookmark, user_id: user.id, message_id: message.id) do
+        nil ->
+          %Bookmark{}
+          |> Bookmark.changeset(%{user_id: user.id, message_id: message.id})
+          |> Repo.insert()
+          |> case do
+            {:ok, _} -> {:ok, %{message | is_bookmarked_by_me: true}}
+            {:error, %Ecto.Changeset{} = changeset} -> {:error, changeset}
+          end
+
+        bookmark ->
+          case Repo.delete(bookmark) do
+            {:ok, _} -> {:ok, %{message | is_bookmarked_by_me: false}}
+            error -> error
+          end
+      end
+    end
+  end
+
+  @doc """
+  Bookmarked messages for the current user, newest first.
+
+  Only rows the user may still view are returned. Soft-deleted messages are skipped.
+  """
+  def list_user_bookmarks(scope, opts \\ [])
+
+  def list_user_bookmarks(%Scope{user: user}, opts) when not is_nil(user) do
+    limit = Keyword.get(opts, :limit, 50)
+
+    from(b in Bookmark,
+      where: b.user_id == ^user.id,
+      join: m in assoc(b, :message),
+      join: c in assoc(m, :channel),
+      join: sm in ServerMember,
+      on: sm.server_id == c.server_id and sm.user_id == ^user.id,
+      where: is_nil(m.deleted_at) and has_perm(sm.permissions, :view_channel),
+      order_by: [desc: b.inserted_at, desc: b.id],
+      limit: ^limit,
+      select: b
+    )
+    |> Repo.all()
+    |> Repo.preload(message: [:user, channel: :server])
+    |> Enum.map(fn bookmark ->
+      %{bookmark.message | is_bookmarked_by_me: true}
+    end)
+  end
+
+  def list_user_bookmarks(_, _opts), do: []
+
+  @doc """
+  Sets `is_bookmarked_by_me` on each message from a single lookup of the user's
+  bookmarks among `messages`.
+  """
+  def attach_bookmark_flags(messages, user_id) when is_list(messages) and is_binary(user_id) do
+    ids = Enum.map(messages, & &1.id)
+    bookmarked = MapSet.new(bookmarked_message_ids(user_id, ids))
+
+    Enum.map(messages, fn message ->
+      %{message | is_bookmarked_by_me: MapSet.member?(bookmarked, message.id)}
+    end)
+  end
+
+  def attach_bookmark_flags(messages, _user_id), do: messages
+
+  def bookmarked_message_ids(_user_id, []), do: []
+
+  def bookmarked_message_ids(user_id, message_ids) when is_list(message_ids) do
+    from(b in Bookmark,
+      where: b.user_id == ^user_id and b.message_id in ^message_ids,
+      select: b.message_id
+    )
+    |> Repo.all()
+  end
 
   @doc """
   Shortens `plain_text/1` for the quoted preview shown above a reply.
@@ -575,6 +663,9 @@ defmodule Xamt.Messages do
   defp pinable?(%Message{} = message, user) do
     authorize_channel_perm(user.id, message.channel_id, :manage_messages)
   end
+
+  defp bookmarkable?(%Message{deleted_at: %DateTime{}}), do: {:error, :deleted}
+  defp bookmarkable?(%Message{}), do: :ok
 
   defp maybe_insert_message_deleted_log(multi, false, _message, _user, _reason) do
     Ecto.Multi.put(multi, :audit_log, nil)

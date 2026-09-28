@@ -67,7 +67,7 @@ export function attachVirtualKeyboard(ime, {eager = false} = {}) {
       return
     }
     if (owner !== ime) return
-    if (e.target?.closest?.(".xamt-search-hit, #search-results")) {
+    if (e.target?.closest?.("#search-palette")) {
       release()
       return
     }

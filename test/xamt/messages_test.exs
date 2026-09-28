@@ -1010,6 +1010,95 @@ defmodule Xamt.MessagesTest do
     assert {:error, :deleted} = Messages.toggle_pin_message(scope, message.id)
   end
 
+  test "toggle_bookmark is personal and does not leak across users", %{
+    scope: scope,
+    channel: channel
+  } do
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>keep this</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    assert {:ok, saved} = Messages.toggle_bookmark(scope, message.id)
+    assert saved.is_bookmarked_by_me
+
+    [hit] = Messages.list_user_bookmarks(scope)
+    assert hit.id == message.id
+    assert hit.is_bookmarked_by_me
+    assert hit.channel.server
+
+    outsider = Xamt.AccountsFixtures.user_fixture()
+    outsider_scope = Scope.for_user(outsider)
+    assert Messages.list_user_bookmarks(outsider_scope) == []
+
+    assert {:error, :unauthorized} = Messages.toggle_bookmark(outsider_scope, message.id)
+
+    assert {:ok, unsaved} = Messages.toggle_bookmark(scope, message.id)
+    refute unsaved.is_bookmarked_by_me
+    assert Messages.list_user_bookmarks(scope) == []
+  end
+
+  test "bookmarks skip deleted messages and revoked view_channel", %{
+    scope: scope,
+    channel: channel,
+    server: server
+  } do
+    {:ok, message} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>ephemeral</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    assert {:ok, _} = Messages.toggle_bookmark(scope, message.id)
+    assert {:ok, _} = Messages.delete_message(scope, message.id)
+    assert Messages.list_user_bookmarks(scope) == []
+    assert {:error, :deleted} = Messages.toggle_bookmark(scope, message.id)
+
+    muted = Xamt.AccountsFixtures.user_fixture()
+    muted_scope = Scope.for_user(muted)
+    {:ok, _} = Servers.add_member(muted_scope, server.id)
+
+    {:ok, visible} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>still here</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    assert {:ok, _} = Messages.toggle_bookmark(muted_scope, visible.id)
+    {:ok, _} = Servers.revoke_permission(scope, server.id, muted.id, :view_channel)
+    assert Messages.list_user_bookmarks(muted_scope) == []
+  end
+
+  test "search_user_messages covers every readable server", %{
+    scope: scope,
+    channel: channel
+  } do
+    {:ok, _} =
+      Messages.create_message(scope, channel.id, %{
+        "content_html" => "<p>global-needle-omega</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    other_owner = Xamt.AccountsFixtures.creator_fixture()
+    other_scope = Scope.for_user(other_owner)
+    {:ok, other_server} = Servers.create_server(other_scope, %{"name" => "Elsewhere"})
+    other_channel = hd(Channels.list_channels(other_server.id))
+
+    {:ok, _} =
+      Messages.create_message(other_scope, other_channel.id, %{
+        "content_html" => "<p>global-needle-omega</p>",
+        "content" => %{"type" => "rich_text"}
+      })
+
+    hits = Messages.search_user_messages(scope, "global-needle-omega")
+    assert length(hits) == 1
+    assert hd(hits).channel_id == channel.id
+    assert hd(hits).channel.server
+
+    assert Messages.search_user_messages(other_scope, "global-needle-omega") != []
+  end
+
   test "moderator delete without a reason still writes an audit log", %{
     scope: scope,
     channel: channel,

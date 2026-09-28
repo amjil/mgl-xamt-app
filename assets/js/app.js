@@ -17,6 +17,7 @@ import {ReadReceipt} from "./hooks/read-receipt"
 import {WebPush} from "./hooks/web-push"
 import {LightboxSwipe} from "./hooks/lightbox-swipe"
 import {StatusEmoji} from "./hooks/status-emoji"
+import {SearchPalette} from "./hooks/search-palette"
 import {adoptImeElements} from "./utils/ime"
 import {initVisualViewport, trackImeKeyboard} from "./utils/viewport"
 import {toast} from "./utils/offline-store"
@@ -42,6 +43,7 @@ const Hooks = {
   WebPush,
   LightboxSwipe,
   StatusEmoji,
+  SearchPalette,
 }
 
 // Jittered backoff for reconnect/rejoin so a server restart or regional
@@ -81,6 +83,16 @@ window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 
 // Map vertical wheel → horizontal scroll for Mongolian (vertical-lr) surfaces
 installGlobalMongolianWheelScroll()
+
+// Global search palette: Cmd+K (macOS) and Ctrl+K (Windows/Linux).
+window.addEventListener("keydown", (event) => {
+  if (!(event.metaKey || event.ctrlKey) || event.altKey) return
+  if (event.key !== "k" && event.key !== "K") return
+  if (!document.getElementById("search-palette-root")) return
+
+  event.preventDefault()
+  window.dispatchEvent(new CustomEvent("xamt:open_search"))
+})
 
 // Dispatched by JS.dispatch/2 from quote buttons — no per-message Hook needed.
 window.addEventListener("xamt:highlight", (event) => {

@@ -5,35 +5,10 @@ defmodule XamtWeb.ServerLive.MessageList do
 
   import XamtWeb.ServerLive.Helpers
   import XamtWeb.ServerLive.MessageItem
-  alias Xamt.Messages
 
   def messages_region(assigns) do
     ~H"""
     <div class="xamt-messages-region">
-      <div :if={@search_results} id="search-results" class="xamt-search-results">
-        <p class="xamt-search-results__head mongol-text">
-          {gettext("Search results")}
-        </p>
-        <p :if={@search_results == []} class="xamt-empty mongol-text">
-          {gettext("No matches.")}
-        </p>
-        <button
-          :for={message <- @search_results}
-          type="button"
-          id={"search-hit-#{message.id}"}
-          class="xamt-search-hit"
-          phx-click="open_search_result"
-          phx-value-id={message.id}
-          phx-value-channel-id={message.channel_id}
-        >
-          <span class="xamt-quote__author mongol-text">{display_name(message.user)}</span>
-          <span :if={message.channel} class="xamt-search-hit__channel mongol-text">
-            <span class="xamt-channel-hash">#</span>
-            {message.channel.name}
-          </span>
-          <span class="xamt-quote__text mongol-text">{Messages.excerpt(message)}</span>
-        </button>
-      </div>
       <div
         :if={@messages_empty?}
         id="messages-empty"

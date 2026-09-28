@@ -98,11 +98,9 @@ defmodule XamtWeb.ServerLive do
       |> assign(:show_status_picker, false)
       |> assign(:show_pinned_drawer, false)
       |> assign(:pinned_messages, [])
+      |> assign(:bookmarked_ids, MapSet.new())
       |> assign(:mobile_panel, :messages)
-      |> assign(:mobile_search?, false)
       |> assign(:unread_channels, MapSet.new(unread_ids))
-      |> assign_search("")
-      |> assign(:search_results, nil)
       |> assign(:highlight_id, Map.get(params, "highlight"))
       |> assign(:lightbox_images, nil)
       |> assign(:lightbox_index, 0)
@@ -593,6 +591,25 @@ defmodule XamtWeb.ServerLive do
     end
   end
 
+  def handle_event("toggle_bookmark", %{"msg-id" => id}, socket) do
+    case Messages.toggle_bookmark(socket.assigns.current_scope, id) do
+      {:ok, message} ->
+        {:noreply,
+         socket
+         |> patch_bookmarked_id(message)
+         |> stream_message(message)}
+
+      {:error, :unauthorized} ->
+        {:noreply, put_flash(socket, :error, gettext("Permission denied"))}
+
+      {:error, :deleted} ->
+        {:noreply, put_flash(socket, :error, gettext("Message was deleted"))}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, gettext("Could not update bookmark"))}
+    end
+  end
+
   def handle_event("load_older", _params, socket) do
     channel = socket.assigns.active_channel
     oldest_id = socket.assigns[:oldest_message_id]
@@ -626,6 +643,7 @@ defmodule XamtWeb.ServerLive do
             |> assign(:oldest_message_id, first.id)
             |> assign(:oldest_message_info, oldest_message_info(grouped))
             |> assign(:has_more_messages, length(msgs) >= @message_page_size)
+            |> merge_bookmarked_ids(msgs)
             |> merge_reactions(msgs)
             |> merge_polls(msgs)
             |> stream(:messages, items, at: 0)
@@ -823,54 +841,18 @@ defmodule XamtWeb.ServerLive do
 
   def handle_event("set_mobile_panel", _params, socket), do: {:noreply, socket}
 
-  def handle_event("toggle_mobile_search", _params, socket) do
-    open? = !socket.assigns.mobile_search?
+  def handle_event("open_global_search_result", %{"id" => id} = params, socket) do
+    current_slug = socket.assigns.server && socket.assigns.server.slug
+    target_slug = params["server-slug"]
 
-    {:noreply,
-     socket
-     |> assign(:mobile_search?, open?)
-     |> push_event(if(open?, do: "search:focus", else: "search:dismiss"), %{})}
-  end
-
-  def handle_event("search", %{"q" => q}, socket) do
-    q = String.trim(q)
-
-    results =
-      if q == "" do
-        nil
-      else
-        Messages.search_server_messages(
-          socket.assigns.current_scope,
-          socket.assigns.server.id,
-          q
-        )
+    if is_binary(current_slug) and current_slug == target_slug do
+      {:noreply, focus_message(socket, id)}
+    else
+      case jump_search_path(params) do
+        nil -> {:noreply, socket}
+        path -> {:noreply, push_navigate(socket, to: path)}
       end
-
-    {:noreply,
-     socket
-     |> assign_search(q)
-     |> assign(
-       search_results: results,
-       mobile_search?: q != "" or socket.assigns.mobile_search?
-     )}
-  end
-
-  def handle_event("clear_search", _params, socket) do
-    {:noreply,
-     socket
-     |> assign_search("")
-     |> assign(search_results: nil, mobile_search?: false)
-     |> push_event("search:dismiss", %{})}
-  end
-
-  def handle_event("open_search_result", %{"id" => id}, socket) do
-    {:noreply,
-     socket
-     |> assign(:search_results, nil)
-     |> assign_search("")
-     |> assign(:mobile_search?, false)
-     |> push_event("search:dismiss", %{})
-     |> focus_message(id)}
+    end
   end
 
   def handle_event("jump_to_message", %{"id" => id}, socket) do
@@ -1209,6 +1191,11 @@ defmodule XamtWeb.ServerLive do
 
     items = Helpers.with_date_dividers(grouped, offset)
 
+    bookmarked_ids =
+      grouped
+      |> Enum.filter(& &1.is_bookmarked_by_me)
+      |> MapSet.new(& &1.id)
+
     socket
     |> assign(:oldest_message_id, oldest_id)
     |> assign(:oldest_message_info, Helpers.oldest_message_info(grouped))
@@ -1220,6 +1207,7 @@ defmodule XamtWeb.ServerLive do
     |> assign(:messages_empty?, messages == [])
     |> assign(:viewing_latest?, latest_window?(socket.assigns[:active_channel], grouped))
     |> assign(:reactions, Messages.reaction_summary(Enum.map(messages, & &1.id)))
+    |> assign(:bookmarked_ids, bookmarked_ids)
     |> assign_polls(messages)
     |> stream(:messages, items, reset: true)
   end
@@ -1351,11 +1339,13 @@ defmodule XamtWeb.ServerLive do
   defp around_opts(%{"highlight" => id}) when is_binary(id) and id != "", do: [around_id: id]
   defp around_opts(_), do: []
 
-  defp assign_search(socket, q) do
-    socket
-    |> assign(:search_q, q)
-    |> assign(:search_form, to_form(%{"q" => q || ""}))
+  defp jump_search_path(%{"id" => id, "server-slug" => server, "channel-slug" => channel})
+       when is_binary(id) and is_binary(server) and is_binary(channel) and
+              id != "" and server != "" and channel != "" do
+    ~p"/servers/#{server}/#{channel}?highlight=#{id}"
   end
+
+  defp jump_search_path(_), do: nil
 
   defp latest_window?(_channel, []), do: true
   defp latest_window?(nil, _), do: true
@@ -1541,8 +1531,6 @@ defmodule XamtWeb.ServerLive do
     |> assign(:show_pinned_drawer, false)
     |> assign(:pinned_messages, [])
     |> assign(:mobile_panel, :messages)
-    |> assign_search("")
-    |> assign(:search_results, nil)
     |> assign(:highlight_id, Map.get(params, "highlight"))
     |> assign_messages(messages)
     |> maybe_push_composer_reset(params)
@@ -1831,7 +1819,39 @@ defmodule XamtWeb.ServerLive do
 
   defp stream_message(socket, message) do
     show_header = Map.get(socket.assigns.header_flags, message.id, true)
-    stream_insert(socket, :messages, %{message | show_header: show_header})
+    bookmarked? = MapSet.member?(socket.assigns[:bookmarked_ids] || MapSet.new(), message.id)
+
+    stream_insert(socket, :messages, %{
+      message
+      | show_header: show_header,
+        is_bookmarked_by_me: bookmarked?
+    })
+  end
+
+  defp merge_bookmarked_ids(socket, messages) do
+    extra =
+      messages
+      |> Enum.filter(& &1.is_bookmarked_by_me)
+      |> MapSet.new(& &1.id)
+
+    assign(
+      socket,
+      :bookmarked_ids,
+      MapSet.union(socket.assigns[:bookmarked_ids] || MapSet.new(), extra)
+    )
+  end
+
+  defp patch_bookmarked_id(socket, message) do
+    ids = socket.assigns[:bookmarked_ids] || MapSet.new()
+
+    ids =
+      if message.is_bookmarked_by_me do
+        MapSet.put(ids, message.id)
+      else
+        MapSet.delete(ids, message.id)
+      end
+
+    assign(socket, :bookmarked_ids, ids)
   end
 
   defp maybe_refresh_pinned_list(socket) do

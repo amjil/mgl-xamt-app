@@ -43,7 +43,10 @@ defmodule XamtWeb.Router do
     get "/uploads/:filename", UploadController, :show
 
     live_session :public,
-      on_mount: [{XamtWeb.UserAuth, :mount_current_scope}] do
+      on_mount: [
+        {XamtWeb.UserAuth, :mount_current_scope},
+        {XamtWeb.SearchPaletteHook, :default}
+      ] do
       live "/", HomeLive, :index
       live "/profile/:username", ProfileLive, :show
     end
@@ -53,13 +56,17 @@ defmodule XamtWeb.Router do
     pipe_through [:browser, :require_authenticated_user]
 
     live_session :authenticated,
-      on_mount: [{XamtWeb.UserAuth, :ensure_authenticated}] do
+      on_mount: [
+        {XamtWeb.UserAuth, :ensure_authenticated},
+        {XamtWeb.SearchPaletteHook, :default}
+      ] do
       live "/invite/:code", InviteLive, :show
       live "/servers/:server_slug", ServerLive, :show
       live "/servers/:server_slug/:channel_slug/new", ServerLive, :new_channel
       live "/servers/:server_slug/:channel_slug/edit/:edit_slug", ServerLive, :edit_channel
       live "/servers/:server_slug/:channel_slug", ServerLive, :show
       live "/settings", SettingsLive, :edit
+      live "/saved", SavedLive, :index
     end
   end
 
@@ -69,7 +76,11 @@ defmodule XamtWeb.Router do
     pipe_through [:browser, :require_authenticated_user]
 
     live_session :admin,
-      on_mount: [{XamtWeb.UserAuth, :ensure_authenticated}, {XamtWeb.UserAuth, :ensure_admin}] do
+      on_mount: [
+        {XamtWeb.UserAuth, :ensure_authenticated},
+        {XamtWeb.UserAuth, :ensure_admin},
+        {XamtWeb.SearchPaletteHook, :default}
+      ] do
       live "/admin/users", AdminUsersLive, :index
       live "/admin/users/new", AdminUserLive, :new
       live "/admin/users/:id/edit", AdminUserLive, :edit

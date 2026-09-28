@@ -28,6 +28,15 @@ defmodule XamtWeb.ServerLive.Rails do
       >
         X
       </.link>
+      <.link
+        navigate={~p"/saved"}
+        id="drawer-saved"
+        class="xamt-rail__saved"
+        title={gettext("Saved")}
+        aria-label={gettext("Saved")}
+      >
+        <.icon name="hero-star" class="size-5" />
+      </.link>
     </aside>
     """
   end
@@ -275,55 +284,16 @@ defmodule XamtWeb.ServerLive.Rails do
       >
         <.icon name="hero-bookmark-square" class="size-5" />
       </button>
-      <.form
-        for={@search_form}
-        id="channel-search"
-        phx-change="search"
-        phx-submit="search"
-        class={["xamt-search", @mobile_search? && "is-open"]}
+      <button
+        type="button"
+        id="mobile-nav-search"
+        class="xamt-icon-btn xamt-search-entry"
+        phx-click="open_search"
+        aria-label={gettext("Search")}
+        title={gettext("Search")}
       >
-        <button
-          type="button"
-          id="mobile-nav-search"
-          class="xamt-icon-btn xamt-search__toggle"
-          phx-click={
-            if @mobile_search? do
-              JS.push("toggle_mobile_search")
-            else
-              JS.push("toggle_mobile_search") |> JS.focus(to: "#channel-search-q")
-            end
-          }
-          aria-label={gettext("Search")}
-          aria-expanded={@mobile_search?}
-        >
-          <.icon name="hero-magnifying-glass" class="size-5" />
-        </button>
-        <label class="xamt-search__field">
-          <span class="sr-only">{gettext("Search")}</span>
-          <textarea
-            name={@search_form[:q].name}
-            id="channel-search-q"
-            rows="1"
-            placeholder={gettext("Search")}
-            class="xamt-input mongol-input"
-            phx-hook="MongolianIME"
-            inputmode="none"
-            virtualkeyboardpolicy="manual"
-            autocomplete="off"
-            wrap="off"
-          >{@search_form[:q].value}</textarea>
-        </label>
-        <button
-          :if={@search_results}
-          type="button"
-          id="clear-search"
-          class="xamt-icon-btn"
-          phx-click="clear_search"
-          aria-label={gettext("Clear search")}
-        >
-          <.icon name="hero-x-mark" class="size-4" />
-        </button>
-      </.form>
+        <.icon name="hero-magnifying-glass" class="size-5" />
+      </button>
       <button
         type="button"
         id="mobile-nav-members"

@@ -3,10 +3,13 @@ defmodule Xamt.Messages.Search do
 
   import Ecto.Query, warn: false
 
+  import Xamt.Servers.Permissions, only: [has_perm: 2]
+
   alias Xamt.Accounts.Scope
   alias Xamt.Channels.Channel
   alias Xamt.Messages.Message
   alias Xamt.Repo
+  alias Xamt.Servers.ServerMember
 
   # Traditional Mongolian joins suffixes with NNBSP (U+202F) and the Mongolian
   # vowel separator (U+180E); Postgres' parser does not break on either, so a
@@ -60,7 +63,7 @@ defmodule Xamt.Messages.Search do
             fragment("search_tsv @@ plainto_tsquery('simple', ?)", ^normalized),
         order_by: [desc: m.inserted_at, desc: m.id],
         limit: ^limit,
-        preload: [:user, :channel]
+        preload: [:user, channel: :server]
       )
       |> Repo.all()
     end
@@ -84,4 +87,27 @@ defmodule Xamt.Messages.Search do
       []
     end
   end
+
+  @doc """
+  Full-text search across every server the user can view.
+
+  Channel IDs are resolved from membership + `:view_channel`, so callers cannot
+  widen the search by inventing IDs.
+  """
+  def search_user_messages(scope, query, opts \\ [])
+
+  def search_user_messages(%Scope{user: user}, query, opts) when not is_nil(user) do
+    channel_ids =
+      from(c in Channel,
+        join: sm in ServerMember,
+        on: sm.server_id == c.server_id and sm.user_id == ^user.id,
+        where: has_perm(sm.permissions, :view_channel),
+        select: c.id
+      )
+      |> Repo.all()
+
+    search_messages(channel_ids, query, opts)
+  end
+
+  def search_user_messages(_, _query, _opts), do: []
 end

@@ -15,11 +15,13 @@ defmodule Xamt.Messages.Message do
     field :mentioned_user_ids, {:array, :binary_id}, virtual: true, default: []
     # In-memory grouping flag: consecutive same-author messages hide the header.
     field :show_header, :boolean, virtual: true, default: true
+    field :is_bookmarked_by_me, :boolean, virtual: true, default: false
 
     belongs_to :channel, Xamt.Channels.Channel
     belongs_to :user, Xamt.Accounts.User
     belongs_to :reply_to, Xamt.Messages.Message, foreign_key: :reply_to_id
     has_many :mentions, Xamt.Messages.Mention
+    has_many :bookmarks, Xamt.Messages.Bookmark
     has_one :poll, Xamt.Messages.Poll
 
     timestamps(type: :utc_datetime)

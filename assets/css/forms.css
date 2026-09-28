@@ -166,10 +166,6 @@ input[type="tel"] {
   line-height: 1;
 }
 
-.xamt-search .xamt-ime-emoji {
-  display: none;
-}
-
 .xamt-checkbox {
   width: 1rem;
   height: 1rem;

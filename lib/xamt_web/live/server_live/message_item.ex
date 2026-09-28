@@ -449,6 +449,31 @@ defmodule XamtWeb.ServerLive.MessageItem do
               >
                 <button
                   type="button"
+                  id={"bookmark-message-#{@message.id}"}
+                  class={[
+                    "xamt-message__action",
+                    @message.is_bookmarked_by_me && "is-active"
+                  ]}
+                  phx-click="toggle_bookmark"
+                  phx-value-msg-id={@message.id}
+                  title={
+                    if @message.is_bookmarked_by_me,
+                      do: gettext("Remove bookmark"),
+                      else: gettext("Save message")
+                  }
+                  aria-label={
+                    if @message.is_bookmarked_by_me,
+                      do: gettext("Remove bookmark"),
+                      else: gettext("Save message")
+                  }
+                >
+                  <.icon
+                    name={if @message.is_bookmarked_by_me, do: "hero-star-solid", else: "hero-star"}
+                    class="size-4"
+                  />
+                </button>
+                <button
+                  type="button"
                   id={"reply-message-#{@message.id}"}
                   class="xamt-message__action"
                   phx-click="reply_message"

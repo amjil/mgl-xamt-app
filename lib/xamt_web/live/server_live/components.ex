@@ -11,7 +11,13 @@ defmodule XamtWeb.ServerLive.Components do
 
   def preview(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope}>
+    <Layouts.app
+      flash={@flash}
+      current_scope={@current_scope}
+      show_search={@show_search}
+      global_search_query={@global_search_query}
+      global_search_results={@global_search_results}
+    >
       <section class="xamt-stack" id="server-preview">
         <div class="xamt-auth-intro">
           <span class="xamt-ornament" aria-hidden="true"></span>
@@ -48,7 +54,13 @@ defmodule XamtWeb.ServerLive.Components do
 
   def chat(assigns) do
     ~H"""
-    <Layouts.chat flash={@flash} current_scope={@current_scope}>
+    <Layouts.chat
+      flash={@flash}
+      current_scope={@current_scope}
+      show_search={@show_search}
+      global_search_query={@global_search_query}
+      global_search_results={@global_search_results}
+    >
       <div class="xamt-chat" id="xamt-app" phx-hook="MobileDrawer">
         <div class={"xamt-app xamt-app--panel-#{@mobile_panel}"}>
           <button

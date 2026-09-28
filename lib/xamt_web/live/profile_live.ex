@@ -26,7 +26,13 @@ defmodule XamtWeb.ProfileLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope}>
+    <Layouts.app
+      flash={@flash}
+      current_scope={@current_scope}
+      show_search={@show_search}
+      global_search_query={@global_search_query}
+      global_search_results={@global_search_results}
+    >
       <section :if={@profile_user} class="xamt-stack" id="profile-panel">
         <div class="xamt-auth-intro">
           <span class="xamt-ornament" aria-hidden="true"></span>

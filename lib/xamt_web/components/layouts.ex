@@ -5,6 +5,8 @@ defmodule XamtWeb.Layouts do
   """
   use XamtWeb, :html
 
+  import XamtWeb.SearchPalette
+
   # Embed all files in layouts/* within this module.
   # The default root.html.heex file contains the HTML
   # skeleton of your application, namely HTML headers
@@ -52,6 +54,10 @@ defmodule XamtWeb.Layouts do
     default: nil,
     doc: "the current [scope](https://hexdocs.pm/phoenix/scopes.html)"
 
+  attr :show_search, :boolean, default: nil
+  attr :global_search_query, :string, default: ""
+  attr :global_search_results, :list, default: []
+
   slot :inner_block, required: true
 
   def app(assigns) do
@@ -64,6 +70,7 @@ defmodule XamtWeb.Layouts do
       </div>
     </main>
 
+    <.global_search_palette {assigns} />
     <.flash_group flash={@flash} current_scope={@current_scope} />
     """
   end
@@ -74,6 +81,9 @@ defmodule XamtWeb.Layouts do
   """
   attr :flash, :map, required: true
   attr :current_scope, :map, default: nil
+  attr :show_search, :boolean, default: nil
+  attr :global_search_query, :string, default: ""
+  attr :global_search_results, :list, default: []
   slot :inner_block, required: true
 
   def home(assigns) do
@@ -82,6 +92,7 @@ defmodule XamtWeb.Layouts do
       <.flash_group flash={@flash} current_scope={@current_scope} />
       {render_slot(@inner_block)}
     </div>
+    <.global_search_palette {assigns} />
     """
   end
 
@@ -90,12 +101,16 @@ defmodule XamtWeb.Layouts do
   """
   attr :flash, :map, required: true
   attr :current_scope, :map, default: nil
+  attr :show_search, :boolean, default: nil
+  attr :global_search_query, :string, default: ""
+  attr :global_search_results, :list, default: []
   slot :inner_block, required: true
 
   def chat(assigns) do
     ~H"""
     <.flash_group flash={@flash} current_scope={@current_scope} />
     {render_slot(@inner_block)}
+    <.global_search_palette {assigns} />
     """
   end
 
@@ -156,6 +171,23 @@ defmodule XamtWeb.Layouts do
 
     <.web_push_manager current_scope={@current_scope} />
     """
+  end
+
+  defp global_search_palette(assigns) do
+    ~H"""
+    <.search_palette
+      :if={search_palette?(assigns)}
+      show={@show_search}
+      search_query={@global_search_query}
+      search_results={@global_search_results}
+      current_scope={@current_scope}
+    />
+    """
+  end
+
+  defp search_palette?(assigns) do
+    user? = match?(%{user: %{id: _}}, assigns[:current_scope] || assigns.current_scope)
+    user? and is_boolean(assigns.show_search)
   end
 
   @doc """

@@ -44,6 +44,9 @@
                 <.link navigate={~p"/"} class="mongol-text">{gettext("Home")}</.link>
               </li>
               <li>
+                <.link navigate={~p"/saved"} class="mongol-text">{gettext("Saved")}</.link>
+              </li>
+              <li>
                 <.link navigate={~p"/settings"} class="mongol-text">{gettext("Settings")}</.link>
               </li>
               <li :if={site_admin?(@current_scope)}>

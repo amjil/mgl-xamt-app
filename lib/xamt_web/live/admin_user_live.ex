@@ -108,7 +108,13 @@ defmodule XamtWeb.AdminUserLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope}>
+    <Layouts.app
+      flash={@flash}
+      current_scope={@current_scope}
+      show_search={@show_search}
+      global_search_query={@global_search_query}
+      global_search_results={@global_search_results}
+    >
       <section
         class="xamt-stack"
         id={if(@live_action == :edit, do: "admin-edit-user", else: "admin-create-user")}
