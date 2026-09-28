@@ -150,6 +150,23 @@ export const OfflineStore = {
       req.onerror = () => reject(req.error)
     })
   },
+
+  async listAll() {
+    const db = await this.init()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(this.storeName, "readonly")
+      const req = tx.objectStore(this.storeName).getAll()
+      req.onsuccess = () => resolve(req.result || [])
+      req.onerror = () => reject(req.error)
+    })
+  },
+
+  async listByChannel(channelId) {
+    const messages = await this.listAll()
+    if (!channelId) return messages
+    const id = String(channelId)
+    return messages.filter((msg) => String(msg.channel_id) === id)
+  },
 }
 
 export function csrfToken() {

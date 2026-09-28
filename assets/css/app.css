@@ -50,3 +50,55 @@ mgl-emoji-picker {
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
 }
+
+/* LiveView disconnect + navigator.onLine=false share this capsule.
+   Root layout mounts it outside the LiveView, so :has(.phx-disconnected)
+   is required — the class lands on the LV container, not on <body>. */
+.xamt-offline-banner {
+  position: fixed;
+  top: calc(1rem + var(--xamt-safe-top));
+  left: calc(var(--xamt-leftnav-w) + 0.75rem);
+  z-index: var(--xamt-z-offline);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  font-family: var(--xamt-font-mongol);
+  letter-spacing: 0.06em;
+  background-color: var(--xamt-error);
+  color: #fff;
+  padding: 0.85rem 0.55rem;
+  border-radius: 9999px;
+  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.15);
+  transform: translateX(-150%);
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    visibility 0.3s;
+}
+
+body:has(.xamt-app) .xamt-offline-banner {
+  left: calc(0.75rem + var(--xamt-safe-left));
+}
+
+body.xamt-is-offline .xamt-offline-banner,
+body:has(.phx-disconnected) .xamt-offline-banner {
+  transform: translateX(0);
+  visibility: visible;
+  pointer-events: auto;
+}
+
+body.xamt-is-offline .xamt-messages,
+body:has(.phx-disconnected) .xamt-messages {
+  filter: grayscale(20%) opacity(0.8);
+  transition: filter 0.3s ease;
+}
+
+/* The capsule replaces the default LiveView client-error flash. */
+body:has(#xamt-offline-banner) #client-error {
+  display: none;
+}

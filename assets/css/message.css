@@ -1,5 +1,24 @@
 /* Messages, quotes, reactions, search — extracted from layout.css */
 
+.xamt-offline-pending {
+  display: contents;
+}
+
+.xamt-message--pending {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.xamt-message__pending-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  margin-block-start: 0.4rem;
+  font-size: 0.7rem;
+  color: var(--xamt-muted);
+}
+
 .xamt-messages {
   flex: 1 1 auto;
   min-width: 0;

@@ -31,6 +31,17 @@
     </script>
   </head>
   <body class="xamt-body">
+    <div
+      id="xamt-offline-banner"
+      class="xamt-offline-banner"
+      role="status"
+      aria-live="polite"
+      aria-hidden="true"
+    >
+      <.icon name="hero-wifi" class="w-4 h-4" />
+      <span class="mongol-text">{gettext("Network disconnected, reconnecting…")}</span>
+    </div>
+
     <div class="xamt-shell">
       <%!-- Left rail: always on the left so labels read top→bottom --%>
       <aside id="leftnav" class="xamt-leftnav">

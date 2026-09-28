@@ -25,7 +25,8 @@
   src: url("/fonts/OyunQaganTig.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
-  font-display: swap;
+  /* Block (not swap) so offline cache-miss never flashes Latin tofu. */
+  font-display: block;
 }
 
 /* Metric-matched fallback so font-display:swap does not jump column height */
@@ -59,6 +60,7 @@
   --xamt-role-admin: #b33a2b;
   --xamt-role-admin-soft: rgba(179, 58, 43, 0.12);
   --xamt-role-admin-line: rgba(179, 58, 43, 0.28);
+  --xamt-error: var(--xamt-role-admin);
   --xamt-role-creator: #8a6a2c;
   --xamt-role-creator-soft: rgba(138, 106, 44, 0.14);
   --xamt-role-creator-line: rgba(138, 106, 44, 0.32);
@@ -100,6 +102,7 @@
   --xamt-z-nav: 40;
   --xamt-z-sheet: 45;
   --xamt-z-toast: 50;
+  --xamt-z-offline: 55;
   --xamt-z-search: 60;
   --xamt-z-mention: 10050;
 }
@@ -119,6 +122,7 @@
   --xamt-role-admin: #e07060;
   --xamt-role-admin-soft: rgba(224, 112, 96, 0.16);
   --xamt-role-admin-line: rgba(224, 112, 96, 0.36);
+  --xamt-error: var(--xamt-role-admin);
   --xamt-role-creator: #c9a56a;
   --xamt-role-creator-soft: rgba(201, 165, 106, 0.16);
   --xamt-role-creator-line: rgba(201, 165, 106, 0.36);

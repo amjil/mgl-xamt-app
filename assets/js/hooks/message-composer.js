@@ -13,6 +13,11 @@ import {
   registerBackgroundSync,
   toast,
 } from "../utils/offline-store.js"
+import {
+  removePendingMessage,
+  renderPendingMessage,
+  restorePendingMessages,
+} from "../utils/offline-pending.js"
 import { attachMentionAutocomplete, hydrateMentions } from "./mention-autocomplete.js"
 import { containsEmoji, deleteAtomicIsland, insertUprightText, islandJustDeleted, isEmojiText, wrapEmojis } from "../utils/emoji.js"
 
@@ -355,9 +360,20 @@ export const MessageComposer = {
     window.addEventListener("online", this._onOnline)
 
     this._onSwMessage = (event) => {
+      if (event.data?.type === "xamt:offline-sent") {
+        removePendingMessage(event.data.id)
+        return
+      }
       if (event.data?.type === "xamt:flush-offline") this.flushOfflineQueue()
     }
     navigator.serviceWorker?.addEventListener("message", this._onSwMessage)
+
+    this._onChannelChanged = (event) => {
+      const channelId = event.detail?.channelId
+      if (channelId) this._channelId = channelId
+      restorePendingMessages(this._channelId)
+    }
+    window.addEventListener("xamt:channel-changed", this._onChannelChanged)
 
     // Capture-phase paste: beat mongolian-editor's text-only paste handler.
     // Image files go through LiveView allow_upload(:media) via this.upload.
@@ -414,6 +430,7 @@ export const MessageComposer = {
 
     // Flush leftovers from a previous session; register Background Sync as well
     // so the Service Worker can HTTP-replay if this tab is gone when we reconnect.
+    restorePendingMessages(this._channelId)
     this.flushOfflineQueue()
     registerBackgroundSync()
   },
@@ -430,6 +447,7 @@ export const MessageComposer = {
     this._channelId = channelId
     this.wrap = wrap
     this.syncEmojiButton()
+    restorePendingMessages(channelId)
   },
 
   // LiveView WebSocket restored — retry queued pushEvents
@@ -445,6 +463,7 @@ export const MessageComposer = {
     document.removeEventListener("pointerdown", this._onEmojiPointer)
     document.removeEventListener("click", this._onEmojiClick)
     window.removeEventListener("online", this._onOnline)
+    window.removeEventListener("xamt:channel-changed", this._onChannelChanged)
     navigator.serviceWorker?.removeEventListener("message", this._onSwMessage)
     this.host?.removeEventListener("paste", this._onPaste, true)
     this.host?.removeEventListener("beforeinput", this._onBeforeInput, true)
@@ -562,6 +581,7 @@ export const MessageComposer = {
           sent === 1 ? "Synced 1 offline message" : `Synced ${sent} offline messages`
         )
       }
+      await restorePendingMessages(this._channelId)
     } catch (_err) {
       registerBackgroundSync()
     } finally {
@@ -611,7 +631,10 @@ export const MessageComposer = {
       }
 
       OfflineStore.save({channel_id: channelId, event, payload})
-        .then(() => registerBackgroundSync())
+        .then((record) => {
+          renderPendingMessage(record)
+          return registerBackgroundSync()
+        })
         .then(() => {
           toast("warning", "You're offline — message will send when you're back online")
           this.clear()

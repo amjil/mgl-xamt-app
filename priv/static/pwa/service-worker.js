@@ -1,23 +1,25 @@
-const HTML_CACHE = "xamt-html-v1";
-const ASSET_CACHE = "xamt-assets-v1";
+const HTML_CACHE = "xamt-html-v2";
+const ASSET_CACHE = "xamt-assets-v2";
 const FONT_CACHE = "xamt-fonts-v1";
 
-const SHELL = ["/", "/pwa/manifest.json"];
-const ASSETS = ["/assets/css/app.css", "/assets/js/app.js"];
+const SHELL = ["/", "/pwa/manifest.json", "/offline.html"];
 const FONTS = ["/fonts/OyunQaganTig.ttf"];
+const IMAGES = ["/images/logo.svg"];
 
-// 1. Install: pre-cache shell, assets, and fonts
+// 1. Install: pre-cache shell, fonts, and images. Asset URLs are digested
+// in production, so they are filled in at runtime via Cache First.
 self.addEventListener("install", (event) => {
   event.waitUntil(
     Promise.all([
-      caches.open(HTML_CACHE).then((cache) => cache.addAll(SHELL)),
-      caches.open(ASSET_CACHE).then((cache) => cache.addAll(ASSETS)),
-      caches.open(FONT_CACHE).then((cache) => cache.addAll(FONTS))
+      precache(HTML_CACHE, SHELL),
+      precache(FONT_CACHE, FONTS),
+      precache(ASSET_CACHE, IMAGES)
     ]).then(() => self.skipWaiting())
   );
 });
 
-// 2. Activate: drop caches from older versions
+// 2. Activate: drop caches from older versions (keep FONT_CACHE so the
+// Mongolian typeface is never evicted just because the HTML/JS cache bumped).
 self.addEventListener("activate", (event) => {
   const allowedCaches = [HTML_CACHE, ASSET_CACHE, FONT_CACHE];
   event.waitUntil(
@@ -42,53 +44,59 @@ self.addEventListener("fetch", (event) => {
   // Do not cache the Background Sync HTTP endpoint (or any JSON API).
   if (url.pathname.startsWith("/api/")) return;
 
-  // Strategy A: fonts -> Cache-First
-  // Serve from cache immediately to avoid FOUT; fetch only on miss.
+  // Strategy A: fonts -> Cache First (never block Mongolian glyphs on the network)
   if (url.pathname.startsWith("/fonts/")) {
-    event.respondWith(
-      caches.match(request).then((cached) => {
-        return cached || fetch(request).then((response) => {
-          const copy = response.clone();
-          caches.open(FONT_CACHE).then((cache) => cache.put(request, copy));
-          return response;
-        });
-      })
-    );
+    event.respondWith(cacheFirst(request, FONT_CACHE));
     return;
   }
 
-  // Strategy B: static assets (CSS/JS/Images) -> Stale-While-Revalidate
-  // Return cache for instant paint; refresh in the background for next visit.
+  // Strategy B: static assets (CSS/JS/Images) -> Cache First
   if (url.pathname.startsWith("/assets/") || url.pathname.startsWith("/images/")) {
-    event.respondWith(
-      caches.match(request).then((cached) => {
-        const networkFetch = fetch(request).then((response) => {
-          const copy = response.clone();
-          caches.open(ASSET_CACHE).then((cache) => cache.put(request, copy));
-          return response;
-        }).catch(() => {}); // Ignore background refresh failures while offline
-
-        return cached || networkFetch;
-      })
-    );
+    event.respondWith(cacheFirst(request, ASSET_CACHE));
     return;
   }
 
-  // Strategy C: pages -> Network-First (fall back to cache offline)
-  // Prefer fresh content; only show the app shell when fully offline.
+  // Strategy C: pages -> Network First (fall back to cache, then offline.html)
   event.respondWith(
     fetch(request)
       .then((response) => {
-        const copy = response.clone();
-        caches.open(HTML_CACHE).then((cache) => cache.put(request, copy));
+        if (response && response.ok && request.method === "GET") {
+          const copy = response.clone();
+          caches.open(HTML_CACHE).then((cache) => cache.put(request, copy));
+        }
         return response;
       })
       .catch(async () => {
         const cached = await caches.match(request);
-        return cached || caches.match("/"); // Fully offline: return home shell
+        return cached || caches.match("/offline.html") || caches.match("/");
       })
   );
 });
+
+async function precache(cacheName, urls) {
+  const cache = await caches.open(cacheName);
+  await Promise.all(
+    urls.map((url) =>
+      cache.add(url).catch((err) => {
+        console.warn("Precache skipped", url, err);
+      })
+    )
+  );
+}
+
+function cacheFirst(request, cacheName) {
+  return caches.match(request).then((cached) => {
+    if (cached) return cached;
+
+    return fetch(request).then((response) => {
+      if (response && response.ok) {
+        const copy = response.clone();
+        caches.open(cacheName).then((cache) => cache.put(request, copy));
+      }
+      return response;
+    });
+  });
+}
 
 // 4. Background Sync: replay IndexedDB-queued messages over HTTP.
 // The worker cannot reuse the LiveView WebSocket; keep DB constants in sync
@@ -110,7 +118,12 @@ async function flushOfflineMessages() {
 
   for (;;) {
     const msg = await claimNextPendingMessage();
-    if (!msg) return sent;
+    if (!msg) {
+      if (sent > 0) {
+        await notifyClients({ type: "xamt:flush-offline", sent: sent });
+      }
+      return sent;
+    }
 
     try {
       const response = await fetch("/api/messages/sync", {
@@ -134,6 +147,11 @@ async function flushOfflineMessages() {
       if (response.ok) {
         await removePendingMessage(msg.id);
         sent += 1;
+        await notifyClients({
+          type: "xamt:offline-sent",
+          id: msg.id,
+          channel_id: msg.channel_id
+        });
         continue;
       }
 
@@ -144,6 +162,11 @@ async function flushOfflineMessages() {
 
       // 4xx (other than 401/403/429): drop — retrying will not help
       await removePendingMessage(msg.id);
+      await notifyClients({
+        type: "xamt:offline-sent",
+        id: msg.id,
+        channel_id: msg.channel_id
+      });
     } catch (err) {
       if (String(err.message || "").includes("will retry later")) throw err;
       await releasePendingMessage(msg);
@@ -235,6 +258,14 @@ async function releasePendingMessage(msg) {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+}
+
+async function notifyClients(data) {
+  const windows = await self.clients.matchAll({
+    type: "window",
+    includeUncontrolled: true
+  });
+  windows.forEach((client) => client.postMessage(data));
 }
 
 // 5. Web Push: show a system notification and open the target URL on click.

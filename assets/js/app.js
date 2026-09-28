@@ -227,6 +227,20 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () 
   }
 })
 
+const syncBrowserOnline = () => {
+  const offline = navigator.onLine === false
+  document.body.classList.toggle("xamt-is-offline", offline)
+  const banner = document.getElementById("xamt-offline-banner")
+  if (banner) {
+    const disconnected = Boolean(document.querySelector(".phx-disconnected"))
+    banner.setAttribute("aria-hidden", offline || disconnected ? "false" : "true")
+  }
+}
+
+window.addEventListener("online", syncBrowserOnline)
+window.addEventListener("offline", syncBrowserOnline)
+syncBrowserOnline()
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     // Root scope is required so chat pages can register Background Sync.

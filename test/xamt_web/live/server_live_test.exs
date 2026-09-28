@@ -33,6 +33,7 @@ defmodule XamtWeb.ServerLiveTest do
     assert html =~ server.name
     assert html =~ channel.name
     assert has_element?(view, "#message-composer-wrap[data-channel-id='#{channel.id}']")
+    assert has_element?(view, "#offline-pending[data-channel-id='#{channel.id}']")
     assert has_element?(view, "#composer-peek")
     assert has_element?(view, "#nav-profile")
     assert has_element?(view, "#composer-emoji")

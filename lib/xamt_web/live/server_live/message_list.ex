@@ -60,6 +60,18 @@ defmodule XamtWeb.ServerLive.MessageList do
             />
           <% end %>
         <% end %>
+
+        <%!-- Optimistic offline bubbles. Lives inside the stream container so
+             pending columns sit at the latest (right) edge, but is ignored by
+             LiveView patches so stream resets do not wipe the queue. --%>
+        <div
+          id="offline-pending"
+          class="xamt-offline-pending"
+          phx-update="ignore"
+          data-channel-id={@active_channel && @active_channel.id}
+          data-waiting-label={gettext("Waiting for network…")}
+        >
+        </div>
       </div>
 
       <%!-- Edge indicator: MessageList toggles .is-visible + unread count --%>

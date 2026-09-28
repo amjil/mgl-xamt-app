@@ -74,6 +74,9 @@ export const MessageList = {
       this._atLatest = true
       this.hideJump()
       this.scrollToLatest(false)
+      window.dispatchEvent(
+        new CustomEvent("xamt:channel-changed", {detail: {channelId}})
+      )
     }
 
     this.highlightFromDataset()
