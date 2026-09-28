@@ -80,12 +80,15 @@ config :xamt, XamtWeb.Endpoint,
 # at the `config/runtime.exs`.
 config :xamt, Xamt.Mailer, adapter: Swoosh.Adapters.Local
 
+# Override with MGL_COMMON_UI_PATH if the library is not a sibling of this app.
+config :xamt, :mgl_common_ui_path, Path.expand("../../mgl-common-ui.js", __DIR__)
+
 # Configure esbuild (the version is required)
 config :esbuild,
   version: "0.25.4",
   xamt: [
     args:
-      ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
+      ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=. --alias:mgl-common-ui=./vendor/mgl-common-ui/index.js),
     cd: Path.expand("../assets", __DIR__),
     env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
   ]

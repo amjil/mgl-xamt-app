@@ -42,9 +42,9 @@
       <span class="mongol-text">{gettext("Network disconnected, reconnecting…")}</span>
     </div>
 
-    <div class="xamt-shell">
+    <div class="xamt-shell mn-shell">
       <%!-- Left rail: always on the left so labels read top→bottom --%>
-      <aside id="leftnav" class="xamt-leftnav">
+      <aside id="leftnav" class="xamt-leftnav mn-rail">
         <nav class="xamt-leftnav__inner">
           <.link navigate={~p"/"} class="xamt-brand-mark" title="Xamt">X</.link>
           <span class="xamt-leftnav__rule" aria-hidden="true"></span>
@@ -87,7 +87,7 @@
       </aside>
 
       <%!-- Reading surface (vertical-lr for non-chat pages) --%>
-      <div class="xamt-main-content" id="page-scroll">
+      <div class="xamt-main-content mn-surface" id="page-scroll">
         {@inner_content}
       </div>
     </div>

@@ -1,0 +1,385 @@
+/* mgl-common-ui — Traditional Mongolian vertical-lr primitives
+ *
+ * Default model:
+ *   html/body stay horizontal-tb
+ *   .mn-shell  is the horizontal chrome frame (rail | surface)
+ *   .mn-surface is the only vertical-lr reading surface
+ *
+ * Do not set writing-mode on html/body. That forces every overlay, auth
+ * form, and tab bar to opt back out — a more expensive dialect.
+ *
+ * Axis swap inside .mn-surface:
+ *   inline-size  = physical HEIGHT
+ *   block-size   = physical WIDTH
+ *   flex column  = left → right
+ *   flex row     = top → bottom
+ */
+
+@font-face {
+  font-family: "Oyun Qagan Tig";
+  src: url("/fonts/OyunQaganTig.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Mongol Fallback";
+  src: local("Noto Sans Mongolian"), local("Mongolian Baiti"), local("serif");
+  size-adjust: 108%;
+  ascent-override: 90%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+}
+
+:root {
+  --mn-font-script: "Oyun Qagan Tig", "Mongol Fallback", "Noto Sans Mongolian",
+    "Mongolian Baiti", "Menksoft Qagan", serif;
+  --mn-font-ui: "IBM Plex Sans", "Source Sans 3", "Noto Sans", ui-sans-serif,
+    system-ui, sans-serif;
+
+  --mn-bg: #f4efe4;
+  --mn-surface: #fbf7ee;
+  --mn-line: rgba(120, 95, 50, 0.2);
+  --mn-line-strong: rgba(120, 95, 50, 0.38);
+  --mn-text: #1c221e;
+  --mn-muted: #5f6a5c;
+  --mn-accent: #2f7d5f;
+  --mn-accent-deep: #8a6a2c;
+  --mn-radius: 0.75rem;
+  --mn-rail: 4.75rem;
+
+  --mn-vh: 100svh;
+  --mn-safe-top: env(safe-area-inset-top, 0px);
+  --mn-safe-right: env(safe-area-inset-right, 0px);
+  --mn-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --mn-safe-left: env(safe-area-inset-left, 0px);
+
+  /* Vertical field inline-size is physical height — cap it to the viewport. */
+  --mn-field-extent: clamp(7rem, calc(var(--mn-vh) - 11rem), 16rem);
+  --mn-field-extent-lg: clamp(8rem, calc(var(--mn-vh) - 10rem), 18rem);
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --mn-vh: 100dvh;
+  }
+}
+
+/* ---------- Reset that the runtime relies on -------------------------- */
+
+.mn-shell,
+.mn-shell *,
+.mn-surface,
+.mn-surface * {
+  box-sizing: border-box;
+}
+
+/* ---------- Shell (horizontal chrome) --------------------------------- */
+
+.mn-shell {
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  height: var(--mn-vh);
+  max-width: 100%;
+  overflow: hidden;
+  background: var(--mn-bg);
+  color: var(--mn-text);
+  font-family: var(--mn-font-script);
+  font-size: 17px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mn-rail {
+  flex: 0 0 var(--mn-rail);
+  width: var(--mn-rail);
+  align-self: stretch;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.mn-rail-link {
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  font-family: var(--mn-font-script);
+  padding: 0.7rem 0.4rem;
+}
+
+/* ---------- Reading surface (vertical-lr) ----------------------------- */
+
+.mn-surface {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  line-height: 1.75;
+  font-family: var(--mn-font-script);
+}
+
+/* Link-dense galleries: JS sets this when data-mn-drag is present. */
+.mn-surface[data-mn-drag] {
+  touch-action: none;
+}
+
+.mn-surface-inner {
+  height: 100%;
+  width: max-content;
+  min-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1.25rem;
+  padding-inline: 1.25rem 1.75rem;
+  padding-block: 1rem 2rem;
+}
+
+/* ---------- Axis helpers inside a vertical surface -------------------- */
+
+.mn-columns {
+  display: flex;
+  flex-direction: column; /* left → right */
+  align-items: stretch;
+  gap: 1.25rem;
+  height: 100%;
+}
+
+.mn-stack {
+  display: flex;
+  flex-direction: row; /* top → bottom */
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+/* ---------- Script / Latin / upright ---------------------------------- */
+
+.mn-text {
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  font-family: var(--mn-font-script);
+  line-height: 1.75;
+  letter-spacing: 0.06em;
+}
+
+.mn-latin {
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  font-family: var(--mn-font-ui);
+}
+
+/* Tate-chu-yoko: short Latin / digit runs as one horizontal cluster. */
+.mn-upright {
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  display: inline-block;
+  font-family: var(--mn-font-ui);
+  font-variant-numeric: lining-nums tabular-nums;
+  line-height: 1;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.mn-upright-combine {
+  writing-mode: inherit;
+  -webkit-writing-mode: inherit;
+  display: inline;
+  text-combine-upright: all;
+  -webkit-text-combine: horizontal;
+}
+
+.mn-emoji {
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75em;
+  height: 1em;
+  line-height: 1;
+  letter-spacing: 0;
+  overflow: visible;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-style: normal;
+  vertical-align: middle;
+}
+
+@media (pointer: coarse) {
+  .mn-emoji {
+    writing-mode: inherit;
+    -webkit-writing-mode: inherit;
+    display: inline;
+    width: auto;
+    height: auto;
+    line-height: inherit;
+    letter-spacing: inherit;
+    vertical-align: baseline;
+  }
+}
+
+/* ---------- Overlays stay out of the reading surface ------------------ */
+
+.mn-overlay {
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  font-family: var(--mn-font-ui);
+}
+
+/* ---------- Form controls (native inputs ignore inherited writing-mode) */
+
+.mn-input,
+.mn-textarea,
+.mn-select {
+  font: inherit;
+  color: inherit;
+  font-family: var(--mn-font-script);
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  block-size: 2.75rem;
+  inline-size: var(--mn-field-extent);
+  max-inline-size: 100%;
+  border: 1px solid var(--mn-line);
+  border-radius: var(--mn-radius);
+  background: var(--mn-surface);
+  padding: 0.55rem;
+}
+
+.mn-textarea,
+textarea.mn-input {
+  block-size: 7rem;
+  inline-size: var(--mn-field-extent-lg);
+  resize: block;
+}
+
+.mn-input-latin {
+  font-family: var(--mn-font-ui);
+}
+
+/* ---------- Document blocks (reading, not editing) -------------------- */
+
+.mn-doc {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1rem;
+  font-size: 17px;
+}
+
+.mn-h1 {
+  font-size: 23px;
+  font-weight: 600;
+}
+
+.mn-h2 {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.mn-h3 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.mn-p {
+  max-inline-size: 100%;
+  line-height: 1.85;
+}
+
+.mn-lead-word {
+  font-size: 2.2em;
+  font-weight: 600;
+  color: var(--mn-accent);
+}
+
+.mn-quote {
+  border-inline-start: 2px solid var(--mn-accent-deep);
+  padding-inline-start: 0.8rem;
+  color: var(--mn-muted);
+}
+
+.mn-callout {
+  background: var(--mn-surface);
+  border-radius: var(--mn-radius);
+  padding: 0.8rem 0.7rem;
+}
+
+.mn-figure {
+  display: flex;
+}
+
+.mn-img {
+  max-inline-size: 100%;
+  max-block-size: 22rem;
+  inline-size: auto;
+  block-size: auto;
+  border-radius: var(--mn-radius);
+}
+
+.mn-hr {
+  align-self: stretch;
+  block-size: 1px;
+  border: 0;
+  background: var(--mn-line-strong);
+}
+
+.mn-ul,
+.mn-ol {
+  margin: 0;
+  padding-inline-start: 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.mn-nested {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding-inline-start: 0.9rem;
+}
+
+.mn-link {
+  color: var(--mn-accent);
+}
+
+/* Nested Y-axis scroll (Latin dropdowns, auth columns). */
+[data-mn-scroll-y] {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Slim bars — height is the visible track on a vertical-lr surface. */
+.mn-surface {
+  scrollbar-width: thin;
+}
+
+.mn-surface::-webkit-scrollbar {
+  height: 8px;
+}
+
+@media (pointer: coarse) {
+  .mn-surface {
+    scrollbar-width: none;
+  }
+
+  .mn-surface::-webkit-scrollbar {
+    height: 0;
+  }
+}

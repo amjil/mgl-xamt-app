@@ -163,7 +163,7 @@ defmodule XamtWeb.Layouts do
         id="toast-container"
         phx-update="ignore"
         phx-hook="ToastHandler"
-        class="xamt-toast"
+        class="xamt-toast mn-overlay mn-latin"
         aria-live="polite"
       >
       </div>

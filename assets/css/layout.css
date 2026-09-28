@@ -12,6 +12,12 @@
     var(--xamt-safe-left);
 }
 
+/* Library .mn-shell paints a solid page; keep Xamt's body glow visible. */
+.xamt-shell.mn-shell {
+  background: transparent;
+  height: calc(var(--xamt-vh) - var(--xamt-ime-kb));
+}
+
 body.mgl-ime-mobile-open .xamt-shell {
   padding-bottom: 0;
 }
@@ -121,7 +127,8 @@ body:has(.xamt-app) .xamt-shell > .xamt-leftnav {
   display: none;
 }
 
-body:has(.xamt-app) .xamt-main-content {
+body:has(.xamt-app) .xamt-main-content,
+body:has(.xamt-app) .xamt-main-content.mn-surface {
   padding: 0;
   height: 100%;
   writing-mode: horizontal-tb;

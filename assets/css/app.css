@@ -21,6 +21,9 @@
 /* Make LiveView wrapper divs transparent for layout */
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
+/* Traditional Mongolian primitives (shell / surface / scroll runtime CSS) */
+@import "../vendor/mgl-common-ui/mgl-common-ui.css";
+
 /* Core application styles */
 @import "./mongolian.css";
 @import "./layout.css";
@@ -43,7 +46,8 @@ mgl-emoji-picker {
 /* Keyboard-safe shell: --xamt-vh is kept in sync by initVisualViewport().
    overflow:hidden is set on html/body in mongolian.css so iOS cannot rubber-band
    the page behind the keys. Inner surfaces contain overscroll so the chain
-   never reaches the locked root. */
+   never reaches the locked root. --mn-vh is kept in sync by mgl-common-ui
+   initVisualViewport(); --xamt-vh aliases it. */
 .xamt-messages,
 .xamt-composer__editor {
   overscroll-behavior-x: contain;

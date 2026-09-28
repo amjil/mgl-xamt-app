@@ -85,9 +85,14 @@ defmodule Xamt.MixProject do
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
-      "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-      "assets.build": ["compile", "tailwind xamt", "esbuild xamt"],
+      "assets.setup": [
+        "tailwind.install --if-missing",
+        "esbuild.install --if-missing",
+        "xamt.vendor_mgl_common_ui"
+      ],
+      "assets.build": ["compile", "xamt.vendor_mgl_common_ui", "tailwind xamt", "esbuild xamt"],
       "assets.deploy": [
+        "xamt.vendor_mgl_common_ui",
         "tailwind xamt --minify",
         "esbuild xamt --minify",
         "phx.digest"

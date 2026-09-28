@@ -186,7 +186,7 @@ defmodule XamtWeb.ServerLive.Composer do
         <% else %>
           <div class="xamt-composer__field">
             <div id="message-composer" phx-hook="MessageComposer" phx-update="ignore">
-              <div class="xamt-composer__editor" id="composer-editor-host"></div>
+              <div class="xamt-composer__editor mn-surface" id="composer-editor-host"></div>
             </div>
 
             <div id="composer-toolbar" class="xamt-composer__toolbar">

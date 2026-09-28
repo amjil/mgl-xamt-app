@@ -526,7 +526,7 @@ export const MessageComposer = {
     const root = this._root()
     if (!root) return
     let needsWrap = false
-    for (const span of root.querySelectorAll(".xamt-emoji")) {
+    for (const span of root.querySelectorAll(".mn-emoji, .xamt-emoji")) {
       const value = span.textContent || ""
       if (value && !isEmojiText(value)) {
         needsWrap = true
@@ -537,7 +537,7 @@ export const MessageComposer = {
       const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
       let node
       while ((node = walker.nextNode())) {
-        if (node.parentElement?.closest(".xamt-emoji, .xamt-mention, .xamt-upright, code, pre")) {
+        if (node.parentElement?.closest(".mn-emoji, .xamt-emoji, .xamt-mention, .xamt-upright, .mn-upright, code, pre")) {
           continue
         }
         if (containsEmoji(node.data)) {

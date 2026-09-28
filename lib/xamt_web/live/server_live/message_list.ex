@@ -20,7 +20,7 @@ defmodule XamtWeb.ServerLive.MessageList do
 
       <div
         id="message-list"
-        class="xamt-messages"
+        class="xamt-messages mn-surface"
         phx-update="stream"
         phx-hook="MessageList"
         data-highlight={@highlight_id}

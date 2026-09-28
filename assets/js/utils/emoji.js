@@ -14,8 +14,8 @@ const EMOJI_SEQ_SRC = `(?:${FLAG}|${ZWJ_SEQ}|${KEYCAP})`
 const ONLY_EMOJI = new RegExp(`^(?:${EMOJI_SEQ_SRC}|\\s)+$`, "u")
 const FIND_EMOJI = new RegExp(EMOJI_SEQ_SRC, "gu")
 
-const SKIP_WRAP = ".xamt-emoji, .xamt-mention, .xamt-upright, code, pre"
-const ATOMIC_ISLAND = ".xamt-emoji, .xamt-mention"
+const SKIP_WRAP = ".mn-emoji, .xamt-emoji, .xamt-mention, .xamt-upright, .mn-upright, code, pre"
+const ATOMIC_ISLAND = ".mn-emoji, .xamt-emoji, .xamt-mention"
 const ZWSP_ONLY = /^[\u200b\u200c\u200d\ufeff]*$/
 
 export function isEmojiText(text) {
@@ -29,7 +29,7 @@ export function containsEmoji(text) {
 }
 
 export function emojiHtml(text) {
-  return `<span class="xamt-emoji" contenteditable="false">${escapeHtml(text)}</span>`
+  return `<span class="mn-emoji xamt-emoji" contenteditable="false">${escapeHtml(text)}</span>`
 }
 
 /** Escape `text` and wrap color-emoji runs so vertical-lr columns stay upright. */
@@ -65,7 +65,7 @@ export function insertUprightText(text) {
 
 export function wrapEmojis(root) {
   if (!root) return
-  for (const span of [...root.querySelectorAll(".xamt-emoji")]) {
+  for (const span of [...root.querySelectorAll(".mn-emoji, .xamt-emoji")]) {
     splitEmojiIsland(span)
   }
 
@@ -86,7 +86,7 @@ export function wrapEmojis(root) {
     textNode.replaceWith(fragmentFor(textNode.data))
   }
 
-  for (const span of root.querySelectorAll(".xamt-emoji")) {
+  for (const span of root.querySelectorAll(".mn-emoji, .xamt-emoji")) {
     span.setAttribute("contenteditable", "false")
     ensureZwspAfter(span)
   }

@@ -58,7 +58,7 @@ defmodule XamtWeb.CoreComponents do
       id={@id}
       phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
       role="alert"
-      class="xamt-toast"
+      class="xamt-toast mn-overlay mn-latin"
       {@rest}
     >
       <div class={[
@@ -505,7 +505,7 @@ defmodule XamtWeb.CoreComponents do
             </button>
           </div>
 
-          <div id={"#{@id}-body"} class="xamt-sheet__body">
+          <div id={"#{@id}-body"} class="xamt-sheet__body mn-surface">
             {render_slot(@inner_block)}
           </div>
         </div>

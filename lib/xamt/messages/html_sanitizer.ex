@@ -185,7 +185,7 @@ defmodule Xamt.Messages.HtmlSanitizer do
     end)
     |> Kernel.||("")
     |> String.split()
-    |> Enum.member?("xamt-emoji")
+    |> Enum.any?(&(&1 in ["xamt-emoji", "mn-emoji"]))
   end
 
   defp emoji_span?(_, _), do: false
