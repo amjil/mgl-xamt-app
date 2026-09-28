@@ -72,7 +72,7 @@ body.mgl-ime-mobile-open {
   padding-bottom: 280px;
 }
 
-/* Candidate bar sits above the keyboard; variant popup lifts the keyboard higher */
+/* Candidate bar sits above the keyboard; long-press popup stacks over it */
 mgl-candidates[variant="bar"] {
   z-index: 10001;
   pointer-events: auto;

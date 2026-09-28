@@ -4737,14 +4737,6 @@ var MglKeyboard = class extends Base2 {
     this._popup.setAttribute("aria-hidden", "true");
     this.removeAttribute("popup-open");
   }
-  /** Visible mobile candidate bar, if any. */
-  _candidateBarRect() {
-    const el = document.querySelector("mgl-candidates[visible]");
-    if (!el) return null;
-    const r = el.getBoundingClientRect();
-    if (!r.height || r.bottom <= 0) return null;
-    return r;
-  }
   /**
    * @param {HTMLElement} btn
    * @param {import("../keyboard/popup-candidates.js").PopupKey[]} keys
@@ -4769,12 +4761,7 @@ var MglKeyboard = class extends Base2 {
     const rightAligned = rect.left + rect.width / 2 > vw / 2;
     let left = rightAligned ? rect.right - pRect.width : rect.left;
     left = Math.max(8, Math.min(left, vw - pRect.width - 8));
-    let top = rect.top - pRect.height - 10;
-    const cand = this._candidateBarRect();
-    if (cand && top + pRect.height > cand.top - 8) {
-      top = cand.top - pRect.height - 8;
-    }
-    top = Math.max(8, top);
+    const top = Math.max(8, rect.top - pRect.height - 10);
     this._popup.style.left = `${left}px`;
     this._popup.style.top = `${top}px`;
     if (this._press) this._press.rightAligned = rightAligned;
