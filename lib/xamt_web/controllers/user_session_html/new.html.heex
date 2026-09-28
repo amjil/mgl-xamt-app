@@ -21,6 +21,7 @@
 
     <.form
       :let={f}
+      :if={@magic_link_enabled?}
       for={@form}
       as={:user}
       id="login_form_magic"
@@ -41,7 +42,7 @@
       </.button>
     </.form>
 
-    <div class="xamt-divider">{gettext("or")}</div>
+    <div :if={@magic_link_enabled?} class="xamt-divider">{gettext("or")}</div>
 
     <.form
       :let={f}

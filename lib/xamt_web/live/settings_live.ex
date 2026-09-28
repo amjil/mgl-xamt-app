@@ -17,6 +17,7 @@ defmodule XamtWeb.SettingsLive do
      |> assign(:status_form, to_form(Accounts.change_user_custom_status(user), as: :status))
      |> assign(:site_admin?, User.admin?(user))
      |> assign(:registration_enabled?, SiteSettings.registration_enabled?())
+     |> assign(:magic_link_enabled?, SiteSettings.magic_link_enabled?())
      |> allow_upload(:avatar,
        accept: ~w(.jpg .jpeg .png .gif .webp),
        max_entries: 1,
@@ -106,13 +107,42 @@ defmodule XamtWeb.SettingsLive do
 
         {:noreply,
          socket
-         |> assign(:registration_enabled?, setting.registration_enabled)
+         |> assign_site_toggles(setting)
          |> put_flash(:info, flash)}
 
       {:error, :unauthorized} ->
         {:noreply,
          put_flash(socket, :error, gettext("You don't have permission to change this."))}
     end
+  end
+
+  def handle_event("toggle_magic_link", _params, socket) do
+    enabled = !socket.assigns.magic_link_enabled?
+
+    case SiteSettings.update_magic_link_enabled(socket.assigns.current_scope.user, enabled) do
+      {:ok, setting} ->
+        flash =
+          if setting.magic_link_enabled do
+            gettext("Magic link login is now open.")
+          else
+            gettext("Magic link login is now closed.")
+          end
+
+        {:noreply,
+         socket
+         |> assign_site_toggles(setting)
+         |> put_flash(:info, flash)}
+
+      {:error, :unauthorized} ->
+        {:noreply,
+         put_flash(socket, :error, gettext("You don't have permission to change this."))}
+    end
+  end
+
+  defp assign_site_toggles(socket, setting) do
+    socket
+    |> assign(:registration_enabled?, setting.registration_enabled)
+    |> assign(:magic_link_enabled?, setting.magic_link_enabled)
   end
 
   defp apply_settings_status(socket, attrs) do
@@ -286,7 +316,7 @@ defmodule XamtWeb.SettingsLive do
         <section :if={@site_admin?} id="site-settings" class="xamt-site-settings xamt-surface">
           <h2 class="xamt-section-title mongol-text">{gettext("Site")}</h2>
           <p class="xamt-site-settings__copy mongol-text">
-            {gettext("Control whether new people can create an account.")}
+            {gettext("Control how people join and sign in.")}
           </p>
 
           <div class="xamt-site-settings__row">
@@ -308,6 +338,31 @@ defmodule XamtWeb.SettingsLive do
               </span>
               <span class="xamt-site-settings__state mongol-text">
                 {if @registration_enabled?,
+                  do: gettext("Open"),
+                  else: gettext("Closed")}
+              </span>
+            </div>
+          </div>
+
+          <div class="xamt-site-settings__row">
+            <button
+              type="button"
+              id="magic-link-toggle"
+              class="xamt-switch"
+              role="switch"
+              aria-checked={to_string(@magic_link_enabled?)}
+              phx-click="toggle_magic_link"
+            >
+              <span class="xamt-switch__track" aria-hidden="true">
+                <span class="xamt-switch__thumb"></span>
+              </span>
+            </button>
+            <div class="xamt-site-settings__meta">
+              <span class="xamt-site-settings__label mongol-text">
+                {gettext("Allow magic link login")}
+              </span>
+              <span class="xamt-site-settings__state mongol-text">
+                {if @magic_link_enabled?,
                   do: gettext("Open"),
                   else: gettext("Closed")}
               </span>

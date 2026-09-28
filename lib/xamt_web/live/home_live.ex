@@ -45,7 +45,10 @@ defmodule XamtWeb.HomeLive do
 
   @impl true
   def handle_info({:site_settings_updated, setting}, socket) do
-    {:noreply, assign(socket, :registration_enabled?, setting.registration_enabled)}
+    {:noreply,
+     socket
+     |> assign(:registration_enabled?, setting.registration_enabled)
+     |> assign(:magic_link_enabled?, setting.magic_link_enabled)}
   end
 
   @impl true

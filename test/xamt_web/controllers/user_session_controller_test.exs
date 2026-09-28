@@ -49,6 +49,17 @@ defmodule XamtWeb.UserSessionControllerTest do
       refute response =~ ~p"/register"
       assert response =~ "Registration is currently closed."
     end
+
+    test "hides magic link form when magic link login is closed", %{conn: conn} do
+      Xamt.SiteSettings.put_magic_link_enabled!(false)
+
+      conn = get(conn, ~p"/users/log-in")
+      response = html_response(conn, 200)
+      assert response =~ "Log in"
+      refute response =~ "Log in with email"
+      refute response =~ ~s(id="login_form_magic")
+      assert response =~ ~s(id="login_form_password")
+    end
   end
 
   describe "GET /users/log-in/:token" do
@@ -80,6 +91,36 @@ defmodule XamtWeb.UserSessionControllerTest do
 
       assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
                "Magic link is invalid or it has expired."
+    end
+
+    test "rejects confirmed-user magic link when login is closed", %{conn: conn, user: user} do
+      Xamt.SiteSettings.put_magic_link_enabled!(false)
+
+      token =
+        extract_user_token(fn url ->
+          Accounts.deliver_login_instructions(user, url)
+        end)
+
+      conn = get(conn, ~p"/users/log-in/#{token}")
+      assert redirected_to(conn) == ~p"/login"
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
+               "Magic link login is currently closed."
+    end
+
+    test "still confirms unconfirmed users when magic link login is closed", %{
+      conn: conn,
+      unconfirmed_user: user
+    } do
+      Xamt.SiteSettings.put_magic_link_enabled!(false)
+
+      token =
+        extract_user_token(fn url ->
+          Accounts.deliver_login_instructions(user, url)
+        end)
+
+      conn = get(conn, ~p"/users/log-in/#{token}")
+      assert html_response(conn, 200) =~ "Confirm and stay logged in"
     end
   end
 
@@ -160,6 +201,19 @@ defmodule XamtWeb.UserSessionControllerTest do
       refute get_session(conn, :user_token)
       assert html_response(conn, 200) =~ "Invalid email or password"
     end
+
+    test "still accepts password login when magic link login is closed", %{conn: conn, user: user} do
+      Xamt.SiteSettings.put_magic_link_enabled!(false)
+      user = set_password(user)
+
+      conn =
+        post(conn, ~p"/users/log-in", %{
+          "user" => %{"email" => user.email, "password" => valid_user_password()}
+        })
+
+      assert get_session(conn, :user_token)
+      assert redirected_to(conn) == ~p"/"
+    end
   end
 
   describe "POST /users/log-in - magic link" do
@@ -225,6 +279,58 @@ defmodule XamtWeb.UserSessionControllerTest do
         })
 
       assert html_response(conn, 200) =~ "The link is invalid or it has expired."
+    end
+
+    test "does not send a magic link when login is closed", %{conn: conn, user: user} do
+      Xamt.SiteSettings.put_magic_link_enabled!(false)
+
+      conn =
+        post(conn, ~p"/users/log-in", %{
+          "user" => %{"email" => user.email}
+        })
+
+      assert redirected_to(conn) == ~p"/login"
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
+               "Magic link login is currently closed."
+
+      refute Xamt.Repo.get_by(Accounts.UserToken, user_id: user.id, context: "login")
+    end
+
+    test "rejects confirmed-user magic link login when closed", %{conn: conn, user: user} do
+      Xamt.SiteSettings.put_magic_link_enabled!(false)
+      {token, _hashed_token} = generate_user_magic_link_token(user)
+
+      conn =
+        post(conn, ~p"/users/log-in", %{
+          "user" => %{"token" => token}
+        })
+
+      refute get_session(conn, :user_token)
+      assert redirected_to(conn) == ~p"/login"
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
+               "Magic link login is currently closed."
+    end
+
+    test "still confirms unconfirmed users when magic link login is closed", %{
+      conn: conn,
+      unconfirmed_user: user
+    } do
+      Xamt.SiteSettings.put_magic_link_enabled!(false)
+      {token, _hashed_token} = generate_user_magic_link_token(user)
+      refute user.confirmed_at
+
+      conn =
+        post(conn, ~p"/users/log-in", %{
+          "user" => %{"token" => token},
+          "_action" => "confirmed"
+        })
+
+      assert get_session(conn, :user_token)
+      assert redirected_to(conn) == ~p"/"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "User confirmed successfully."
+      assert Accounts.get_user!(user.id).confirmed_at
     end
   end
 

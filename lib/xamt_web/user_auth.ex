@@ -81,7 +81,9 @@ defmodule XamtWeb.UserAuth do
   Assigns site-wide flags used by layouts and auth templates.
   """
   def assign_site_settings(conn, _opts) do
-    assign(conn, :registration_enabled?, Xamt.SiteSettings.registration_enabled?())
+    conn
+    |> assign(:registration_enabled?, Xamt.SiteSettings.registration_enabled?())
+    |> assign(:magic_link_enabled?, Xamt.SiteSettings.magic_link_enabled?())
   end
 
   defp ensure_user_token(conn) do
@@ -311,6 +313,9 @@ defmodule XamtWeb.UserAuth do
       end)
       |> Phoenix.Component.assign_new(:registration_enabled?, fn ->
         Xamt.SiteSettings.registration_enabled?()
+      end)
+      |> Phoenix.Component.assign_new(:magic_link_enabled?, fn ->
+        Xamt.SiteSettings.magic_link_enabled?()
       end)
 
     maybe_attach_web_push_hook(socket)

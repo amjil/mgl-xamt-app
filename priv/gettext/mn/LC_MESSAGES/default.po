@@ -339,12 +339,17 @@ msgstr ""
 msgid "Admin"
 msgstr ""
 
+#: lib/xamt_web/live/settings_live.ex:362
+#, elixir-autogen, elixir-format
+msgid "Allow magic link login"
+msgstr ""
+
 #: lib/xamt_web/live/server_live/composer.ex:158
 #, elixir-autogen, elixir-format
 msgid "Allow multiple answers"
 msgstr ""
 
-#: lib/xamt_web/live/settings_live.ex:287
+#: lib/xamt_web/live/settings_live.ex:337
 #, elixir-autogen, elixir-format
 msgid "Allow registration"
 msgstr ""
@@ -460,9 +465,9 @@ msgstr ""
 msgid "Confirming..."
 msgstr ""
 
-#: lib/xamt_web/live/settings_live.ex:270
+#: lib/xamt_web/live/settings_live.ex:319
 #, elixir-autogen, elixir-format
-msgid "Control whether new people can create an account."
+msgid "Control how people join and sign in."
 msgstr ""
 
 #: lib/xamt_web/live/home_live.ex:405
@@ -682,6 +687,21 @@ msgstr ""
 #: lib/xamt_web/controllers/user_session_html/confirm.html.heex:66
 #, elixir-autogen, elixir-format
 msgid "Logging in..."
+msgstr ""
+
+#: lib/xamt_web/controllers/user_session_controller.ex:152
+#, elixir-autogen, elixir-format
+msgid "Magic link login is currently closed."
+msgstr ""
+
+#: lib/xamt_web/live/settings_live.ex:128
+#, elixir-autogen, elixir-format
+msgid "Magic link login is now closed."
+msgstr ""
+
+#: lib/xamt_web/live/settings_live.ex:126
+#, elixir-autogen, elixir-format
+msgid "Magic link login is now open."
 msgstr ""
 
 #: lib/xamt_web/controllers/user_settings_html/edit.html.heex:10

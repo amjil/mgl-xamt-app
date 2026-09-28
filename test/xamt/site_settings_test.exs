@@ -5,9 +5,11 @@ defmodule Xamt.SiteSettingsTest do
 
   alias Xamt.SiteSettings
 
-  test "registration is enabled by default" do
+  test "registration and magic link login are enabled by default" do
     assert SiteSettings.registration_enabled?()
+    assert SiteSettings.magic_link_enabled?()
     assert SiteSettings.get().registration_enabled
+    assert SiteSettings.get().magic_link_enabled
   end
 
   test "admins can close and reopen registration" do
@@ -22,12 +24,27 @@ defmodule Xamt.SiteSettingsTest do
     assert SiteSettings.registration_enabled?()
   end
 
-  test "non-admins cannot change registration" do
+  test "admins can close and reopen magic link login" do
+    admin = admin_fixture()
+
+    assert {:ok, closed} = SiteSettings.update_magic_link_enabled(admin, false)
+    refute closed.magic_link_enabled
+    refute SiteSettings.magic_link_enabled?()
+
+    assert {:ok, opened} = SiteSettings.update_magic_link_enabled(admin, true)
+    assert opened.magic_link_enabled
+    assert SiteSettings.magic_link_enabled?()
+  end
+
+  test "non-admins cannot change registration or magic link login" do
     user = user_fixture()
     creator = creator_fixture()
 
     assert {:error, :unauthorized} = SiteSettings.update_registration_enabled(user, false)
     assert {:error, :unauthorized} = SiteSettings.update_registration_enabled(creator, false)
+    assert {:error, :unauthorized} = SiteSettings.update_magic_link_enabled(user, false)
+    assert {:error, :unauthorized} = SiteSettings.update_magic_link_enabled(creator, false)
     assert SiteSettings.registration_enabled?()
+    assert SiteSettings.magic_link_enabled?()
   end
 end

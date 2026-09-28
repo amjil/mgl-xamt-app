@@ -46,6 +46,7 @@ defmodule XamtWeb.SettingsLiveTest do
 
     refute has_element?(view, "#site-settings")
     refute has_element?(view, "#registration-toggle")
+    refute has_element?(view, "#magic-link-toggle")
     refute has_element?(view, "#manage-users-link")
   end
 
@@ -68,12 +69,37 @@ defmodule XamtWeb.SettingsLiveTest do
     assert has_element?(view, "#registration-toggle[aria-checked='true']")
   end
 
+  test "admins can close and reopen magic link login", %{conn: conn} do
+    admin = admin_fixture()
+    {:ok, view, _html} = live(log_in_user(conn, admin), ~p"/settings")
+
+    assert has_element?(view, "#magic-link-toggle[aria-checked='true']")
+
+    view |> element("#magic-link-toggle") |> render_click()
+
+    refute Xamt.SiteSettings.magic_link_enabled?()
+    assert has_element?(view, "#magic-link-toggle[aria-checked='false']")
+
+    view |> element("#magic-link-toggle") |> render_click()
+
+    assert Xamt.SiteSettings.magic_link_enabled?()
+    assert has_element?(view, "#magic-link-toggle[aria-checked='true']")
+  end
+
   test "non-admins cannot toggle registration by sending the event", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/settings")
 
     html = render_click(view, "toggle_registration", %{})
     assert html =~ "permission to change this"
     assert Xamt.SiteSettings.registration_enabled?()
+  end
+
+  test "non-admins cannot toggle magic link login by sending the event", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/settings")
+
+    html = render_click(view, "toggle_magic_link", %{})
+    assert html =~ "permission to change this"
+    assert Xamt.SiteSettings.magic_link_enabled?()
   end
 
   test "clears custom status", %{conn: conn, user: user} do
