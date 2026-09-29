@@ -1431,7 +1431,7 @@ defmodule XamtWeb.ServerLiveTest do
 
     audio =
       file_input(view, "#audio-form", :audio, [
-        %{name: "voice.webm", content: <<1, 2, 3, 4>>, type: "audio/webm"}
+        %{name: "voice.webm", content: :binary.copy(<<1>>, 512), type: "audio/webm"}
       ])
 
     render_upload(audio, "voice.webm")
@@ -1443,6 +1443,28 @@ defmodule XamtWeb.ServerLiveTest do
     assert has_element?(view, "audio.xamt-audio-player")
   end
 
+  test "send_audio rejects empty stub recordings", %{
+    conn: conn,
+    server: server,
+    channel: channel
+  } do
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    audio =
+      file_input(view, "#audio-form", :audio, [
+        %{name: "voice.webm", content: <<1, 2, 3, 4>>, type: "audio/webm"}
+      ])
+
+    render_upload(audio, "voice.webm")
+
+    view
+    |> form("#audio-form")
+    |> render_submit()
+
+    refute has_element?(view, "audio.xamt-audio-player")
+    assert render(view) =~ "Could not send voice message"
+  end
+
   test "send_audio accepts Safari m4a recordings", %{
     conn: conn,
     server: server,
@@ -1452,7 +1474,7 @@ defmodule XamtWeb.ServerLiveTest do
 
     audio =
       file_input(view, "#audio-form", :audio, [
-        %{name: "voice.m4a", content: <<1, 2, 3, 4>>, type: "audio/mp4"}
+        %{name: "voice.m4a", content: :binary.copy(<<1>>, 512), type: "audio/mp4"}
       ])
 
     render_upload(audio, "voice.m4a")

@@ -1,6 +1,6 @@
 defmodule Xamt.Uploads do
   @moduledoc """
-  Authorization for files stored under `priv/static/uploads`.
+  Authorization for files stored under `priv/uploads`.
 
   Avatars and server icons are public (profile pages are unauthenticated).
   Message media requires membership of a server that references the file.

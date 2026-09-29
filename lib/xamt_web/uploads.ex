@@ -1,6 +1,10 @@
 defmodule XamtWeb.Uploads do
   @moduledoc """
-  Persist LiveView uploads under `priv/static/uploads`.
+  Persist LiveView uploads under `priv/uploads` (outside `priv/static`).
+
+  Storing authenticated media under `priv/static` makes `Plug.Static` raise
+  `InvalidPathError` in development (`raise_on_missing_only`), so the browser
+  receives an HTML error page instead of audio bytes and players show 0:00.
   """
 
   require Logger
@@ -13,6 +17,22 @@ defmodule XamtWeb.Uploads do
     ".3gp" => ".mp4"
   }
   @thumb_max_edge 180
+  # Real MediaRecorder blobs are at least a few KB; 4-byte test stubs are not playable.
+  @min_audio_bytes 256
+
+  @doc """
+  Absolute directory for persisted upload bytes (`priv/uploads`).
+  """
+  def dir do
+    Path.join(:code.priv_dir(:xamt), "uploads")
+  end
+
+  @doc """
+  Absolute disk path for a `/uploads/:filename` URL or bare filename.
+  """
+  def disk_path(url_or_name) when is_binary(url_or_name) do
+    Path.join(dir(), Path.basename(url_or_name))
+  end
 
   def consume_images(socket, name) do
     consume(socket, name, &image_ext/1)
@@ -42,7 +62,20 @@ defmodule XamtWeb.Uploads do
   end
 
   def consume_audio(socket, name) do
-    List.first(consume(socket, name, &audio_ext/1))
+    case List.first(consume(socket, name, &audio_ext/1)) do
+      url when is_binary(url) ->
+        path = disk_path(url)
+
+        if File.regular?(path) and File.stat!(path).size >= @min_audio_bytes do
+          url
+        else
+          delete_stored(url)
+          nil
+        end
+
+      _ ->
+        nil
+    end
   end
 
   @doc """
@@ -64,8 +97,7 @@ defmodule XamtWeb.Uploads do
     name = Path.basename(url)
 
     if String.starts_with?(url, "/uploads/") and Xamt.Uploads.safe_filename?(name) do
-      dest = Path.join([:code.priv_dir(:xamt), "static", "uploads", name])
-      File.rm(dest)
+      File.rm(disk_path(name))
     end
 
     :ok
@@ -74,7 +106,7 @@ defmodule XamtWeb.Uploads do
   def delete_stored(_), do: :ok
 
   defp persist_gallery_image(path, uuid, ext) do
-    uploads_dir = Path.join([:code.priv_dir(:xamt), "static", "uploads"])
+    uploads_dir = dir()
     File.mkdir_p!(uploads_dir)
 
     original_name = "#{uuid}#{ext}"
@@ -93,7 +125,7 @@ defmodule XamtWeb.Uploads do
 
   defp write_thumbnail(original_path, uuid, ext) do
     thumb_name = "thumb_#{uuid}#{ext}"
-    thumb_dest = Path.join([:code.priv_dir(:xamt), "static", "uploads", thumb_name])
+    thumb_dest = Path.join(dir(), thumb_name)
 
     with {:ok, thumb} <- Image.thumbnail(original_path, @thumb_max_edge),
          {:ok, _} <- Image.write(thumb, thumb_dest) do
@@ -119,7 +151,7 @@ defmodule XamtWeb.Uploads do
 
       if is_binary(ext) do
         filename = "#{entry.uuid}#{ext}"
-        dest = Path.join([:code.priv_dir(:xamt), "static", "uploads", filename])
+        dest = Path.join(dir(), filename)
         File.mkdir_p!(Path.dirname(dest))
         File.cp!(path, dest)
         {:ok, "/uploads/#{filename}"}

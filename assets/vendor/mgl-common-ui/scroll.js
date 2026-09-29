@@ -8,7 +8,8 @@
 
 const DEFAULT_SELECTOR = ".mn-surface"
 const VERTICAL_ALLOW = "[data-mn-scroll-y], .mn-latin, .mn-overlay"
-const EDITABLE = "textarea, input, select, [contenteditable], .mn-input, .mn-textarea"
+const EDITABLE =
+  "textarea, input, select, [contenteditable], .mn-input, .mn-textarea, .mgl-editor-scope"
 const DRAG_THRESHOLD = 6
 
 function canScrollAxis(el, axis) {
@@ -86,6 +87,7 @@ function installKeyboard(selector) {
   const onKey = (event) => {
     if (event.metaKey || event.ctrlKey || event.altKey) return
     if (isEditable(event.target)) return
+    if (event.target instanceof Element && event.target.closest(VERTICAL_ALLOW)) return
 
     const el =
       closestSurface(event.target, selector) || document.querySelector(selector)

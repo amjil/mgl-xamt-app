@@ -17,7 +17,7 @@ defmodule XamtWeb.UploadControllerTest do
     channel = hd(Channels.list_channels(server.id))
 
     filename = "media-#{System.unique_integer([:positive])}.png"
-    dest = Path.join([:code.priv_dir(:xamt), "static", "uploads", filename])
+    dest = XamtWeb.Uploads.disk_path(filename)
     File.mkdir_p!(Path.dirname(dest))
     File.cp!(@fixture, dest)
 
@@ -64,7 +64,8 @@ defmodule XamtWeb.UploadControllerTest do
 
   test "avatars are public", %{conn: conn, owner: owner} do
     filename = "avatar-#{System.unique_integer([:positive])}.png"
-    dest = Path.join([:code.priv_dir(:xamt), "static", "uploads", filename])
+    dest = XamtWeb.Uploads.disk_path(filename)
+    File.mkdir_p!(Path.dirname(dest))
     File.cp!(@fixture, dest)
     on_exit(fn -> File.rm(dest) end)
 

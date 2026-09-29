@@ -2,13 +2,14 @@ defmodule XamtWeb.UploadController do
   @moduledoc """
   Authenticated (or publicly referenced) file serving for `/uploads/:filename`.
 
-  Files stay on disk under `priv/static/uploads` but are no longer served by
+  Files live under `priv/uploads` (not `priv/static`) and are never served by
   `Plug.Static`, so membership / avatar checks run before bytes leave the app.
   """
 
   use XamtWeb, :controller
 
   alias Xamt.Uploads
+  alias XamtWeb.Uploads, as: UploadStore
 
   def show(conn, %{"filename" => filename}) do
     user = current_user(conn)
@@ -39,7 +40,7 @@ defmodule XamtWeb.UploadController do
   end
 
   defp existing_disk_path(filename) do
-    disk = Path.join([:code.priv_dir(:xamt), "static", "uploads", filename])
+    disk = UploadStore.disk_path(filename)
 
     if File.regular?(disk) do
       disk
