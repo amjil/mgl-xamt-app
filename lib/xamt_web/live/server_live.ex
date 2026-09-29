@@ -79,6 +79,8 @@ defmodule XamtWeb.ServerLive do
       |> assign(:member?, true)
       |> assign(:current_member, current_member)
       |> assign(:channels, channels)
+      |> assign(:channel_filter, "")
+      |> assign_filtered_channels()
       |> assign(:members_offset, @member_page_size)
       |> assign(:has_more_members, length(members) == @member_page_size)
       |> stream(:members, members)
@@ -722,6 +724,15 @@ defmodule XamtWeb.ServerLive do
       status_text: Map.get(params, "text")
     })
   end
+
+  def handle_event("filter_channels", %{"q" => query}, socket) do
+    {:noreply,
+     socket
+     |> assign(:channel_filter, query)
+     |> assign_filtered_channels()}
+  end
+
+  def handle_event("filter_channels", _params, socket), do: {:noreply, socket}
 
   def handle_event("save_channel", %{"channel" => params}, socket) do
     save_channel(socket, socket.assigns.live_action, params)
@@ -1468,8 +1479,42 @@ defmodule XamtWeb.ServerLive do
   end
 
   defp refresh_channels(socket) do
-    assign(socket, :channels, Channels.list_channels(socket.assigns.server.id))
+    socket
+    |> assign(:channels, Channels.list_channels(socket.assigns.server.id))
+    |> assign_filtered_channels()
   end
+
+  defp assign_filtered_channels(socket) do
+    assign(
+      socket,
+      :filtered_channels,
+      filter_channels(socket.assigns.channels, socket.assigns.channel_filter)
+    )
+  end
+
+  defp filter_channels(channels, filter) when is_binary(filter) do
+    needle =
+      filter
+      |> Messages.search_normalize()
+      |> String.downcase()
+
+    if needle == "" do
+      channels
+    else
+      Enum.filter(channels, fn channel ->
+        name =
+          channel.name
+          |> Messages.search_normalize()
+          |> String.downcase()
+
+        slug = channel.slug |> to_string() |> String.downcase()
+
+        String.contains?(name, needle) or String.contains?(slug, needle)
+      end)
+    end
+  end
+
+  defp filter_channels(channels, _), do: channels
 
   defp overlay_return_path(socket) do
     case socket.assigns.active_channel do

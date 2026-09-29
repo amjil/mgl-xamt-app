@@ -70,8 +70,37 @@ defmodule XamtWeb.ServerLive.Rails do
             </.link>
           </div>
 
-          <nav class="xamt-channel-nav">
-            <div :for={ch <- @channels} class="xamt-channel-item">
+          <.form
+            for={to_form(%{"q" => @channel_filter})}
+            id="channel-filter-form"
+            phx-change="filter_channels"
+            phx-submit="filter_channels"
+            class="xamt-channel-filter"
+          >
+            <.input
+              type="search"
+              name="q"
+              id="channel-filter-q"
+              value={@channel_filter}
+              label={gettext("Filter channels")}
+              placeholder={gettext("Filter channels")}
+              class="xamt-input mongol-input xamt-channel-filter__input"
+              phx-hook="MongolianIME"
+              phx-debounce="200"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </.form>
+
+          <nav class="xamt-channel-nav" id="channel-nav">
+            <div
+              :if={@filtered_channels == [] and @channel_filter != ""}
+              id="channel-filter-empty"
+              class="xamt-channel-filter__empty mongol-text"
+            >
+              {gettext("No matching channels")}
+            </div>
+            <div :for={ch <- @filtered_channels} class="xamt-channel-item">
               <.link
                 patch={~p"/servers/#{@server.slug}/#{ch.slug}"}
                 id={"channel-link-#{ch.slug}"}

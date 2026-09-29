@@ -627,6 +627,41 @@ defmodule XamtWeb.ServerLiveTest do
     assert has_element?(view, "#channel-menu-#{channel.id}")
   end
 
+  test "filters channels by name in the sidebar", %{
+    conn: conn,
+    server: server,
+    channel: channel,
+    scope: scope
+  } do
+    {:ok, general} = Channels.create_channel(scope, server, %{"name" => "general-chat"})
+    {:ok, roadtrip} = Channels.create_channel(scope, server, %{"name" => "roadtrip"})
+
+    {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
+
+    assert has_element?(view, "#channel-filter-form")
+    assert has_element?(view, "#channel-link-#{channel.slug}")
+    assert has_element?(view, "#channel-link-#{general.slug}")
+    assert has_element?(view, "#channel-link-#{roadtrip.slug}")
+
+    view |> form("#channel-filter-form", %{q: "road"}) |> render_change()
+
+    assert has_element?(view, "#channel-link-#{roadtrip.slug}")
+    refute has_element?(view, "#channel-link-#{general.slug}")
+    refute has_element?(view, "#channel-filter-empty")
+
+    view |> form("#channel-filter-form", %{q: "no-such-channel"}) |> render_change()
+
+    refute has_element?(view, "#channel-link-#{roadtrip.slug}")
+    refute has_element?(view, "#channel-link-#{general.slug}")
+    assert has_element?(view, "#channel-filter-empty")
+
+    view |> form("#channel-filter-form", %{q: ""}) |> render_change()
+
+    assert has_element?(view, "#channel-link-#{channel.slug}")
+    assert has_element?(view, "#channel-link-#{general.slug}")
+    assert has_element?(view, "#channel-link-#{roadtrip.slug}")
+  end
+
   test "chat page has no server-settings entry", %{
     conn: conn,
     server: server,
