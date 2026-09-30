@@ -1,6 +1,9 @@
 import Config
 
 # Configure your database
+# C locale: the text-search parser treats every non-ASCII character as a letter.
+# en_US.UTF-8 on macOS classifies traditional Mongolian as spaces, so to_tsvector
+# stores no lexemes. template0 is required when the locale differs from template1.
 config :xamt, Xamt.Repo,
   username: System.get_env("PGUSER", "amjil"),
   password: System.get_env("PGPASSWORD", ""),
@@ -8,7 +11,10 @@ config :xamt, Xamt.Repo,
   database: "xamt_dev",
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
-  pool_size: 10
+  pool_size: 10,
+  template: "template0",
+  lc_collate: "C",
+  lc_ctype: "C"
 
 # For development, we disable any cache and enable
 # debugging and code reloading.

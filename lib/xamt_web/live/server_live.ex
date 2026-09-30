@@ -1452,8 +1452,6 @@ defmodule XamtWeb.ServerLive do
     end
   end
 
-  defp visible_pins(_scope, nil), do: []
-
   defp visible_pins(scope, channel) do
     case Messages.list_pinned_messages_for_user(scope, channel.id) do
       {:ok, messages} -> messages
@@ -1826,8 +1824,6 @@ defmodule XamtWeb.ServerLive do
   end
 
   defp channel_topic_id(id), do: "xamt:channel:#{id}"
-
-  defp subscribe_typing(nil), do: :ok
 
   defp subscribe_typing(%Channel{} = channel) do
     Phoenix.PubSub.subscribe(Xamt.PubSub, TypingTracker.topic(channel))

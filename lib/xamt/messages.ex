@@ -284,7 +284,6 @@ defmodule Xamt.Messages do
     index_text(html, content)
   end
 
-  def plain_text(%Message{content_html: html}), do: plain_text(html)
   def plain_text(nil), do: ""
 
   def plain_text(html) when is_binary(html) do
