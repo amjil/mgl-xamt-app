@@ -7,36 +7,36 @@ msgstr ""
 #: lib/xamt_web/live/settings_live.ex:299
 #, elixir-autogen, elixir-format
 msgid "Account / password"
-msgstr ""
+msgstr "ᠳᠠᠩᠰᠠ / ᠨᠢᠭᠤᠴᠠ ᠦᠭᠡ"
 
 #: lib/xamt_web/components/core_components.ex:368
 #, elixir-autogen, elixir-format
 msgid "Actions"
-msgstr ""
+msgstr "ᠦᠢᠯᠡᠳᠦᠯ᠎ᠦᠳ"
 
 #: lib/xamt_web/controllers/user_registration_html/new.html.heex:10
 #, elixir-autogen, elixir-format
 msgid "Already registered?"
-msgstr ""
+msgstr "ᠡᠮᠦᠨ᠎ᠡ ᠨᠢ ᠪᠦᠷᠢᠳᠬᠡᠭᠦᠯᠦᠭᠰᠡᠨ ᠦᠦ?"
 
 #: lib/xamt_web/components/layouts.ex:99
 #: lib/xamt_web/components/layouts.ex:111
 #, elixir-autogen, elixir-format
 msgid "Attempting to reconnect"
-msgstr ""
+msgstr "ᠳᠠᠬᠢᠨ ᠬᠣᠯᠪᠣᠭᠳᠠᠵᠤ ᠪᠠᠢᠨ᠎ᠠ ᠡ "
 
 #: lib/xamt_web/live/invite_live.ex:74
 #: lib/xamt_web/live/profile_live.ex:71
 #: lib/xamt_web/live/server_live/components.ex:42
 #, elixir-autogen, elixir-format
 msgid "Back"
-msgstr ""
+msgstr "ᠪᠤᠴᠠᠬᠤ"
 
 #: lib/xamt_web/live/profile_live.ex:55
 #: lib/xamt_web/live/settings_live.ex:187
 #, elixir-autogen, elixir-format
 msgid "Bio"
-msgstr ""
+msgstr "ᠨᠠᠮᠲᠠᠷ"
 
 #: lib/xamt_web/live/home_live.ex:183
 #: lib/xamt_web/live/home_live.ex:376
@@ -47,45 +47,45 @@ msgstr ""
 #: lib/xamt_web/live/server_live/overlays.ex:273
 #, elixir-autogen, elixir-format
 msgid "Cancel"
-msgstr ""
+msgstr "ᠴᠤᠴᠠᠯᠬᠤ"
 
 #: lib/xamt_web/live/server_live/overlays.ex:259
 #, elixir-autogen, elixir-format
 msgid "Channel name"
-msgstr ""
+msgstr "ᠰᠤᠪᠠᠭ᠎ᠤᠨ ᠨᠡᠷ᠎ᠡ"
 
 #: lib/xamt_web/live/server_live/rails.ex:45
 #, elixir-autogen, elixir-format
 msgid "Channels"
-msgstr ""
+msgstr "ᠰᠤᠪᠠᠭ᠎ᠤᠳ "
 
 #: lib/xamt_web/controllers/user_registration_html/new.html.heex:64
 #, elixir-autogen, elixir-format
 msgid "Confirm password"
-msgstr ""
+msgstr "ᠨᠢᠭᠤᠴᠠ ᠦᠭᠡ᠎ᠶᠢ ᠪᠠᠲᠤᠯᠠᠬᠤ"
 
 #: lib/xamt_web/live/server_live.ex:1032
 #, elixir-autogen, elixir-format
 msgid "Could not delete message"
-msgstr ""
+msgstr "ᠵᠤᠷᠪᠤᠰ᠎ᠢ ᠤᠰᠠᠳᠬᠠᠵᠤ ᠳᠡᠢᠯᠬᠦ ᠦᠭᠡᠢ ᠪᠠᠢᠨ᠎ᠠ"
 
 #: lib/xamt_web/live/server_live.ex:245
 #: lib/xamt_web/live/server_live.ex:248
 #, elixir-autogen, elixir-format
 msgid "Could not send message"
-msgstr ""
+msgstr "ᠵᠤᠷᠪᠤᠰ᠎ᠢ ᠢᠯᠡᠭᠡᠵᠦ ᠳᠡᠢᠯᠦᠭᠰᠡᠨ ᠦᠭᠡᠢ"
 
 #: lib/xamt_web/live/server_live.ex:394
 #: lib/xamt_web/live/server_live.ex:419
 #, elixir-autogen, elixir-format
 msgid "Could not update message"
-msgstr ""
+msgstr "ᠵᠤᠷᠪᠤᠰ᠎ᠢ ᠰᠢᠨᠡᠴᠢᠯᠡᠵᠦ ᠳᠡᠢᠯᠦᠭᠰᠡᠨ ᠦᠭᠡᠢ"
 
 #: lib/xamt_web/live/home_live.ex:227
 #: lib/xamt_web/live/server_live/overlays.ex:222
 #, elixir-autogen, elixir-format
 msgid "Create"
-msgstr ""
+msgstr "ᠡᠭᠦᠰᠬᠡᠬᠦ"
 
 #: lib/xamt_web/controllers/user_registration_html/new.html.heex:70
 #, elixir-autogen, elixir-format

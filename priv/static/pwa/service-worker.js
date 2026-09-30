@@ -1,10 +1,17 @@
-const HTML_CACHE = "xamt-html-v2";
-const ASSET_CACHE = "xamt-assets-v2";
+const HTML_CACHE = "xamt-html-v3";
+const ASSET_CACHE = "xamt-assets-v3";
 const FONT_CACHE = "xamt-fonts-v1";
 
 const SHELL = ["/", "/pwa/manifest.json", "/offline.html"];
 const FONTS = ["/fonts/OyunQaganTig.ttf"];
 const IMAGES = ["/images/logo.svg"];
+
+// Phoenix digests look like app-A1B2C3D4E5….css — those URLs change on every
+// deploy, so Cache First is safe. Undigested /assets/css/app.css (dev) must
+// not be Cache First or the PWA forever serves a stale stylesheet.
+function isDigestedAsset(pathname) {
+  return /-[a-fA-F0-9]{32}\.[a-z0-9]+$/i.test(pathname);
+}
 
 // 1. Install: pre-cache shell, fonts, and images. Asset URLs are digested
 // in production, so they are filled in at runtime via Cache First.
@@ -50,27 +57,20 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Strategy B: static assets (CSS/JS/Images) -> Cache First
+  // Strategy B: static assets
+  // Digested CSS/JS/images -> Cache First (URL changes on deploy)
+  // Undigested /assets/* (dev watchers) -> Network First so CSS/JS updates land
   if (url.pathname.startsWith("/assets/") || url.pathname.startsWith("/images/")) {
-    event.respondWith(cacheFirst(request, ASSET_CACHE));
+    if (isDigestedAsset(url.pathname) || url.pathname.startsWith("/images/")) {
+      event.respondWith(cacheFirst(request, ASSET_CACHE));
+    } else {
+      event.respondWith(networkFirst(request, ASSET_CACHE));
+    }
     return;
   }
 
   // Strategy C: pages -> Network First (fall back to cache, then offline.html)
-  event.respondWith(
-    fetch(request)
-      .then((response) => {
-        if (response && response.ok && request.method === "GET") {
-          const copy = response.clone();
-          caches.open(HTML_CACHE).then((cache) => cache.put(request, copy));
-        }
-        return response;
-      })
-      .catch(async () => {
-        const cached = await caches.match(request);
-        return cached || caches.match("/offline.html") || caches.match("/");
-      })
-  );
+  event.respondWith(networkFirst(request, HTML_CACHE, ["/offline.html", "/"]));
 });
 
 async function precache(cacheName, urls) {
@@ -96,6 +96,26 @@ function cacheFirst(request, cacheName) {
       return response;
     });
   });
+}
+
+function networkFirst(request, cacheName, fallbackUrls = []) {
+  return fetch(request)
+    .then((response) => {
+      if (response && response.ok && request.method === "GET") {
+        const copy = response.clone();
+        caches.open(cacheName).then((cache) => cache.put(request, copy));
+      }
+      return response;
+    })
+    .catch(async () => {
+      const cached = await caches.match(request);
+      if (cached) return cached;
+      for (const url of fallbackUrls) {
+        const fallback = await caches.match(url);
+        if (fallback) return fallback;
+      }
+      return cached;
+    });
 }
 
 // 4. Background Sync: replay IndexedDB-queued messages over HTTP.

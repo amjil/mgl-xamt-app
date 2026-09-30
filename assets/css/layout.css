@@ -258,6 +258,11 @@ body:has(.xamt-app) {
   place-items: center;
   width: 2.6rem;
   height: 2.6rem;
+  min-width: 2.6rem;
+  min-height: 2.6rem;
+  aspect-ratio: 1;
+  flex: 0 0 auto; /* leftnav column must not squash the mark */
+  box-sizing: border-box;
   border-radius: 0.85rem;
   background: linear-gradient(155deg, #5cb894 0%, var(--xamt-accent) 48%, #2a6a50 100%);
   color: #f7fff9;
@@ -551,7 +556,7 @@ html[data-theme-mode="system"] .xamt-leftnav .xamt-theme-toggle__indicator {
   display: flex;
   flex-direction: row; /* vertical-lr: icon above, text below */
   gap: 0.7rem;
-  align-items: flex-start;
+  align-items: center; /* vertical-lr: center icon + meta on block axis */
   padding: 0.95rem 0.85rem;
   border-radius: var(--xamt-radius);
   background:

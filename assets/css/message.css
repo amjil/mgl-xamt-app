@@ -62,17 +62,29 @@
   flex-direction: column;
 }
 
-/* Cmd+K palette: vertical-lr query + result columns */
+/* Cmd+K palette: vertical-lr query + result columns.
+   Height follows --xamt-vh / --xamt-ime-kb so the panel sits above the
+   Mongolian virtual keyboard on mobile instead of using layout 70vh. */
 .xamt-search-palette {
+  --xamt-search-avail: calc(var(--xamt-vh, 100dvh) - var(--xamt-ime-kb, 0px));
   writing-mode: horizontal-tb;
   -webkit-writing-mode: horizontal-tb;
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--xamt-search-avail);
   z-index: var(--xamt-z-search);
   display: flex;
   align-items: flex-start;
   justify-content: center;
   padding: 4.5rem 1rem 1.5rem;
+  box-sizing: border-box;
+}
+
+body.mgl-ime-mobile-open .xamt-search-palette {
+  padding-top: max(0.75rem, var(--xamt-safe-top, 0px));
+  padding-bottom: 0.5rem;
 }
 
 .xamt-search-palette__backdrop {
@@ -94,7 +106,8 @@
   text-orientation: mixed;
   display: flex;
   flex-direction: column;
-  height: min(70vh, 36rem);
+  height: min(36rem, 100%);
+  max-height: 100%;
   max-width: min(92vw, 52rem);
   overflow: auto;
   border: 1px solid var(--xamt-line);
@@ -108,10 +121,16 @@
   display: flex;
   flex-direction: row;
   align-items: center;
+  align-self: stretch;
+  /* Physical height matches the IME-aware panel */
+  height: 100%;
   gap: 0.55rem;
   flex: 0 0 auto;
+  min-inline-size: 0;
+  min-height: 0;
   padding: 0.7rem 0.55rem;
   border-block-end: 1px solid var(--xamt-line);
+  box-sizing: border-box;
 }
 
 .xamt-search-palette__icon {
@@ -123,8 +142,11 @@
 
 .xamt-search-palette__field {
   display: flex;
+  flex: 1 1 auto;
   min-inline-size: 0;
+  min-height: 0;
   min-block-size: 0;
+  align-self: stretch;
 }
 
 .xamt-search-palette__input,
@@ -133,9 +155,13 @@ textarea.xamt-search-palette__input {
   -webkit-writing-mode: vertical-lr;
   text-orientation: mixed;
   font-family: var(--xamt-font-mongol);
-  inline-size: calc(min(70vh, 36rem) - 5.5rem);
+  /* Physical height fills the flexed field; width is the column thickness */
+  height: 100%;
+  width: 2.5rem;
+  inline-size: auto;
   block-size: 2.5rem;
   max-inline-size: none;
+  min-height: 4rem;
   margin: 0;
   padding: 0.45rem 0.4rem;
   border: 0;
@@ -144,6 +170,7 @@ textarea.xamt-search-palette__input {
   overflow-x: hidden;
   overflow-y: hidden;
   caret-color: var(--xamt-accent);
+  box-sizing: border-box;
 }
 
 .xamt-search-palette__input::placeholder {
@@ -152,9 +179,7 @@ textarea.xamt-search-palette__input {
 
 .xamt-search-palette__kbd {
   flex: 0 0 auto;
-  writing-mode: horizontal-tb;
-  -webkit-writing-mode: horizontal-tb;
-  padding: 0.2rem 0.45rem;
+  padding: 0.45rem 0.2rem;
   border: 1px solid var(--xamt-line);
   border-radius: 0.4rem;
   background: var(--xamt-bg-2);
@@ -1846,4 +1871,3 @@ a.xamt-mention:hover {
   font-weight: 600;
   color: var(--xamt-text);
 }
-
