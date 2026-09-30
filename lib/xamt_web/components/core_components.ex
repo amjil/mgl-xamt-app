@@ -58,7 +58,7 @@ defmodule XamtWeb.CoreComponents do
       id={@id}
       phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
       role="alert"
-      class="xamt-toast mn-overlay mn-latin"
+      class="xamt-toast mn-overlay"
       {@rest}
     >
       <div class={[
@@ -66,15 +66,15 @@ defmodule XamtWeb.CoreComponents do
         @kind == :info && "xamt-alert--info",
         @kind == :error && "xamt-alert--error"
       ]}>
-        <.icon :if={@kind == :info} name="hero-information-circle" class="size-5" />
-        <.icon :if={@kind == :error} name="hero-exclamation-circle" class="size-5" />
-        <div>
+        <button type="button" class="xamt-toast__close group" aria-label={gettext("close")}>
+          <.icon name="hero-x-mark" class="size-5 opacity-40 group-hover:opacity-70" />
+        </button>
+        <.icon :if={@kind == :info} name="hero-information-circle" class="xamt-toast__icon size-5" />
+        <.icon :if={@kind == :error} name="hero-exclamation-circle" class="xamt-toast__icon size-5" />
+        <div class="xamt-toast__body mongol-text">
           <p :if={@title} class="font-semibold">{@title}</p>
           <p>{msg}</p>
         </div>
-        <button type="button" class="group self-start cursor-pointer" aria-label={gettext("close")}>
-          <.icon name="hero-x-mark" class="size-5 opacity-40 group-hover:opacity-70" />
-        </button>
       </div>
     </div>
     """

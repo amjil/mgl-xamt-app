@@ -210,7 +210,6 @@ body {
 /* Latin / UI chrome that must stay horizontal inside a vertical surface */
 .latin-text,
 .xamt-latin,
-.xamt-toast,
 .xamt-theme-toggle,
 .xamt-link-preview {
   writing-mode: horizontal-tb;

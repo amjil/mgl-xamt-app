@@ -234,16 +234,75 @@ label:has(> input, > textarea, > select) > * {
 
 .xamt-toast {
   position: fixed;
-  top: 1rem;
-  right: 1rem;
+  top: calc(1rem + var(--xamt-safe-top));
+  right: calc(1rem + var(--xamt-safe-right));
   z-index: var(--xamt-z-toast);
   display: flex;
+  /* vertical-lr: column = left → right stacking of multiple alerts */
   flex-direction: column;
   gap: 0.5rem;
-  max-width: min(24rem, calc(100vw - 2rem));
+  /* Physical height grows with content; never taller than half the viewport */
+  height: auto;
+  max-height: calc(var(--xamt-vh, 100dvh) * 0.5);
+  max-width: min(20rem, calc(100vw - 2rem));
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  font-family: var(--xamt-font-mongol);
+  letter-spacing: 0.06em;
+}
+
+.xamt-toast .xamt-alert {
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  font-family: var(--xamt-font-mongol);
+  /* vertical-lr row = top → bottom: close, icon, body */
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.55rem;
+  /* Adaptive physical height, capped by the toast’s half-screen max */
+  height: auto;
+  max-height: 100%;
+  width: auto;
+  max-width: 100%;
+  inline-size: auto;
+  max-inline-size: none;
+  overflow: auto;
+}
+
+.xamt-toast__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  /* vertical-lr row: first item is top; flex-end = physical right */
+  align-self: flex-end;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
   writing-mode: horizontal-tb;
   -webkit-writing-mode: horizontal-tb;
-  font-family: var(--xamt-font-ui);
+}
+
+.xamt-toast__icon {
+  flex-shrink: 0;
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+}
+
+.xamt-toast__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-inline-size: 0;
+}
+
+.xamt-toast__body p {
+  margin: 0;
 }
 
 .xamt-alert {
