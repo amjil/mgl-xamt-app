@@ -29,6 +29,8 @@ defmodule XamtWeb.UploadControllerTest do
         "content" => %{"type" => "gallery", "images" => [%{"thumb" => url, "original" => url}]}
       })
 
+    {:ok, _} = Xamt.Uploads.grant_server_file(filename, server.id, owner.id)
+
     on_exit(fn -> File.rm(dest) end)
 
     %{
@@ -73,6 +75,69 @@ defmodule XamtWeb.UploadControllerTest do
 
     conn = get(conn, ~p"/uploads/#{filename}")
     assert conn.status == 200
+  end
+
+  test "quoting the path in a message does not authorize the file", %{
+    conn: conn,
+    owner: owner,
+    server: server
+  } do
+    filename = "quoted-#{System.unique_integer([:positive])}.png"
+    dest = XamtWeb.Uploads.disk_path(filename)
+    File.mkdir_p!(Path.dirname(dest))
+    File.cp!(@fixture, dest)
+    on_exit(fn -> File.rm(dest) end)
+
+    channel = hd(Channels.list_channels(server.id))
+    url = "/uploads/#{filename}"
+
+    {:ok, _} =
+      Messages.create_message(Scope.for_user(owner), channel.id, %{
+        "content_html" => ~s(<p><img src="#{url}"></p>),
+        "content" => %{"type" => "gallery", "images" => [%{"thumb" => url, "original" => url}]}
+      })
+
+    conn = conn |> log_in_user(owner) |> get(~p"/uploads/#{filename}")
+    assert conn.status == 404
+  end
+
+  test "quoting another server's upload does not grant access", %{
+    conn: conn,
+    filename: filename,
+    url: url
+  } do
+    attacker = creator_fixture()
+    attacker_scope = Scope.for_user(attacker)
+    {:ok, server} = Servers.create_server(attacker_scope, %{"name" => "Quoted Media"})
+    channel = hd(Channels.list_channels(server.id))
+
+    {:ok, _} =
+      Messages.create_message(attacker_scope, channel.id, %{
+        "content_html" => ~s(<p>#{url}</p>),
+        "content" => %{
+          "type" => "gallery",
+          "images" => [%{"thumb" => url, "original" => url}]
+        }
+      })
+
+    conn = conn |> log_in_user(attacker) |> get(~p"/uploads/#{filename}")
+    assert conn.status == 404
+  end
+
+  test "members without view_channel cannot fetch message media", %{
+    conn: conn,
+    owner: owner,
+    filename: filename,
+    server: server
+  } do
+    muted = user_fixture()
+    {:ok, _} = Servers.add_member(Scope.for_user(muted), server.id)
+
+    {:ok, _} =
+      Servers.revoke_permission(Scope.for_user(owner), server.id, muted.id, :view_channel)
+
+    conn = conn |> log_in_user(muted) |> get(~p"/uploads/#{filename}")
+    assert conn.status == 404
   end
 
   test "rejects path-like filenames", %{conn: conn, owner: owner} do

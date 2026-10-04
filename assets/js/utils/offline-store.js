@@ -213,10 +213,11 @@ export async function postQueuedMessage(msg) {
 
 export async function flushPendingMessages() {
   let sent = 0
+  const rejected = []
 
   for (;;) {
     const msg = await OfflineStore.claimNext()
-    if (!msg) return sent
+    if (!msg) return {sent, rejected, stalled: false}
 
     try {
       const response = await postQueuedMessage(msg)
@@ -228,15 +229,15 @@ export async function flushPendingMessages() {
 
       if (shouldRetrySyncStatus(response.status)) {
         await OfflineStore.release(msg)
-        throw new Error(`sync failed: ${response.status}`)
+        return {sent, rejected, stalled: true}
       }
 
-      // Non-retryable 4xx: drop — retrying will not help.
+      // Non-retryable 4xx: drop, but hand the draft back to the caller.
       await OfflineStore.remove(msg.id)
-    } catch (err) {
-      if (err?.message?.startsWith("sync failed:")) throw err
+      rejected.push(msg)
+    } catch (_err) {
       await OfflineStore.release(msg)
-      throw err
+      return {sent, rejected, stalled: true}
     }
   }
 }

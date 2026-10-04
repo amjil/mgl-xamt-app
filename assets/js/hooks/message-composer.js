@@ -364,6 +364,16 @@ export const MessageComposer = {
         removePendingMessage(event.data.id)
         return
       }
+      if (event.data?.type === "xamt:offline-rejected") {
+        this.applyRejected([
+          {
+            id: event.data.id,
+            content_html: event.data.content_html || "",
+            payload: {content_html: event.data.content_html || ""},
+          },
+        ])
+        return
+      }
       if (event.data?.type === "xamt:flush-offline") this.flushOfflineQueue()
     }
     navigator.serviceWorker?.addEventListener("message", this._onSwMessage)
@@ -574,19 +584,39 @@ export const MessageComposer = {
 
     this._flushing = true
     try {
-      const sent = await flushPendingMessages()
+      const {sent, rejected, stalled} = await flushPendingMessages()
       if (sent > 0) {
         toast(
           "success",
           sent === 1 ? "Synced 1 offline message" : `Synced ${sent} offline messages`
         )
       }
+      this.applyRejected(rejected)
       await restorePendingMessages(this._channelId)
+      if (stalled) registerBackgroundSync()
     } catch (_err) {
       registerBackgroundSync()
     } finally {
       this._flushing = false
     }
+  },
+
+  applyRejected(rejected) {
+    if (!rejected?.length) return
+
+    const html = rejected
+      .map((msg) => msg.payload?.content_html || msg.content_html || "")
+      .filter(Boolean)
+      .join("")
+
+    rejected.forEach((msg) => removePendingMessage(msg.id))
+    toast(
+      "error",
+      rejected.length === 1
+        ? "A queued message could not be sent"
+        : `${rejected.length} queued messages could not be sent`
+    )
+    if (!this.hasDraft() && html) this.populate({html})
   },
 
   submit() {

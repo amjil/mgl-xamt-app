@@ -237,7 +237,14 @@ defmodule XamtWeb.ServerLive do
         {:noreply, put_flash(socket, :error, gettext("Please wait for uploads to finish"))}
 
       true ->
-        images = XamtWeb.Uploads.consume_gallery_images(socket, :media)
+        images =
+          XamtWeb.Uploads.consume_gallery_images(
+            socket,
+            :media,
+            socket.assigns.server.id,
+            scope.user.id
+          )
+
         attrs = build_message_attrs(params, images, socket.assigns.replying_to)
 
         case Messages.create_message(scope, channel.id, attrs) do
@@ -449,7 +456,13 @@ defmodule XamtWeb.ServerLive do
         {:noreply, put_flash(socket, :error, gettext("Please wait for uploads to finish"))}
 
       true ->
-        new_images = XamtWeb.Uploads.consume_gallery_images(socket, :media)
+        new_images =
+          XamtWeb.Uploads.consume_gallery_images(
+            socket,
+            :media,
+            socket.assigns.server.id,
+            scope.user.id
+          )
 
         existing_images =
           case Messages.get_message_for_user(scope, id) do
@@ -2047,7 +2060,12 @@ defmodule XamtWeb.ServerLive do
         voice_failed(socket, gettext("Could not send voice message"))
 
       true ->
-        case XamtWeb.Uploads.consume_audio(socket, :audio) do
+        case XamtWeb.Uploads.consume_audio(
+               socket,
+               :audio,
+               channel.server_id,
+               socket.assigns.current_scope.user.id
+             ) do
           url when is_binary(url) ->
             attrs = %{
               "content" => %{"type" => "audio", "url" => url},

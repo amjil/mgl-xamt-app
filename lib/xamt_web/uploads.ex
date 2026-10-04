@@ -48,7 +48,7 @@ defmodule XamtWeb.Uploads do
   Returns a list of `%{"thumb" => url, "original" => url}`. On thumbnail
   failure (missing libvips, corrupt file), `thumb` falls back to `original`.
   """
-  def consume_gallery_images(socket, name) do
+  def consume_gallery_images(socket, name, server_id, user_id) do
     Phoenix.LiveView.consume_uploaded_entries(socket, name, fn %{path: path}, entry ->
       case image_ext(entry) do
         ext when is_binary(ext) ->
@@ -59,18 +59,25 @@ defmodule XamtWeb.Uploads do
       end
     end)
     |> Enum.filter(&is_map/1)
+    |> Enum.flat_map(&grant_gallery_image(&1, server_id, user_id))
   end
 
-  def consume_audio(socket, name) do
+  def consume_audio(socket, name, server_id, user_id) do
     case List.first(consume(socket, name, &audio_ext/1)) do
       url when is_binary(url) ->
         path = disk_path(url)
 
-        if File.regular?(path) and File.stat!(path).size >= @min_audio_bytes do
-          url
-        else
-          delete_stored(url)
-          nil
+        cond do
+          not (File.regular?(path) and File.stat!(path).size >= @min_audio_bytes) ->
+            delete_stored(url)
+            nil
+
+          match?({:ok, _}, remember_upload(url, server_id, user_id)) ->
+            url
+
+          true ->
+            delete_stored(url)
+            nil
         end
 
       _ ->
@@ -98,6 +105,7 @@ defmodule XamtWeb.Uploads do
 
     if String.starts_with?(url, "/uploads/") and Xamt.Uploads.safe_filename?(name) do
       File.rm(disk_path(name))
+      Xamt.Uploads.revoke_server_file(name)
     end
 
     :ok
@@ -121,6 +129,33 @@ defmodule XamtWeb.Uploads do
       end
 
     %{"thumb" => thumb_url, "original" => original_url}
+  end
+
+  defp grant_gallery_image(
+         %{"thumb" => thumb, "original" => original} = image,
+         server_id,
+         user_id
+       ) do
+    urls = Enum.uniq([original, thumb])
+
+    granted? =
+      Enum.reduce_while(urls, true, fn url, true ->
+        case remember_upload(url, server_id, user_id) do
+          {:ok, _} -> {:cont, true}
+          _ -> {:halt, false}
+        end
+      end)
+
+    if granted? do
+      [image]
+    else
+      delete_stored(image)
+      []
+    end
+  end
+
+  defp remember_upload(url, server_id, user_id) when is_binary(url) do
+    Xamt.Uploads.grant_server_file(Path.basename(url), server_id, user_id)
   end
 
   defp write_thumbnail(original_path, uuid, ext) do

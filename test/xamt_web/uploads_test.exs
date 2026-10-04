@@ -1,5 +1,5 @@
 defmodule XamtWeb.UploadsTest do
-  use ExUnit.Case, async: false
+  use Xamt.DataCase, async: false
 
   @fixture Path.expand("../support/fixtures/gallery_sample.png", __DIR__)
 
