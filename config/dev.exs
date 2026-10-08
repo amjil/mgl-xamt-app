@@ -52,10 +52,11 @@ config :xamt, XamtWeb.Endpoint,
 # Enable dev routes for dashboard and mailbox
 config :xamt, dev_routes: true
 
-# Candidate backend for mgl-web-ime. Override with XAMT_IME_BASE_URL; set it to
-# empty / "local" to stay on the bundled dictionary. Phones on the LAN must be
-# able to resolve this host — "localhost" will not work from a device.
-config :xamt, :ime_base_url, System.get_env("XAMT_IME_BASE_URL", "http://dev1:3003")
+# Candidate backend for mgl-web-ime. Empty (the default) is same-origin
+# `baseUrl: ""`, so `/api/next_word/` is requested on the host that served
+# the page. Set XAMT_IME_BASE_URL to a full URL for a direct backend, or
+# "local" for the bundled dictionary.
+config :xamt, :ime_base_url, System.get_env("XAMT_IME_BASE_URL", "")
 
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"

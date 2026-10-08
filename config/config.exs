@@ -25,8 +25,10 @@ config :xamt,
   generators: [timestamp_type: :utc_datetime, binary_id: true],
   secure_cookies: false
 
-# Remote candidate backend for mgl-web-ime. Dev defaults to http://dev1:3003;
-# set XAMT_IME_BASE_URL to override, or empty / "local" for the bundled dictionary.
+# Remote candidate backend for mgl-web-ime. Empty uses the page origin
+# (`baseUrl: ""` → `/api/next_word/` on the current host). Set
+# XAMT_IME_BASE_URL to a full URL for another host, or "local" for the
+# bundled dictionary.
 config :xamt, :ime_base_url, nil
 
 # Message send rate limit (ETS sliding window). Tests override limit.
