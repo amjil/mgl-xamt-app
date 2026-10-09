@@ -111,10 +111,79 @@ input[type="tel"] {
   outline: none;
 }
 
+.mn-select-host:focus-within {
+  border-color: var(--xamt-accent-2);
+  box-shadow: 0 0 0 3px var(--xamt-gold-soft);
+}
+
 .xamt-input--error,
 .xamt-select--error,
+.mn-select-host.xamt-select--error,
 .xamt-textarea--error {
   border-color: #d46a6a;
+}
+
+/* Host replaces the native control's box; trigger fills it. */
+.xamt-form--vertical .mn-select-host {
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  block-size: auto;
+  min-block-size: 2.85rem;
+  inline-size: var(--xamt-field-extent);
+  max-inline-size: 100%;
+  padding: 0;
+  border: 1px solid var(--xamt-line);
+  border-radius: 0.55rem;
+  background: var(--xamt-bg);
+  color: var(--xamt-text);
+}
+
+.xamt-form--vertical .mn-select-trigger {
+  font-family: var(--xamt-font-ui);
+  min-inline-size: var(--xamt-field-extent);
+  inline-size: 100%;
+  padding: 0.7rem 0.6rem;
+  /* Match other vertical fields: value starts at the top. */
+  justify-content: flex-start !important;
+  align-items: flex-start !important;
+  align-content: flex-start !important;
+  text-align: start;
+}
+
+.xamt-form--vertical .mn-select-list {
+  font-family: var(--xamt-font-ui);
+  background: var(--xamt-bg-2);
+  border-color: var(--xamt-line-strong);
+  color: var(--xamt-text);
+  /* Options left→right (horizontal scroll); do not inherit vertical-lr flex axes. */
+  writing-mode: horizontal-tb !important;
+  -webkit-writing-mode: horizontal-tb !important;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  height: min(var(--xamt-field-extent-lg, 18rem), calc(var(--xamt-vh, 100dvh) - 4rem));
+  max-width: min(22rem, calc(100vw - 1.5rem));
+}
+
+.xamt-form--vertical .mn-select-option {
+  writing-mode: vertical-lr !important;
+  -webkit-writing-mode: vertical-lr !important;
+  text-orientation: mixed;
+  flex: 0 0 auto;
+  height: 100%;
+}
+
+.xamt-form--vertical .mn-select-option:hover,
+.xamt-form--vertical .mn-select-option--active {
+  background: var(--xamt-accent-soft);
+}
+
+.xamt-form--vertical .mn-select-option--selected {
+  color: var(--xamt-accent);
 }
 
 /* Desktop-only emoji trigger inserted after MongolianIME fields. */
@@ -599,7 +668,8 @@ label:has(> input, > textarea, > select) > * {
 
 .xamt-form--vertical .xamt-input:not(.xamt-status-picker__emoji),
 .xamt-form--vertical .mongol-input,
-.xamt-form--vertical .xamt-select,
+.xamt-form--vertical .xamt-select:not(.mn-select-native),
+.xamt-form--vertical .mn-select-host,
 .xamt-form--vertical input[type="text"]:not(.xamt-status-picker__emoji),
 .xamt-form--vertical input[type="email"],
 .xamt-form--vertical input[type="password"],
@@ -616,6 +686,11 @@ label:has(> input, > textarea, > select) > * {
   min-height: 0;
   block-size: 2.85rem;
   inline-size: var(--xamt-field-extent);
+}
+
+.xamt-form--vertical .mn-select-host {
+  block-size: auto;
+  min-block-size: 2.85rem;
 }
 
 .xamt-form--vertical .mongol-input,

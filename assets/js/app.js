@@ -20,6 +20,7 @@ import {StatusEmoji} from "./hooks/status-emoji"
 import {SearchPalette} from "./hooks/search-palette"
 import {adoptImeElements} from "./utils/ime"
 import {initVisualViewport} from "mgl-common-ui"
+import {MnSelect} from "./hooks/mn-select"
 import {trackImeKeyboard} from "./utils/viewport"
 import {toast} from "./utils/offline-store"
 import {highlightMessageById} from "./utils/highlight-message"
@@ -45,6 +46,7 @@ const Hooks = {
   LightboxSwipe,
   StatusEmoji,
   SearchPalette,
+  MnSelect,
 }
 
 // Jittered backoff for reconnect/rejoin so a server restart or regional

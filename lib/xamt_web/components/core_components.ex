@@ -241,19 +241,22 @@ defmodule XamtWeb.CoreComponents do
     <div class="xamt-field">
       <label>
         <span :if={@label} class="xamt-field__label">{@label}</span>
-        <select
-          id={@id}
-          name={@name}
-          class={[
-            @class || "xamt-select",
-            @errors != [] && (@error_class || "xamt-select--error")
-          ]}
-          multiple={@multiple}
-          {@rest}
-        >
-          <option :if={@prompt} value="">{@prompt}</option>
-          {Phoenix.HTML.Form.options_for_select(@options, @value)}
-        </select>
+        <%!-- phx-update="ignore": enhanceSelect injects trigger/list siblings. --%>
+        <div id={"#{@id}-mn-select"} class="mn-select-host" phx-hook="MnSelect" phx-update="ignore">
+          <select
+            id={@id}
+            name={@name}
+            class={[
+              @class || "xamt-select",
+              @errors != [] && (@error_class || "xamt-select--error")
+            ]}
+            multiple={@multiple}
+            {@rest}
+          >
+            <option :if={@prompt} value="">{@prompt}</option>
+            {Phoenix.HTML.Form.options_for_select(@options, @value)}
+          </select>
+        </div>
       </label>
       <.error :for={msg <- @errors}>{msg}</.error>
     </div>
