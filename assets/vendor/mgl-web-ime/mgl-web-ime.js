@@ -320,6 +320,14 @@ function getLastWord(text) {
   const parts = normalized.split(/[\s\n\u202F]+/);
   return parts[parts.length - 1] || "";
 }
+function isMobileSymbol(ch) {
+  const cp = typeof ch === "string" ? ch.codePointAt(0) : void 0;
+  if (cp == null) return false;
+  if (cp >= 6176 && cp <= 6314) return false;
+  if (cp >= 6155 && cp <= 6158) return false;
+  if (cp === 8204 || cp === 8205 || cp === 8239) return false;
+  return true;
+}
 
 // src/core/suffix.js
 var MVS = String.fromCodePoint(Mongol.mvs);
@@ -999,12 +1007,21 @@ var ImeCore = class {
     this.adapter.insertText("\n");
     return true;
   }
+  /**
+   * Insert punctuation / FVS / NNBSP at the caret and close the candidate list.
+   * Does not commit a candidate or request next-word suggestions. An in-progress
+   * phonetic preview stays in the editor; only the list and composition state go.
+   * @param {string} ch
+   */
   async _injectDirect(ch) {
-    if (this.state.composition || this.state.candidates.length) {
-      await this.commitCurrent({ addSpaceAfter: false });
-    }
-    this.adapter.replaceBeforeCaret?.(this.state.previewLen, ch);
+    const hadComp = this.state.composing || this.state.previewLen > 0;
+    const preview = this.state.preview;
+    this._session.next();
+    this.adapter.replaceBeforeCaret?.(0, ch);
     this.setState(clearCompositionFields(this.state));
+    if (hadComp) {
+      this.emit("mgl-ime-composition-end", { text: preview, cancelled: false });
+    }
   }
   /**
    * Insert emoji / other literal text without candidate lookup.
@@ -1024,11 +1041,12 @@ var ImeCore = class {
   /** Mobile: insert Mongol char and refresh candidates from last word. */
   async _insertDirectMobile(ch) {
     this.adapter.insertText(ch);
-    this.setState({ pendingSuffixDelete: false });
-    if (this.state.mode === "latin") {
-      if (this.state.candidates.length) this.setState(clearCompositionFields(this.state));
+    if (this.state.mode === "latin" || isMobileSymbol(ch)) {
+      this._session.next();
+      this.setState(clearCompositionFields(this.state));
       return true;
     }
+    this.setState({ pendingSuffixDelete: false });
     const ctx = this.adapter.getTextBeforeCaret?.() ?? this.adapter.getText();
     const last = getLastWord(ctx);
     if (last) await this.queryCandidates(last, "typing");
@@ -1628,6 +1646,23 @@ function resolveLayoutName({ base = "mongol", special = false, otherSpecial = fa
   if (otherSpecial) return "mongol-other-special";
   if (special) return "mongol-special";
   return base;
+}
+var SIDEWAYS_SYMBOLS = /* @__PURE__ */ new Set([
+  "\uFF01",
+  // ！
+  "\uFF1F",
+  // ？
+  "\u2048",
+  // ⁈
+  "\u2049"
+  // ⁉
+]);
+function shouldRotateSymbolDisplay(value, layoutName) {
+  if (layoutName !== "mongol-special" && layoutName !== "mongol-other-special") {
+    return false;
+  }
+  const ch = typeof value === "string" ? Array.from(value)[0] : "";
+  return SIDEWAYS_SYMBOLS.has(ch);
 }
 
 // src/keyboard/key.js
@@ -4500,6 +4535,17 @@ function buildTemplate2() {
       text-orientation: mixed;
       font-size: 22px;
     }
+    /* \uFF01\uFF1F\u2049\u2048 are sideways in the Mongol font; turn the label only. */
+    button.key.sideways {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    button.key.sideways > span {
+      display: block;
+      line-height: 1;
+      transform: rotate(90deg);
+    }
     .hint {
       position: absolute;
       top: 3px; left: 4px;
@@ -4993,6 +5039,12 @@ var MglKeyboard = class extends Base2 {
       return;
     }
     const rows = this._vk.getLayoutRows();
+    const layoutName = resolveLayoutName({
+      base: this._vk.baseLayout,
+      special: this._vk.special,
+      otherSpecial: this._vk.otherSpecial,
+      latin: this._vk.latin
+    });
     const isMongolLayout = !this._vk.latin && !this._vk.special && !this._vk.otherSpecial;
     rows.forEach((row) => {
       const rowEl = document.createElement("div");
@@ -5024,6 +5076,9 @@ var MglKeyboard = class extends Base2 {
           btn.appendChild(label);
         } else {
           if (key.mongol) btn.classList.add("mongol");
+          if (shouldRotateSymbolDisplay(key.value, layoutName)) {
+            btn.classList.add("sideways");
+          }
           if (isMongolLayout && key.id && !["ng", "-", "_"].includes(key.id)) {
             const hint = document.createElement("span");
             hint.className = "hint";
