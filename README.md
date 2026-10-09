@@ -55,10 +55,10 @@ Before commit: `mix precommit`.
 | `PHX_SERVER` | Set `true` when starting a release |
 | `PGUSER` / `PGPASSWORD` | Dev/test Postgres (defaults `amjil` / empty) |
 
-IME candidate backend: development defaults to `http://dev1:3003`. Override with
-`XAMT_IME_BASE_URL`; set it to empty or `local` to stay on the bundled dictionary.
-The host must be reachable from the client device — `localhost` will not work from
-a phone on the LAN.
+IME candidate backend: with `XAMT_IME_BASE_URL` unset, the client uses
+`baseUrl: ""`, so candidates are requested on the page origin
+(`/api/next_word/`, which nginx can proxy). Set the variable to a full URL
+to call another host, or `local` to stay on the bundled dictionary.
 
 ## Routes
 

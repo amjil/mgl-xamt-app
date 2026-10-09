@@ -1,8 +1,10 @@
-const HTML_CACHE = "xamt-html-v3";
-const ASSET_CACHE = "xamt-assets-v3";
+const HTML_CACHE = "xamt-html-v4";
+const ASSET_CACHE = "xamt-assets-v4";
 const FONT_CACHE = "xamt-fonts-v1";
 
-const SHELL = ["/", "/pwa/manifest.json", "/offline.html"];
+// Do not precache "/" — that response is the signed-in home page when the
+// worker installs from an authenticated session.
+const SHELL = ["/pwa/manifest.json", "/offline.html"];
 const FONTS = ["/fonts/OyunQaganTig.ttf"];
 const IMAGES = ["/images/logo.svg"];
 
@@ -51,6 +53,9 @@ self.addEventListener("fetch", (event) => {
   // Do not cache the Background Sync HTTP endpoint (or any JSON API).
   if (url.pathname.startsWith("/api/")) return;
 
+  // Private files are authorized per request. Never store the bytes.
+  if (url.pathname.startsWith("/uploads/")) return;
+
   // Strategy A: fonts -> Cache First (never block Mongolian glyphs on the network)
   if (url.pathname.startsWith("/fonts/")) {
     event.respondWith(cacheFirst(request, FONT_CACHE));
@@ -69,8 +74,10 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Strategy C: pages -> Network First (fall back to cache, then offline.html)
-  event.respondWith(networkFirst(request, HTML_CACHE, ["/offline.html", "/"]));
+  // Pages and other GETs: network only. Authenticated HTML (servers, settings,
+  // admin) must not be written into Cache Storage, or the next offline session
+  // on this browser can read the previous account.
+  event.respondWith(networkOnly(request));
 });
 
 async function precache(cacheName, urls) {
@@ -98,7 +105,7 @@ function cacheFirst(request, cacheName) {
   });
 }
 
-function networkFirst(request, cacheName, fallbackUrls = []) {
+function networkFirst(request, cacheName) {
   return fetch(request)
     .then((response) => {
       if (response && response.ok && request.method === "GET") {
@@ -107,15 +114,14 @@ function networkFirst(request, cacheName, fallbackUrls = []) {
       }
       return response;
     })
-    .catch(async () => {
-      const cached = await caches.match(request);
-      if (cached) return cached;
-      for (const url of fallbackUrls) {
-        const fallback = await caches.match(url);
-        if (fallback) return fallback;
-      }
-      return cached;
-    });
+    .catch(async () => (await caches.match(request)) || Response.error());
+}
+
+function networkOnly(request) {
+  const pending = fetch(request);
+  if (request.mode !== "navigate") return pending;
+
+  return pending.catch(async () => (await caches.match("/offline.html")) || Response.error());
 }
 
 // 4. Background Sync: replay IndexedDB-queued messages over HTTP.
@@ -180,12 +186,14 @@ async function flushOfflineMessages() {
         throw new Error("Sync failed, will retry later: " + response.status);
       }
 
-      // 4xx (other than 401/403/429): drop — retrying will not help
+      // 4xx (other than 401/403/429): drop — retrying will not help.
+      // Tell the page it was rejected so the draft can be restored.
       await removePendingMessage(msg.id);
       await notifyClients({
-        type: "xamt:offline-sent",
+        type: "xamt:offline-rejected",
         id: msg.id,
-        channel_id: msg.channel_id
+        channel_id: msg.channel_id,
+        content_html: (msg.payload && msg.payload.content_html) || msg.content_html || ""
       });
     } catch (err) {
       if (String(err.message || "").includes("will retry later")) throw err;

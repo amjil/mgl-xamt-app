@@ -14,8 +14,10 @@ defmodule XamtWeb.Layouts do
   embed_templates "layouts/*"
 
   @doc """
-  Remote candidate backend for mgl-web-ime, or `""` when the IME should stay
-  on its bundled local dictionary.
+  Remote candidate backend for mgl-web-ime.
+
+  `""` is same-origin (`baseUrl: ""`, so `/api/next_word/` stays on the page
+  host). `"local"` keeps the bundled dictionary.
   """
   def ime_base_url do
     case Application.get_env(:xamt, :ime_base_url) do
@@ -28,7 +30,8 @@ defmodule XamtWeb.Layouts do
     trimmed = url |> String.trim() |> String.trim_trailing("/")
 
     cond do
-      trimmed in ["", "local"] -> ""
+      trimmed == "" -> ""
+      trimmed == "local" -> "local"
       String.starts_with?(trimmed, ["http://", "https://"]) -> trimmed
       true -> "http://" <> trimmed
     end
@@ -225,7 +228,6 @@ defmodule XamtWeb.Layouts do
   defp web_push_enabled?(_), do: false
 
   defp site_admin?(%{user: user}) when not is_nil(user), do: Xamt.Accounts.User.admin?(user)
-  defp site_admin?(_), do: false
 
   @doc """
   Provides dark vs light theme toggle based on the `.dark` class variant.

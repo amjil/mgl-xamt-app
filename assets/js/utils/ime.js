@@ -1,11 +1,12 @@
 /**
  * Shared candidate provider for every mgl-web-ime instance on the page.
  *
- * Typing hits the remote backend when a base URL is configured. The vendored
- * RemoteCandidateProvider swallows network errors, so a dead backend would
- * otherwise cost a full timeout on every keystroke — three consecutive
- * timeouts trip the circuit for the session (reset when the browser comes
- * back online).
+ * Typing hits the remote backend. An empty baseUrl is same-origin
+ * (`/api/next_word/` on the page host, the mgl-web-ime `baseUrl: ""` setup).
+ * The vendored RemoteCandidateProvider swallows network errors, so a dead
+ * backend would otherwise cost a full timeout on every keystroke — three
+ * consecutive timeouts trip the circuit for the session (reset when the
+ * browser comes back online).
  */
 import {
   CandidateProvider,
@@ -13,14 +14,18 @@ import {
   RemoteCandidateProvider,
 } from "../../vendor/mgl-web-ime/mgl-web-ime.js"
 
-const DEFAULT_IME_BASE_URL = "http://dev1:3003"
 const REMOTE_TIMEOUT_MS = 800
 const FAILURES_BEFORE_TRIP = 3
 
+/**
+ * `""` is same-origin. `null` stays on the bundled dictionary.
+ * A meta value with a host is passed through as `baseUrl`.
+ */
 export function imeBaseUrl() {
   const meta = document.querySelector('meta[name="ime-base-url"]')
-  const raw = (meta?.getAttribute("content") || DEFAULT_IME_BASE_URL).trim()
-  if (!raw || raw === "local") return ""
+  const raw = (meta?.getAttribute("content") ?? "").trim()
+  if (raw === "local") return null
+  if (!raw) return ""
   const withScheme = /^https?:\/\//i.test(raw) ? raw : `http://${raw}`
   return withScheme.replace(/\/+$/, "")
 }
@@ -85,7 +90,8 @@ let shared = null
 export function imeProvider() {
   if (!shared) {
     const baseUrl = imeBaseUrl()
-    shared = baseUrl ? new GatedRemoteProvider(baseUrl) : new LocalCandidateProvider()
+    shared =
+      baseUrl === null ? new LocalCandidateProvider() : new GatedRemoteProvider(baseUrl)
   }
   return shared
 }

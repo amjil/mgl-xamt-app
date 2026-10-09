@@ -530,7 +530,7 @@ var RemoteCandidateProvider = class extends CandidateProvider {
   /** @param {RemoteOptions} [options] */
   constructor(options = {}) {
     super();
-    this.baseUrl = (options.baseUrl ?? "http://dev1:3003").replace(/\/+$/, "");
+    this.baseUrl = (options.baseUrl ?? "").replace(/\/+$/, "");
     this.candidatesPath = options.candidatesPath ?? "/api/next_word/candidates";
     this.nextWordsPath = options.nextWordsPath ?? "/api/next_word/list";
     this.timeoutMs = options.timeoutMs ?? 2500;
@@ -5425,7 +5425,7 @@ var MglIME = class {
     this.targetEl = resolveTarget(options.target);
     this.adapter = adapterForElement(this.targetEl, options.adapter);
     this.provider = options.provider ?? createDefaultProvider({
-      baseUrl: options.remote?.baseUrl ?? options.baseUrl ?? "http://dev1:3003",
+      baseUrl: options.remote?.baseUrl ?? options.baseUrl ?? "",
       ...options.remote
     });
     this.core = new ImeCore({
