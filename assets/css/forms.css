@@ -662,6 +662,12 @@ label:has(> input, > textarea, > select) > * {
   gap: 0.75rem;
 }
 
+.xamt-form--vertical .xamt-form__actions {
+  /* In vertical-lr, row stacks top→bottom so Create + Cancel share one column. */
+  flex-direction: row;
+  flex-wrap: nowrap;
+}
+
 
 /* Custom status picker — vertical-lr Mongolian sheet / settings surface */
 .xamt-status-picker {

@@ -86,6 +86,7 @@
   height: var(--mn-vh);
   max-width: 100%;
   overflow: hidden;
+  overscroll-behavior-x: none;
   background: var(--mn-bg);
   color: var(--mn-text);
   font-family: var(--mn-font-script);
@@ -105,7 +106,8 @@
   padding: 0.9rem 0;
   overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: contain;
 }
 
 .mn-rail-link {
@@ -127,7 +129,7 @@
   text-orientation: mixed;
   overflow-x: auto;
   overflow-y: hidden;
-  overscroll-behavior-x: contain;
+  overscroll-behavior-x: none;
   -webkit-overflow-scrolling: touch;
   line-height: 1.75;
   font-family: var(--mn-font-script);

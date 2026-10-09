@@ -39,7 +39,8 @@ canvas.xamt-topbar {
   padding: 1.25rem 0 1rem;
   overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: contain;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -103,7 +104,7 @@ canvas.xamt-topbar {
   height: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  overscroll-behavior-x: contain;
+  overscroll-behavior-x: none;
   -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
 }

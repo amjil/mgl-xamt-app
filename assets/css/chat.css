@@ -61,7 +61,7 @@
   box-shadow: var(--xamt-shadow);
   overflow-x: auto;
   overflow-y: hidden;
-  overscroll-behavior-x: contain;
+  overscroll-behavior-x: none;
   -webkit-overflow-scrolling: touch;
   animation: xamt-fade-in 160ms ease;
 }
@@ -217,7 +217,7 @@
   min-height: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  overscroll-behavior-x: contain;
+  overscroll-behavior-x: none;
   -webkit-overflow-scrolling: touch;
   padding: 0.85rem 0.75rem;
 }
@@ -235,7 +235,7 @@
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  overscroll-behavior-x: contain;
+  overscroll-behavior-x: none;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -252,7 +252,7 @@
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  overscroll-behavior-x: contain;
+  overscroll-behavior-x: none;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -656,7 +656,7 @@
   max-block-size: min(20rem, 50vw);
   overflow-x: auto;
   overflow-y: hidden;
-  overscroll-behavior-x: contain;
+  overscroll-behavior-x: none;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -830,7 +830,7 @@
   padding: 0.5rem;
   overflow-x: auto;
   overflow-y: hidden;
-  overscroll-behavior-x: contain;
+  overscroll-behavior-x: none;
   -webkit-overflow-scrolling: touch;
   border-bottom: 1px solid var(--xamt-line);
 }
@@ -978,7 +978,7 @@
   max-block-size: 14rem;
   overflow-x: auto;
   overflow-y: hidden;
-  overscroll-behavior-x: contain;
+  overscroll-behavior-x: none;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
   border: 1px solid var(--xamt-line);
@@ -1390,7 +1390,7 @@ html.xamt-desktop-ime .xamt-composer__emoji {
   min-height: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  overscroll-behavior-x: contain;
+  overscroll-behavior-x: none;
   -webkit-overflow-scrolling: touch;
   padding: 0.75rem 1.15rem 1.35rem;
   --xamt-field-extent: clamp(8rem, calc(var(--xamt-vh) - 8rem), 22rem);
@@ -1627,7 +1627,8 @@ html.xamt-desktop-ime .xamt-composer__emoji {
   min-inline-size: 0;
   max-inline-size: calc(100% - 2.5rem - 0.75rem);
   overflow: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: contain;
 }
 
 .xamt-pinned-card__meta {
