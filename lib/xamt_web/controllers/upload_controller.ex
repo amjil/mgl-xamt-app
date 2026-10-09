@@ -2,27 +2,27 @@ defmodule XamtWeb.UploadController do
   @moduledoc """
   Authenticated (or publicly referenced) file serving for `/uploads/:filename`.
 
-  Files live under `priv/uploads` (not `priv/static`) and are never served by
-  `Plug.Static`, so membership / avatar checks run before bytes leave the app.
+  Bytes come from `Xamt.Storage` (local disk or S3). Membership / avatar checks
+  run before any payload leaves the app.
   """
 
   use XamtWeb, :controller
 
+  alias Xamt.Storage
   alias Xamt.Uploads
-  alias XamtWeb.Uploads, as: UploadStore
 
   def show(conn, %{"filename" => filename}) do
     user = current_user(conn)
     path = "/uploads/#{filename}"
 
     with true <- Uploads.safe_filename?(filename),
-         disk when is_binary(disk) <- existing_disk_path(filename),
-         true <- Uploads.visible_to_user?(path, user) do
+         true <- Uploads.visible_to_user?(path, user),
+         {:ok, body} <- Storage.fetch(filename) do
       conn
       |> put_resp_header("x-content-type-options", "nosniff")
       |> put_resp_header("cache-control", "private, max-age=86400")
       |> put_resp_content_type(content_type(filename), nil)
-      |> send_file(200, disk)
+      |> send_resp(200, body)
     else
       _ ->
         conn
@@ -36,14 +36,6 @@ defmodule XamtWeb.UploadController do
     case conn.assigns[:current_scope] do
       %{user: user} -> user
       _ -> nil
-    end
-  end
-
-  defp existing_disk_path(filename) do
-    disk = UploadStore.disk_path(filename)
-
-    if File.regular?(disk) do
-      disk
     end
   end
 

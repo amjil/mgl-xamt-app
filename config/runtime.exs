@@ -22,6 +22,21 @@ end
 
 config :xamt, XamtWeb.Endpoint, http: [port: String.to_integer(System.get_env("PORT", "4002"))]
 
+# Object storage for /uploads (SeaweedFS S3 API or any S3-compatible endpoint).
+# When unset, the Local adapter keeps files under priv/uploads.
+# Tests always stay on Local so CI does not depend on SeaweedFS.
+s3_endpoint = System.get_env("XAMT_S3_ENDPOINT")
+
+if s3_endpoint && config_env() != :test do
+  config :xamt, Xamt.Storage,
+    adapter: Xamt.Storage.S3,
+    endpoint: s3_endpoint,
+    bucket: System.get_env("XAMT_S3_BUCKET") || raise("XAMT_S3_BUCKET is missing"),
+    access_key: System.get_env("XAMT_S3_ACCESS_KEY") || raise("XAMT_S3_ACCESS_KEY is missing"),
+    secret_key: System.get_env("XAMT_S3_SECRET_KEY") || raise("XAMT_S3_SECRET_KEY is missing"),
+    region: System.get_env("XAMT_S3_REGION", "us-east-1")
+end
+
 if base_url = System.get_env("XAMT_IME_BASE_URL") do
   config :xamt, :ime_base_url, base_url
 end
@@ -47,6 +62,14 @@ cond do
 end
 
 if config_env() == :prod do
+  unless s3_endpoint do
+    raise """
+    environment variable XAMT_S3_ENDPOINT is missing.
+    Production stores uploads on S3-compatible storage (SeaweedFS).
+    Also set XAMT_S3_BUCKET, XAMT_S3_ACCESS_KEY, and XAMT_S3_SECRET_KEY.
+    """
+  end
+
   database_url =
     System.get_env("DATABASE_URL") ||
       raise """
