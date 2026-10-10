@@ -238,6 +238,7 @@ defmodule XamtWeb.ServerLive.Composer do
                 data-stop-label={gettext("Stop recording")}
               >
                 <.live_file_input upload={@uploads.audio} class="hidden" />
+                <input type="hidden" id="audio-duration" name="duration" value="" />
                 <div id="voice-chrome" phx-update="ignore">
                   <button
                     type="button"

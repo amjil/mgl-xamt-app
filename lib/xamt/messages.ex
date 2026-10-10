@@ -873,9 +873,11 @@ defmodule Xamt.Messages do
   defp sanitize_media_content(content, "audio") when is_map(content) do
     case Map.get(content, "url") do
       url when is_binary(url) ->
-        if safe_upload_path?(url),
-          do: %{"type" => "audio", "url" => url},
-          else: %{"type" => "audio"}
+        if safe_upload_path?(url) do
+          maybe_put_audio_duration(%{"type" => "audio", "url" => url}, content)
+        else
+          %{"type" => "audio"}
+        end
 
       _ ->
         %{"type" => "audio"}
@@ -887,6 +889,28 @@ defmodule Xamt.Messages do
     |> Map.drop(["images", "url"])
     |> Map.put("type", type)
   end
+
+  defp maybe_put_audio_duration(payload, content) do
+    case parse_audio_duration(Map.get(content, "duration")) do
+      nil -> payload
+      seconds -> Map.put(payload, "duration", seconds)
+    end
+  end
+
+  defp parse_audio_duration(n) when is_integer(n) and n in 1..60, do: n
+
+  defp parse_audio_duration(n) when is_float(n) do
+    n |> round() |> parse_audio_duration()
+  end
+
+  defp parse_audio_duration(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {n, ""} -> parse_audio_duration(n)
+      _ -> nil
+    end
+  end
+
+  defp parse_audio_duration(_), do: nil
 
   defp sanitize_gallery_image(%{"thumb" => thumb, "original" => original})
        when is_binary(thumb) and is_binary(original) do
@@ -931,7 +955,7 @@ defmodule Xamt.Messages do
 
   # Strip nested payload we do not need on the wire.
   # LiveView rendering only depends on `content_html` and `user`, except
-  # audio (`type` + `url`) and gallery (`type` + `images`) which need structured
+  # audio (`type` + `url` + optional `duration`) and gallery (`type` + `images`) which need structured
   # content to mount players / photo grids without refetching.
   # Clear the editor AST so PubSub does not copy it into every subscriber heap.
   # Large `content_html` binaries are refcounted and shared by the BEAM with no copy cost.
@@ -947,7 +971,8 @@ defmodule Xamt.Messages do
     %{message | content: broadcast_content(message.content), reply_to: reply_to}
   end
 
-  defp broadcast_content(%{"type" => "audio"} = content), do: Map.take(content, ["type", "url"])
+  defp broadcast_content(%{"type" => "audio"} = content),
+    do: Map.take(content, ["type", "url", "duration"])
 
   defp broadcast_content(%{"type" => "gallery"} = content),
     do: Map.take(content, ["type", "images"])

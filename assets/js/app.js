@@ -8,6 +8,7 @@ import {MongolianIME} from "./hooks/mongolian-ime"
 import {MessageComposer} from "./hooks/message-composer"
 import {MessageList} from "./hooks/message-list"
 import {AudioRecorder} from "./hooks/audio-recorder"
+import {VoicePlayer} from "./hooks/voice-player"
 import {InfiniteScroll} from "./hooks/infinite-scroll"
 import {MongolianScroll, installGlobalMongolianWheelScroll} from "./hooks/mongolian-scroll"
 import {MessageScroll} from "./hooks/message-scroll"
@@ -36,6 +37,7 @@ const Hooks = {
   MessageComposer,
   MessageList,
   AudioRecorder,
+  VoicePlayer,
   MessageScroll,
   InfiniteScroll,
   MongolianScroll,

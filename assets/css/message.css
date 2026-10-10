@@ -45,7 +45,7 @@
 
 .xamt-messages audio,
 .xamt-messages iframe,
-.xamt-messages .xamt-audio-player,
+.xamt-messages .xamt-voice-bar,
 .xamt-messages .xamt-embed-island,
 .xamt-messages .xamt-embed-island *,
 .xamt-messages .xamt-embed-video {
@@ -1467,31 +1467,107 @@ a.xamt-mention:hover {
 }
 
 .xamt-message__audio {
-  /* Keep native controls in horizontal-tb, then stand the strip upright
-     so it reads with the vertical Mongolian column. */
   writing-mode: horizontal-tb;
   -webkit-writing-mode: horizontal-tb;
   text-orientation: mixed;
   position: relative;
-  width: 2.75rem;
-  height: 16rem;
-  max-height: min(16rem, calc(var(--xamt-vh) - 10rem));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  --voice-duration: 30;
+  --voice-progress: 0;
+  width: 2.5rem;
   flex: 0 0 auto;
 }
 
-.xamt-audio-player {
+.xamt-voice-bar__media {
   position: absolute;
-  left: 50%;
-  top: 50%;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.xamt-voice-bar {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+  height: calc(4rem + clamp(1, var(--voice-duration), 60) * 0.2rem);
+  max-height: min(16rem, calc(var(--xamt-vh) - 10rem));
+  margin: 0;
+  padding: 0.55rem 0.2rem;
+  border: 0;
+  border-radius: 0.4rem;
+  overflow: hidden;
+  cursor: pointer;
+  color: var(--xamt-accent);
+  background: color-mix(in srgb, var(--xamt-accent) 16%, var(--xamt-bg-2));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--xamt-accent) 28%, transparent);
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    background 0.16s ease;
+}
+
+.xamt-voice-bar:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--xamt-accent) 24%, var(--xamt-bg-2));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--xamt-accent) 40%, transparent),
+    0 6px 16px color-mix(in srgb, var(--xamt-accent) 18%, transparent);
+}
+
+.xamt-voice-bar:active {
+  transform: translateY(0);
+}
+
+.xamt-voice-bar.is-playing {
+  background: color-mix(in srgb, var(--xamt-accent) 32%, var(--xamt-bg-2));
+  color: var(--xamt-accent-2);
+}
+
+.xamt-voice-bar__progress {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: calc(var(--voice-progress, 0) * 100%);
+  background: color-mix(in srgb, var(--xamt-accent) 38%, transparent);
+  pointer-events: none;
+  transition: height 0.12s linear;
+}
+
+.xamt-voice-bar__play,
+.xamt-voice-bar__stop {
+  position: relative;
+  z-index: 1;
+}
+
+.xamt-voice-bar__stop {
+  display: none;
+}
+
+.xamt-voice-bar.is-playing .xamt-voice-bar__play {
+  display: none;
+}
+
+.xamt-voice-bar.is-playing .xamt-voice-bar__stop {
   display: block;
-  height: 2.5rem;
-  width: 16rem;
-  max-width: none;
-  border-radius: 9999px;
-  outline: none;
-  accent-color: var(--xamt-accent);
-  transform: translate(-50%, -50%) rotate(90deg);
-  transform-origin: center center;
+}
+
+.xamt-voice-bar__unread {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: #e11d48;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #e11d48 35%, transparent);
+}
+
+.xamt-message__audio.is-played .xamt-voice-bar__unread {
+  display: none;
 }
 
 /* Photo wall: under vertical-lr, columns fill top→bottom then extend right. */

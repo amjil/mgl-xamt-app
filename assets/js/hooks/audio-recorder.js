@@ -127,6 +127,8 @@ export const AudioRecorder = {
     this.previewUrl = null
     this.timerId = null
     this.deadlineAt = 0
+    this.recordedSeconds = 0
+    this.durationInput = this.el.querySelector("#audio-duration")
     this._unmounted = false
     this._awaitingAck = false
     this._ackTimer = null
@@ -371,8 +373,22 @@ export const AudioRecorder = {
     }
   },
 
+  elapsedSeconds() {
+    const max = this.maxSeconds()
+    if (!this.deadlineAt) return 1
+    const remaining = Math.max(0, (this.deadlineAt - Date.now()) / 1000)
+    return Math.max(1, Math.min(max, Math.round(max - remaining)))
+  },
+
+  setDurationField(seconds) {
+    if (!this.durationInput) return
+    this.durationInput.value =
+      Number.isFinite(seconds) && seconds > 0 ? String(Math.round(seconds)) : ""
+  },
+
   stopRecording() {
     if (!this.isRecording) return
+    this.recordedSeconds = this.elapsedSeconds()
     this.isRecording = false
     this.clearCountdown()
     this.setRecordingState(false)
@@ -422,6 +438,7 @@ export const AudioRecorder = {
     const type = (mimeType || blob.type || "audio/webm").split(";")[0]
     const ext = extensionFor(type)
     this.pendingFile = blobToFile(blob, `voice_${Date.now()}.${ext}`, type)
+    this.setDurationField(this.recordedSeconds || 1)
     this.revokePreview()
     this.previewUrl = URL.createObjectURL(blob)
     if (this.previewEl) {
@@ -453,6 +470,8 @@ export const AudioRecorder = {
     this.revokePreview()
     this.pendingFile = null
     this.sending = false
+    this.recordedSeconds = 0
+    this.setDurationField("")
     if (!opts.silent) this.resetVoiceUi()
   },
 
