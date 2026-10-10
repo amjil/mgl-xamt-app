@@ -1,12 +1,19 @@
-const HTML_CACHE = "xamt-html-v4";
-const ASSET_CACHE = "xamt-assets-v4";
+const HTML_CACHE = "xamt-html-v5";
+const ASSET_CACHE = "xamt-assets-v5";
 const FONT_CACHE = "xamt-fonts-v1";
 
 // Do not precache "/" — that response is the signed-in home page when the
 // worker installs from an authenticated session.
 const SHELL = ["/pwa/manifest.json", "/offline.html"];
 const FONTS = ["/fonts/OyunQaganTig.ttf"];
-const IMAGES = ["/images/logo.svg"];
+const IMAGES = [
+  "/images/logo.svg",
+  "/images/pwa-icon-192.png",
+  "/images/pwa-icon-512.png",
+  "/images/apple-touch-icon.png",
+  "/images/favicon-32.png",
+  "/favicon.ico"
+];
 
 // Phoenix digests look like app-A1B2C3D4E5….css — those URLs change on every
 // deploy, so Cache First is safe. Undigested /assets/css/app.css (dev) must
@@ -332,8 +339,8 @@ async function showPushNotification(event) {
 
   const options = {
     body: payload.body,
-    icon: "/images/logo.svg",
-    badge: "/images/logo.svg",
+    icon: "/images/pwa-icon-192.png",
+    badge: "/images/pwa-icon-192.png",
     data: { url: payload.url || "/" },
     vibrate: [200, 100, 200]
   };

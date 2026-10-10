@@ -26,7 +26,13 @@ defmodule XamtWeb.ServerLive.Rails do
         title={gettext("Home")}
         aria-label={gettext("Home")}
       >
-        X
+        <img
+          src={~p"/images/pwa-icon-192.png"}
+          alt=""
+          width="42"
+          height="42"
+          decoding="async"
+        />
       </.link>
       <.link
         navigate={~p"/saved"}
