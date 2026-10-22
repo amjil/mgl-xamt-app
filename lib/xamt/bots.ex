@@ -1,6 +1,6 @@
 defmodule Xamt.Bots do
   @moduledoc """
-  Bot 应用创建、安装、Token 校验与频道操作授权。
+  Bot app creation, installation, token verification, and channel action authorization.
   """
 
   import Ecto.Query
@@ -10,7 +10,7 @@ defmodule Xamt.Bots do
   alias Xamt.Bots.{Bot, BotInstallation, BotToken, BotSubscription}
 
   @doc """
-  创建一个 Bot 应用，同时在 users 表创建一个影子账号供其发言使用。
+  Creates a bot app and a shadow user account for it to post messages.
   """
   def create_bot(creator_user, attrs) do
     Ecto.Multi.new()
@@ -42,7 +42,7 @@ defmodule Xamt.Bots do
   end
 
   @doc """
-  将 Bot 安装到指定 Server，同时生成首次调用的明文 Token（仅在安装时返回一次）。
+  Installs a bot on a server and issues a plaintext token (returned only once at install time).
   """
   def install_bot(bot_id, server_id, installed_by_user, opts \\ []) do
     granted_scopes = Keyword.get(opts, :granted_scopes, [])
@@ -111,7 +111,7 @@ defmodule Xamt.Bots do
   end
 
   @doc """
-  签发 API Token：返回 `{:ok, %{raw_token: ..., record: %BotToken{}}}`，数据库只存 SHA-256 哈希。
+  Issues an API token: returns `{:ok, %{raw_token: ..., record: %BotToken{}}}`; only SHA-256 hash is stored.
   """
   def issue_installation_token(repo \\ Repo, %BotInstallation{} = inst, scopes) do
     raw_random = Base.url_encode64(:crypto.strong_rand_bytes(32), padding: false)
@@ -136,7 +136,7 @@ defmodule Xamt.Bots do
   end
 
   @doc """
-  验证 Bot API 请求的 Bearer Token，返回预加载了 bot 与 installation 的上下文。
+  Validates a Bearer token for bot API requests; returns preloaded bot and installation context.
   """
   def authenticate_token(raw_token) when is_binary(raw_token) do
     hash = :crypto.hash(:sha256, raw_token)
@@ -159,7 +159,7 @@ defmodule Xamt.Bots do
   end
 
   @doc """
-  双重权限校验：验证该 Token 是否有权在目标频道执行指定 scope 操作。
+  Authorizes a channel action: checks token and installation scopes for the target channel.
   """
   def authorize_channel_action(%BotToken{} = token, target_channel, required_scope) do
     inst = token.bot_installation
@@ -188,5 +188,93 @@ defmodule Xamt.Bots do
 
   defp channel_allowed?(%BotInstallation{allowed_channel_ids: allowed}, target_cid) do
     target_cid in allowed
+  end
+
+  @doc "Lists bot installations on a server (preloads bot, subscriptions, active token prefixes)."
+  def list_server_installations(server_id) do
+    from(i in BotInstallation,
+      where: i.server_id == ^server_id,
+      order_by: [asc: i.inserted_at],
+      preload: [
+        :bot,
+        :subscriptions,
+        tokens: ^from(t in BotToken, where: is_nil(t.revoked_at), order_by: [desc: t.inserted_at])
+      ]
+    )
+    |> Repo.all()
+  end
+
+  @doc "Creates a new bot and installs it on the given server in one step."
+  def create_and_install_bot(admin_user, server_id, bot_attrs, install_opts) do
+    with {:ok, %{bot: bot}} <- create_bot(admin_user, bot_attrs),
+         {:ok, result} <- install_bot(bot.id, server_id, admin_user, install_opts) do
+      {:ok, Map.put(result, :bot, bot)}
+    end
+  end
+
+  @doc """
+  Updates installation scopes, channel allowlist, and event subscriptions (idempotent full sync).
+  """
+  def update_installation_config(%BotInstallation{} = inst, %{
+        "granted_scopes" => granted_scopes,
+        "allowed_channel_ids" => allowed_channel_ids,
+        "subscribed_events" => subscribed_events,
+        "status" => status
+      }) do
+    Ecto.Multi.new()
+    |> Ecto.Multi.update(:installation, fn _ ->
+      BotInstallation.changeset(inst, %{
+        granted_scopes: Enum.uniq(granted_scopes),
+        allowed_channel_ids: Enum.uniq(allowed_channel_ids),
+        status: status
+      })
+    end)
+    |> Ecto.Multi.run(:sync_tokens, fn repo, _ ->
+      from(t in BotToken, where: t.bot_installation_id == ^inst.id and is_nil(t.revoked_at))
+      |> repo.update_all(set: [scopes: Enum.uniq(granted_scopes)])
+
+      {:ok, :synced}
+    end)
+    |> Ecto.Multi.run(:sync_subscriptions, fn repo, _ ->
+      from(s in BotSubscription, where: s.bot_installation_id == ^inst.id)
+      |> repo.delete_all()
+
+      now = DateTime.utc_now()
+
+      new_subs =
+        subscribed_events
+        |> Enum.uniq()
+        |> Enum.map(fn ev ->
+          %{
+            id: Ecto.UUID.generate(),
+            bot_installation_id: inst.id,
+            event_type: ev,
+            filter: %{},
+            is_enabled: true,
+            inserted_at: now,
+            updated_at: now
+          }
+        end)
+
+      if new_subs != [] do
+        repo.insert_all(BotSubscription, new_subs)
+      end
+
+      {:ok, :synced}
+    end)
+    |> Repo.transaction()
+  end
+
+  @doc "Rotates the installation token: revokes active tokens and issues a new one."
+  def rotate_installation_token(%BotInstallation{} = inst) do
+    now = DateTime.utc_now()
+
+    Repo.transaction(fn ->
+      from(t in BotToken, where: t.bot_installation_id == ^inst.id and is_nil(t.revoked_at))
+      |> Repo.update_all(set: [revoked_at: now])
+
+      {:ok, token_data} = issue_installation_token(Repo, inst, inst.granted_scopes)
+      token_data
+    end)
   end
 end

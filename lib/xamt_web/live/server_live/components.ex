@@ -120,6 +120,15 @@ defmodule XamtWeb.ServerLive.Components do
           editing_channel={@editing_channel}
         />
 
+        <.bot_management_sheet
+          show={@show_bot_manager}
+          installations={@bot_installations}
+          selected_installation={@selected_bot_installation}
+          channels={@channels}
+          newly_issued_token={@newly_issued_bot_token}
+          show_create_form={@show_bot_create_form}
+        />
+
         <.lightbox :if={@lightbox_images} {assigns} />
       </div>
     </Layouts.chat>

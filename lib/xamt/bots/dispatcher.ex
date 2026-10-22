@@ -6,7 +6,7 @@ defmodule Xamt.Bots.Dispatcher do
   alias Xamt.Repo
 
   @doc """
-  在 Ecto.Multi 事务中调用，自动匹配订阅、校验权限并生成 bot_events 记录。
+  Runs inside an Ecto.Multi transaction: matches subscriptions, checks permissions, enqueues bot_events.
   """
   def enqueue_event_multi(multi, step_name, attrs) do
     Ecto.Multi.run(multi, step_name, fn repo, _changes ->
@@ -15,7 +15,7 @@ defmodule Xamt.Bots.Dispatcher do
   end
 
   @doc """
-  独立事务入队；业务层在写入消息后调用。
+  Enqueues in a standalone transaction; call from the domain layer after persisting messages.
   """
   def enqueue_event(attrs) do
     Repo.transact(fn ->

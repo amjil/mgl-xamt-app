@@ -1,7 +1,7 @@
 defmodule XamtWeb.ServerLive do
   use XamtWeb, :live_view
 
-  alias Xamt.{Accounts, Channels, Messages, Servers}
+  alias Xamt.{Accounts, Bots, Channels, Messages, Servers}
   alias Xamt.Channels.Channel
   alias Xamt.Servers.Permissions
   alias Xamt.Servers.Server
@@ -99,6 +99,11 @@ defmodule XamtWeb.ServerLive do
       |> assign(:show_server_menu, false)
       |> assign(:show_status_picker, false)
       |> assign(:show_pinned_drawer, false)
+      |> assign(:show_bot_manager, false)
+      |> assign(:bot_installations, [])
+      |> assign(:selected_bot_installation, nil)
+      |> assign(:newly_issued_bot_token, nil)
+      |> assign(:show_bot_create_form, false)
       |> assign(:pinned_messages, [])
       |> assign(:bookmarked_ids, MapSet.new())
       |> assign(:mobile_panel, :messages)
@@ -715,6 +720,131 @@ defmodule XamtWeb.ServerLive do
     {:noreply, assign(socket, :show_server_menu, false)}
   end
 
+  def handle_event("open_bot_manager", _params, socket) do
+    if can_manage_server?(socket) do
+      installations = Bots.list_server_installations(socket.assigns.server.id)
+      first_inst = List.first(installations)
+
+      {:noreply,
+       socket
+       |> assign(:show_bot_manager, true)
+       |> assign(:bot_installations, installations)
+       |> assign(:selected_bot_installation, first_inst)
+       |> assign(:show_bot_create_form, Enum.empty?(installations))}
+    else
+      {:noreply, put_flash(socket, :error, gettext("You do not have permission to manage bots"))}
+    end
+  end
+
+  def handle_event("close_bot_manager", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_bot_manager, false)
+     |> assign(:newly_issued_bot_token, nil)}
+  end
+
+  def handle_event("toggle_bot_create_form", _params, socket) do
+    {:noreply, assign(socket, :show_bot_create_form, !socket.assigns.show_bot_create_form)}
+  end
+
+  def handle_event("select_bot_installation", %{"id" => id}, socket) do
+    selected = Enum.find(socket.assigns.bot_installations, &(&1.id == id))
+
+    {:noreply,
+     socket
+     |> assign(:selected_bot_installation, selected)
+     |> assign(:show_bot_create_form, false)}
+  end
+
+  def handle_event("dismiss_bot_token", _params, socket) do
+    {:noreply, assign(socket, :newly_issued_bot_token, nil)}
+  end
+
+  def handle_event("create_and_install_bot", %{"bot" => bot_params}, socket) do
+    if can_manage_server?(socket) do
+      admin = socket.assigns.current_scope.user
+      server_id = socket.assigns.server.id
+
+      default_opts = [
+        granted_scopes: ["channel.messages.send"],
+        subscribed_events: []
+      ]
+
+      case Bots.create_and_install_bot(admin, server_id, bot_params, default_opts) do
+        {:ok, %{installation: inst, token: %{raw_token: raw_token}}} ->
+          installations = Bots.list_server_installations(server_id)
+          selected = Enum.find(installations, &(&1.id == inst.id))
+
+          {:noreply,
+           socket
+           |> assign(:bot_installations, installations)
+           |> assign(:selected_bot_installation, selected)
+           |> assign(:newly_issued_bot_token, raw_token)
+           |> assign(:show_bot_create_form, false)
+           |> put_flash(:info, gettext("Bot created and installed. Save the API token now"))}
+
+        {:error, _, _, _} ->
+          {:noreply,
+           put_flash(socket, :error, gettext("Could not create bot. Check the name or webhook URL"))}
+      end
+    else
+      {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+    end
+  end
+
+  def handle_event("save_bot_installation_config", params, socket) do
+    if can_manage_server?(socket) do
+      inst = socket.assigns.selected_bot_installation
+
+      config_attrs = %{
+        "status" => Map.get(params, "status", "enabled"),
+        "granted_scopes" => Map.get(params, "granted_scopes", []),
+        "subscribed_events" => Map.get(params, "subscribed_events", []),
+        "allowed_channel_ids" => Map.get(params, "allowed_channel_ids", [])
+      }
+
+      case Bots.update_installation_config(inst, config_attrs) do
+        {:ok, _} ->
+          installations = Bots.list_server_installations(socket.assigns.server.id)
+          updated_selected = Enum.find(installations, &(&1.id == inst.id))
+
+          {:noreply,
+           socket
+           |> assign(:bot_installations, installations)
+           |> assign(:selected_bot_installation, updated_selected)
+           |> put_flash(:info, gettext("Bot permissions and subscriptions updated"))}
+
+        {:error, _, _, _} ->
+          {:noreply, put_flash(socket, :error, gettext("Could not save configuration"))}
+      end
+    else
+      {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+    end
+  end
+
+  def handle_event("rotate_bot_token", %{"id" => id}, socket) do
+    if can_manage_server?(socket) do
+      inst = Enum.find(socket.assigns.bot_installations, &(&1.id == id))
+
+      case inst && Bots.rotate_installation_token(inst) do
+        {:ok, %{raw_token: raw_token}} ->
+          installations = Bots.list_server_installations(socket.assigns.server.id)
+          updated_selected = Enum.find(installations, &(&1.id == inst.id))
+
+          {:noreply,
+           socket
+           |> assign(:bot_installations, installations)
+           |> assign(:selected_bot_installation, updated_selected)
+           |> assign(:newly_issued_bot_token, raw_token)}
+
+        _ ->
+          {:noreply, put_flash(socket, :error, gettext("Could not rotate token"))}
+      end
+    else
+      {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+    end
+  end
+
   def handle_event("open_status_picker", _params, socket) do
     {:noreply, assign(socket, :show_status_picker, true)}
   end
@@ -1195,6 +1325,15 @@ defmodule XamtWeb.ServerLive do
 
   defp can_view_channel?(member) do
     Permissions.has_permission?(member.permissions, :view_channel)
+  end
+
+  defp can_manage_server?(socket) do
+    user = socket.assigns.current_scope.user
+    server = socket.assigns.server
+    member = socket.assigns[:current_member]
+
+    server.owner_id == user.id or
+      (member != nil and Permissions.has_permission?(member.permissions, :manage_server))
   end
 
   defp assign_messages(socket, messages) do

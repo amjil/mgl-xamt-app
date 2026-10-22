@@ -15,7 +15,7 @@ defmodule Xamt.Bots.DeliveryWorker do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
-  @doc "当有新事件入队时，可主动唤醒 Worker 立即投递。"
+  @doc "Wakes the worker to deliver queued events immediately."
   def trigger_sweep do
     if Process.whereis(__MODULE__) do
       send(__MODULE__, :sweep)

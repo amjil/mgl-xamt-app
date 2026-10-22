@@ -19,6 +19,16 @@ defmodule XamtWeb.RoleHelper do
   Visual config for a user struct, role string, or anything else (falls back).
   """
   @spec get_role_ui_config(term()) :: role_ui()
+  def get_role_ui_config(%{is_bot: true}) do
+    %{
+      color_class: "text-cyan-500",
+      bg_class: "bg-cyan-500/10 border-cyan-500/30",
+      accent_class: nil,
+      label: "BOT",
+      icon: "hero-cpu-chip"
+    }
+  end
+
   def get_role_ui_config(%{global_role: role}) when is_binary(role),
     do: get_role_ui_config(role)
 

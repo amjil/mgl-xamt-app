@@ -65,15 +65,28 @@ defmodule XamtWeb.ServerLive.Rails do
         <div class="xamt-rail__section">
           <div class="xamt-rail__section-head">
             <span class="mongol-text">{gettext("Channels")}</span>
-            <.link
-              :if={@can_manage_channels? and @active_channel}
-              id="toggle-channel-form"
-              patch={~p"/servers/#{@server.slug}/#{@active_channel.slug}/new"}
-              class="xamt-icon-btn"
-              aria-label={gettext("Create channel")}
-            >
-              +
-            </.link>
+            <div class="xamt-rail__section-actions">
+              <button
+                :if={@can_manage_server?}
+                type="button"
+                id="open-bot-manager"
+                phx-click="open_bot_manager"
+                class="xamt-icon-btn"
+                title={gettext("Manage bot integrations")}
+                aria-label={gettext("Manage bot integrations")}
+              >
+                <.icon name="hero-cpu-chip" class="w-5 h-5" />
+              </button>
+              <.link
+                :if={@can_manage_channels? and @active_channel}
+                id="toggle-channel-form"
+                patch={~p"/servers/#{@server.slug}/#{@active_channel.slug}/new"}
+                class="xamt-icon-btn"
+                aria-label={gettext("Create channel")}
+              >
+                +
+              </.link>
+            </div>
           </div>
 
           <.form
