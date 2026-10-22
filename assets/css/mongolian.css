@@ -125,6 +125,9 @@ body {
   margin: 0;
   height: var(--xamt-vh);
   overflow: hidden;
+  /* none (not contain): leftover horizontal pan must not become Back/Forward */
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: none;
 }
 
 body {

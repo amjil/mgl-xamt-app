@@ -146,16 +146,46 @@ defmodule XamtWeb.ServerLive.MessageItem do
             ]}
           >
             <%= if url = audio_src(@message) do %>
-              <div class="xamt-message__audio">
+              <% duration = audio_duration(@message) %>
+              <% own_voice? = @message.user_id == @current_scope.user.id %>
+              <div
+                id={"msg-audio-#{@message.id}"}
+                class="xamt-message__audio"
+                phx-hook="VoicePlayer"
+                data-src={url}
+                data-duration={duration}
+                data-message-id={@message.id}
+                data-own={to_string(own_voice?)}
+                data-play-label={gettext("Play voice message")}
+                data-stop-label={gettext("Stop voice message")}
+                style={"--voice-duration: #{duration || 30}"}
+              >
                 <audio
-                  id={"msg-audio-#{@message.id}"}
-                  class="xamt-audio-player"
-                  controls
+                  id={"msg-audio-el-#{@message.id}"}
+                  class="xamt-voice-bar__media"
                   preload="metadata"
                   src={url}
                 >
                   {gettext("Voice message")}
                 </audio>
+                <button
+                  type="button"
+                  id={"msg-audio-btn-#{@message.id}"}
+                  class="xamt-voice-bar"
+                  aria-pressed="false"
+                  aria-label={gettext("Play voice message")}
+                  title={gettext("Play voice message")}
+                >
+                  <span class="xamt-voice-bar__progress" aria-hidden="true"></span>
+                  <.icon name="hero-play" class="size-4 xamt-voice-bar__play" />
+                  <.icon name="hero-stop" class="size-4 xamt-voice-bar__stop" />
+                </button>
+                <span
+                  :if={not own_voice?}
+                  class="xamt-voice-bar__unread"
+                  aria-hidden="true"
+                >
+                </span>
               </div>
             <% else %>
               <%= if images = gallery_images(@message) do %>

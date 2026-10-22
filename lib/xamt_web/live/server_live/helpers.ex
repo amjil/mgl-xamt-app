@@ -316,6 +316,12 @@ defmodule XamtWeb.ServerLive.Helpers do
 
   def audio_src(_), do: nil
 
+  def audio_duration(%{content: %{"type" => "audio", "duration" => n}})
+      when is_integer(n) and n in 1..60,
+      do: n
+
+  def audio_duration(_), do: nil
+
   def deleted?(%{deleted_at: %DateTime{}}), do: true
   def deleted?(_), do: false
 end

@@ -4,15 +4,12 @@ defmodule XamtWeb.UploadsTest do
   @fixture Path.expand("../support/fixtures/gallery_sample.png", __DIR__)
 
   test "delete_stored removes persisted upload files and ignores traversal" do
-    dir = XamtWeb.Uploads.dir()
-    File.mkdir_p!(dir)
     name = "orphan-#{System.unique_integer([:positive])}.txt"
-    dest = Path.join(dir, name)
-    File.write!(dest, "tmp")
+    assert :ok = Xamt.Storage.put(name, "tmp")
+    assert Xamt.Storage.exists?(name)
 
-    assert File.exists?(dest)
     assert :ok = XamtWeb.Uploads.delete_stored("/uploads/#{name}")
-    refute File.exists?(dest)
+    refute Xamt.Storage.exists?(name)
 
     assert :ok = XamtWeb.Uploads.delete_stored("/uploads/../#{name}")
     assert :ok = XamtWeb.Uploads.delete_stored("https://evil.example/#{name}")

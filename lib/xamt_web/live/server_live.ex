@@ -176,7 +176,7 @@ defmodule XamtWeb.ServerLive do
     {:noreply, socket}
   end
 
-  def handle_event("send_audio", _params, socket) do
+  def handle_event("send_audio", params, socket) do
     channel = socket.assigns.active_channel
 
     cond do
@@ -187,7 +187,7 @@ defmodule XamtWeb.ServerLive do
         voice_failed(socket, gettext("Unauthorized"))
 
       true ->
-        send_audio_message(socket, channel)
+        send_audio_message(socket, channel, audio_duration_param(params))
     end
   end
 
@@ -2047,7 +2047,7 @@ defmodule XamtWeb.ServerLive do
     end
   end
 
-  defp send_audio_message(socket, channel) do
+  defp send_audio_message(socket, channel, duration) do
     {done, in_progress} = Phoenix.LiveView.uploaded_entries(socket, :audio)
 
     socket =
@@ -2067,8 +2067,12 @@ defmodule XamtWeb.ServerLive do
                socket.assigns.current_scope.user.id
              ) do
           url when is_binary(url) ->
+            content =
+              %{"type" => "audio", "url" => url}
+              |> maybe_put_audio_duration(duration)
+
             attrs = %{
-              "content" => %{"type" => "audio", "url" => url},
+              "content" => content,
               "content_html" => "🎤 <em>#{gettext("Voice message")}</em>",
               "content_type" => "audio",
               "reply_to_id" => socket.assigns.replying_to && socket.assigns.replying_to.id
@@ -2088,6 +2092,20 @@ defmodule XamtWeb.ServerLive do
         end
     end
   end
+
+  defp audio_duration_param(%{"duration" => value}) do
+    case Integer.parse(to_string(value)) do
+      {n, ""} when n in 1..60 -> n
+      _ -> nil
+    end
+  end
+
+  defp audio_duration_param(_), do: nil
+
+  defp maybe_put_audio_duration(content, n) when is_integer(n) and n in 1..60,
+    do: Map.put(content, "duration", n)
+
+  defp maybe_put_audio_duration(content, _), do: content
 
   defp voice_sent(socket) do
     {:noreply,

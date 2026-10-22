@@ -8,6 +8,7 @@ import {MongolianIME} from "./hooks/mongolian-ime"
 import {MessageComposer} from "./hooks/message-composer"
 import {MessageList} from "./hooks/message-list"
 import {AudioRecorder} from "./hooks/audio-recorder"
+import {VoicePlayer} from "./hooks/voice-player"
 import {InfiniteScroll} from "./hooks/infinite-scroll"
 import {MongolianScroll, installGlobalMongolianWheelScroll} from "./hooks/mongolian-scroll"
 import {MessageScroll} from "./hooks/message-scroll"
@@ -20,6 +21,7 @@ import {StatusEmoji} from "./hooks/status-emoji"
 import {SearchPalette} from "./hooks/search-palette"
 import {adoptImeElements} from "./utils/ime"
 import {initVisualViewport} from "mgl-common-ui"
+import {MnSelect} from "./hooks/mn-select"
 import {trackImeKeyboard} from "./utils/viewport"
 import {toast} from "./utils/offline-store"
 import {highlightMessageById} from "./utils/highlight-message"
@@ -35,6 +37,7 @@ const Hooks = {
   MessageComposer,
   MessageList,
   AudioRecorder,
+  VoicePlayer,
   MessageScroll,
   InfiniteScroll,
   MongolianScroll,
@@ -45,6 +48,7 @@ const Hooks = {
   LightboxSwipe,
   StatusEmoji,
   SearchPalette,
+  MnSelect,
 }
 
 // Jittered backoff for reconnect/rejoin so a server restart or regional

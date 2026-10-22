@@ -45,12 +45,12 @@ mgl-emoji-picker {
 
 /* Keyboard-safe shell: --xamt-vh is kept in sync by initVisualViewport().
    overflow:hidden is set on html/body in mongolian.css so iOS cannot rubber-band
-   the page behind the keys. Inner surfaces contain overscroll so the chain
-   never reaches the locked root. --mn-vh is kept in sync by mgl-common-ui
-   initVisualViewport(); --xamt-vh aliases it. */
+   the page behind the keys. Inner surfaces use overscroll-behavior-x: none so
+   leftover horizontal pan does not become Back/Forward. --mn-vh is kept in
+   sync by mgl-common-ui initVisualViewport(); --xamt-vh aliases it. */
 .xamt-messages,
 .xamt-composer__editor {
-  overscroll-behavior-x: contain;
+  overscroll-behavior-x: none;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
 }

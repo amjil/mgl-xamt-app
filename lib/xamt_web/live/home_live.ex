@@ -189,6 +189,14 @@ defmodule XamtWeb.HomeLive do
       <div class="xamt-home">
         <header class="xamt-home__hero">
           <span class="xamt-ornament" aria-hidden="true"></span>
+          <img
+            class="xamt-brand-logo"
+            src={~p"/images/pwa-icon-512.png"}
+            alt="Xamt"
+            width="112"
+            height="112"
+            decoding="async"
+          />
           <p class="xamt-kicker mongol-text">{gettext("Community")}</p>
           <p class="xamt-brand">Xamt</p>
           <h1 class="xamt-home__title mongol-text">{gettext("Mongolian community")}</h1>

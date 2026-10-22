@@ -1434,7 +1434,7 @@ defmodule XamtWeb.ServerLiveTest do
     refute List.keyfind(TypingTracker.list(channel), user.id, 0)
   end
 
-  test "renders a native player for voice messages", %{
+  test "renders a vertical voice bar for voice messages", %{
     conn: conn,
     server: server,
     channel: channel,
@@ -1443,7 +1443,7 @@ defmodule XamtWeb.ServerLiveTest do
     {:ok, message} =
       Messages.create_message(scope, channel.id, %{
         "content_html" => "🎤 <em>Voice message</em>",
-        "content" => %{"type" => "audio", "url" => "/uploads/voice-test.webm"}
+        "content" => %{"type" => "audio", "url" => "/uploads/voice-test.webm", "duration" => 12}
       })
 
     {:ok, view, _html} = live(conn, ~p"/servers/#{server.slug}/#{channel.slug}")
@@ -1453,7 +1453,12 @@ defmodule XamtWeb.ServerLiveTest do
     assert has_element?(view, "#voice-countdown")
     assert has_element?(view, "#btn-voice-send")
     assert has_element?(view, "#btn-voice-discard")
-    assert has_element?(view, "#msg-audio-#{message.id}[src='/uploads/voice-test.webm']")
+    assert has_element?(view, "#msg-audio-#{message.id}[data-src='/uploads/voice-test.webm']")
+    assert has_element?(view, "#msg-audio-#{message.id}[data-duration='12']")
+    assert has_element?(view, "#msg-audio-#{message.id}[data-own='true']")
+    assert has_element?(view, "#msg-audio-el-#{message.id}[src='/uploads/voice-test.webm']")
+    assert has_element?(view, "#msg-audio-btn-#{message.id}")
+    refute has_element?(view, "#msg-audio-#{message.id} .xamt-voice-bar__unread")
     refute has_element?(view, "#edit-message-#{message.id}")
   end
 
@@ -1475,7 +1480,7 @@ defmodule XamtWeb.ServerLiveTest do
     |> form("#audio-form")
     |> render_submit()
 
-    assert has_element?(view, "audio.xamt-audio-player")
+    assert has_element?(view, ".xamt-voice-bar")
   end
 
   test "send_audio rejects empty stub recordings", %{
@@ -1496,7 +1501,7 @@ defmodule XamtWeb.ServerLiveTest do
     |> form("#audio-form")
     |> render_submit()
 
-    refute has_element?(view, "audio.xamt-audio-player")
+    refute has_element?(view, ".xamt-voice-bar")
     assert render(view) =~ "Could not send voice message"
   end
 
@@ -1518,7 +1523,7 @@ defmodule XamtWeb.ServerLiveTest do
     |> form("#audio-form")
     |> render_submit()
 
-    assert has_element?(view, "audio.xamt-audio-player")
+    assert has_element?(view, ".xamt-voice-bar")
   end
 
   test "opens status picker from own avatar and applies a preset", %{

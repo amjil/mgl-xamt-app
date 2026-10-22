@@ -52,6 +52,14 @@ config :xamt, XamtWeb.Endpoint,
 # Enable dev routes for dashboard and mailbox
 config :xamt, dev_routes: true
 
+# Uploads: export XAMT_S3_* then start the server, e.g.
+#   export XAMT_S3_ENDPOINT=http://127.0.0.1:8333
+#   export XAMT_S3_BUCKET=xamt
+#   export XAMT_S3_ACCESS_KEY=...
+#   export XAMT_S3_SECRET_KEY=...
+#   mix phx.server
+# Without them, files fall back to priv/uploads (Local adapter).
+
 # Candidate backend for mgl-web-ime. Empty (the default) is same-origin
 # `baseUrl: ""`, so `/api/next_word/` is requested on the host that served
 # the page. Set XAMT_IME_BASE_URL to a full URL for a direct backend, or

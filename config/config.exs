@@ -50,6 +50,9 @@ config :xamt, Xamt.Messages.LinkPreview,
 # Warm ETS community caches from Postgres on boot (disabled under SQL sandbox).
 config :xamt, :ets_cache_warmup, true
 
+# User media storage. Override to S3/SeaweedFS via XAMT_S3_* in runtime.exs.
+config :xamt, Xamt.Storage, adapter: Xamt.Storage.Local
+
 # Dedicated typing tracker. Batches join/leave diffs to at most one
 # broadcast per window so large channels do not storm PubSub.
 config :xamt, XamtWeb.TypingTracker, broadcast_period: 2_000

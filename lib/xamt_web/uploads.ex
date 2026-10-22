@@ -1,13 +1,14 @@
 defmodule XamtWeb.Uploads do
   @moduledoc """
-  Persist LiveView uploads under `priv/uploads` (outside `priv/static`).
+  Persist LiveView uploads via `Xamt.Storage`.
 
-  Storing authenticated media under `priv/static` makes `Plug.Static` raise
-  `InvalidPathError` in development (`raise_on_missing_only`), so the browser
-  receives an HTML error page instead of audio bytes and players show 0:00.
+  Public URLs stay `/uploads/:filename`. Bytes live on local disk or S3
+  (SeaweedFS); `UploadController` authorizes before serving.
   """
 
   require Logger
+
+  alias Xamt.Storage
 
   @image_exts ~w(.jpg .jpeg .png .gif .webp)
   @audio_exts ~w(.webm .mp4 .mp3 .ogg .wav)
@@ -21,17 +22,16 @@ defmodule XamtWeb.Uploads do
   @min_audio_bytes 256
 
   @doc """
-  Absolute directory for persisted upload bytes (`priv/uploads`).
+  Absolute directory for the local storage adapter (`priv/uploads`).
+  Kept for tests and the migration task.
   """
-  def dir do
-    Path.join(:code.priv_dir(:xamt), "uploads")
-  end
+  def dir, do: Storage.local_dir()
 
   @doc """
-  Absolute disk path for a `/uploads/:filename` URL or bare filename.
+  Absolute disk path when using the local adapter.
   """
   def disk_path(url_or_name) when is_binary(url_or_name) do
-    Path.join(dir(), Path.basename(url_or_name))
+    Xamt.Storage.Local.disk_path(Path.basename(url_or_name))
   end
 
   def consume_images(socket, name) do
@@ -63,19 +63,13 @@ defmodule XamtWeb.Uploads do
   end
 
   def consume_audio(socket, name, server_id, user_id) do
-    case List.first(consume(socket, name, &audio_ext/1)) do
+    case List.first(consume(socket, name, &audio_ext/1, min_bytes: @min_audio_bytes)) do
       url when is_binary(url) ->
-        path = disk_path(url)
-
-        cond do
-          not (File.regular?(path) and File.stat!(path).size >= @min_audio_bytes) ->
-            delete_stored(url)
-            nil
-
-          match?({:ok, _}, remember_upload(url, server_id, user_id)) ->
+        case remember_upload(url, server_id, user_id) do
+          {:ok, _} ->
             url
 
-          true ->
+          _ ->
             delete_stored(url)
             nil
         end
@@ -89,7 +83,7 @@ defmodule XamtWeb.Uploads do
   Removes files previously persisted under `/uploads/...`.
 
   Used when `consume_*` succeeded but the following write (message, profile)
-  failed, so the disk copy is not left orphaned.
+  failed, so the stored copy is not left orphaned.
   """
   def delete_stored(entries) when is_list(entries) do
     Enum.each(entries, &delete_stored/1)
@@ -104,7 +98,7 @@ defmodule XamtWeb.Uploads do
     name = Path.basename(url)
 
     if String.starts_with?(url, "/uploads/") and Xamt.Uploads.safe_filename?(name) do
-      File.rm(disk_path(name))
+      Storage.delete(name)
       Xamt.Uploads.revoke_server_file(name)
     end
 
@@ -114,21 +108,24 @@ defmodule XamtWeb.Uploads do
   def delete_stored(_), do: :ok
 
   defp persist_gallery_image(path, uuid, ext) do
-    uploads_dir = dir()
-    File.mkdir_p!(uploads_dir)
-
     original_name = "#{uuid}#{ext}"
-    original_dest = Path.join(uploads_dir, original_name)
-    File.cp!(path, original_dest)
-    original_url = "/uploads/#{original_name}"
 
-    thumb_url =
-      case write_thumbnail(original_dest, uuid, ext) do
-        {:ok, thumb_name} -> "/uploads/#{thumb_name}"
-        :error -> original_url
-      end
+    case Storage.put(original_name, path) do
+      :ok ->
+        original_url = "/uploads/#{original_name}"
 
-    %{"thumb" => thumb_url, "original" => original_url}
+        thumb_url =
+          case write_thumbnail(path, uuid, ext) do
+            {:ok, thumb_name} -> "/uploads/#{thumb_name}"
+            :error -> original_url
+          end
+
+        %{"thumb" => thumb_url, "original" => original_url}
+
+      {:error, reason} ->
+        Logger.warning("gallery persist failed for #{uuid}: #{inspect(reason)}")
+        nil
+    end
   end
 
   defp grant_gallery_image(
@@ -160,17 +157,21 @@ defmodule XamtWeb.Uploads do
 
   defp write_thumbnail(original_path, uuid, ext) do
     thumb_name = "thumb_#{uuid}#{ext}"
-    thumb_dest = Path.join(dir(), thumb_name)
+    thumb_tmp = Path.join(System.tmp_dir!(), "xamt-#{thumb_name}")
 
     with {:ok, thumb} <- Image.thumbnail(original_path, @thumb_max_edge),
-         {:ok, _} <- Image.write(thumb, thumb_dest) do
+         {:ok, _} <- Image.write(thumb, thumb_tmp),
+         :ok <- Storage.put(thumb_name, thumb_tmp) do
+      File.rm(thumb_tmp)
       {:ok, thumb_name}
     else
       {:error, reason} ->
+        File.rm(thumb_tmp)
         Logger.warning("gallery thumbnail failed for #{uuid}: #{inspect(reason)}")
         :error
 
       other ->
+        File.rm(thumb_tmp)
         Logger.warning("gallery thumbnail failed for #{uuid}: #{inspect(other)}")
         :error
     end
@@ -180,18 +181,30 @@ defmodule XamtWeb.Uploads do
       :error
   end
 
-  defp consume(socket, name, ext_fun) do
+  defp consume(socket, name, ext_fun, opts \\ []) do
+    min_bytes = Keyword.get(opts, :min_bytes, 0)
+
     Phoenix.LiveView.consume_uploaded_entries(socket, name, fn %{path: path}, entry ->
       ext = ext_fun.(entry)
 
-      if is_binary(ext) do
-        filename = "#{entry.uuid}#{ext}"
-        dest = Path.join(dir(), filename)
-        File.mkdir_p!(Path.dirname(dest))
-        File.cp!(path, dest)
-        {:ok, "/uploads/#{filename}"}
-      else
-        {:ok, nil}
+      cond do
+        not is_binary(ext) ->
+          {:ok, nil}
+
+        min_bytes > 0 and (not File.regular?(path) or File.stat!(path).size < min_bytes) ->
+          {:ok, nil}
+
+        true ->
+          filename = "#{entry.uuid}#{ext}"
+
+          case Storage.put(filename, path) do
+            :ok ->
+              {:ok, "/uploads/#{filename}"}
+
+            {:error, reason} ->
+              Logger.warning("upload persist failed for #{filename}: #{inspect(reason)}")
+              {:ok, nil}
+          end
       end
     end)
     |> Enum.filter(&is_binary/1)

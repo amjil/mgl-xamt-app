@@ -1,11 +1,11 @@
 defmodule Xamt.Uploads do
   @moduledoc """
-  Authorization for files stored under `priv/uploads`.
+  Authorization for upload URLs (`/uploads/:filename`).
 
-  Avatars and server icons are public once a profile or server row points at
-  them. Message media is readable only by someone who can view the server that
-  received the upload. Mentioning the path in another server does not grant
-  access.
+  Bytes live in `Xamt.Storage` (local disk or S3). Avatars and server icons are
+  public once a profile or server row points at them. Message media is readable
+  only by someone who can view the server that received the upload. Mentioning
+  the path in another server does not grant access.
   """
 
   import Ecto.Query, warn: false

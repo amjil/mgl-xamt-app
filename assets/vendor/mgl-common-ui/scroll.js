@@ -54,13 +54,52 @@ function wheelDelta(event) {
 }
 
 function applyWheel(el, delta) {
-  const maxLeft = el.scrollWidth - el.clientWidth
-  const atLeft = el.scrollLeft <= 0 && delta < 0
-  const atRight = el.scrollLeft >= maxLeft - 1 && delta > 0
-  if (atLeft || atRight) return false
-  if (!canScrollAxis(el, "x") || canScrollAxis(el, "y")) return false
-  el.scrollLeft += delta
+  if (!el || canScrollAxis(el, "y")) return false
+  const maxLeft = Math.max(0, el.scrollWidth - el.clientWidth)
+  el.scrollLeft = Math.min(maxLeft, Math.max(0, el.scrollLeft + delta))
   return true
+}
+
+function axisDelta(event, axis) {
+  const raw = axis === "x" ? event.deltaX : event.deltaY
+  if (raw === 0) return 0
+  return event.deltaMode === 1 ? raw * 24 : raw
+}
+
+function canConsumeScrollX(el, deltaX) {
+  if (!(el instanceof Element) || !deltaX) return false
+  const maxLeft = el.scrollWidth - el.clientWidth
+  if (maxLeft <= 1) return false
+  if (deltaX < 0 && el.scrollLeft > 0) return true
+  if (deltaX > 0 && el.scrollLeft < maxLeft - 1) return true
+  return false
+}
+
+function canConsumeScrollXFrom(target, deltaX) {
+  let node = target instanceof Element ? target : null
+  while (node && node !== document.documentElement) {
+    const ox = getComputedStyle(node).overflowX
+    if (ox === "auto" || ox === "scroll" || ox === "overlay") {
+      if (canConsumeScrollX(node, deltaX)) return true
+    }
+    node = node.parentElement
+  }
+  return false
+}
+
+function nearestOverflowX(target) {
+  let node = target instanceof Element ? target : null
+  while (node && node !== document.documentElement) {
+    const ox = getComputedStyle(node).overflowX
+    if (
+      (ox === "auto" || ox === "scroll" || ox === "overlay") &&
+      node.scrollWidth > node.clientWidth + 1
+    ) {
+      return node
+    }
+    node = node.parentElement
+  }
+  return document.querySelector(DEFAULT_SELECTOR)
 }
 
 function installWheel(selector) {
@@ -81,6 +120,77 @@ function installWheel(selector) {
 
   window.addEventListener("wheel", onWheel, {passive: false})
   return () => window.removeEventListener("wheel", onWheel)
+}
+
+/**
+ * Stop leftover horizontal pans from becoming Back/Forward.
+ * `overscroll-behavior: contain` still shows Chromium's history swipe;
+ * `none` plus swallowing unconsumed deltaX is what actually blocks it.
+ */
+function installHistorySwipeGuard() {
+  const EDGE = 16
+  const STEAL = 12
+  const IGNORE = "a, button, input, textarea, select, [contenteditable], summary, label"
+  let session = null
+
+  const onWheel = (event) => {
+    if (event.ctrlKey || event.defaultPrevented) return
+    const dx = axisDelta(event, "x")
+    if (!dx) return
+    if (!canConsumeScrollXFrom(event.target, dx)) event.preventDefault()
+  }
+
+  const onTouchStart = (event) => {
+    if (event.touches.length !== 1) return
+    const t = event.touches[0]
+    if (t.clientX > EDGE && t.clientX < window.innerWidth - EDGE) return
+    if (event.target instanceof Element && event.target.closest(IGNORE)) return
+    const scroller = nearestOverflowX(event.target)
+    if (!scroller) return
+    session = {scroller, x: t.clientX, y: t.clientY, claimed: false}
+    if (t.clientX <= STEAL || t.clientX >= window.innerWidth - STEAL) {
+      event.preventDefault()
+    }
+  }
+
+  const onTouchMove = (event) => {
+    if (!session || event.touches.length !== 1) return
+    const t = event.touches[0]
+    const dx = t.clientX - session.x
+    const dy = t.clientY - session.y
+
+    if (!session.claimed) {
+      if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return
+      if (Math.abs(dx) <= Math.abs(dy)) {
+        session = null
+        return
+      }
+      session.claimed = true
+    }
+
+    event.preventDefault()
+    session.scroller.scrollLeft -= dx
+    session.x = t.clientX
+    session.y = t.clientY
+  }
+
+  const onTouchEnd = () => {
+    session = null
+  }
+
+  window.addEventListener("wheel", onWheel, {passive: false, capture: true})
+  window.addEventListener("touchstart", onTouchStart, {passive: false, capture: true})
+  window.addEventListener("touchmove", onTouchMove, {passive: false, capture: true})
+  window.addEventListener("touchend", onTouchEnd, true)
+  window.addEventListener("touchcancel", onTouchEnd, true)
+
+  return () => {
+    window.removeEventListener("wheel", onWheel, true)
+    window.removeEventListener("touchstart", onTouchStart, true)
+    window.removeEventListener("touchmove", onTouchMove, true)
+    window.removeEventListener("touchend", onTouchEnd, true)
+    window.removeEventListener("touchcancel", onTouchEnd, true)
+  }
 }
 
 function installKeyboard(selector) {
@@ -337,7 +447,7 @@ let installed = null
 /**
  * Site-wide install. Safe to call more than once.
  *
- * @param {{ selector?: string, wheel?: boolean, keyboard?: boolean, drag?: boolean }} [options]
+ * @param {{ selector?: string, wheel?: boolean, keyboard?: boolean, drag?: boolean, historySwipe?: boolean }} [options]
  */
 export function install(options = {}) {
   if (installed) return installed.stop
@@ -347,6 +457,7 @@ export function install(options = {}) {
   if (options.wheel !== false) stops.push(installWheel(selector))
   if (options.keyboard !== false) stops.push(installKeyboard(selector))
   if (options.drag !== false) stops.push(installDrag(selector))
+  if (options.historySwipe !== false) stops.push(installHistorySwipeGuard())
 
   const stop = () => {
     for (const fn of stops) fn()
