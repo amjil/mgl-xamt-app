@@ -41,6 +41,7 @@ config :xamt, Xamt.AuthRateLimit,
 
 # SQL sandbox owns connections per test; GenServers must not warm from Repo.
 config :xamt, :ets_cache_warmup, false
+config :xamt, :start_bot_delivery_worker, false
 
 # Short typing-diff window so LiveView tests do not wait 2s.
 config :xamt, XamtWeb.TypingTracker, broadcast_period: 50

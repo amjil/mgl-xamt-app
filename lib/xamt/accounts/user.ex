@@ -14,6 +14,7 @@ defmodule Xamt.Accounts.User do
     field :status_emoji, :string
     field :status_text, :string
     field :global_role, :string, default: "user"
+    field :is_bot, :boolean, default: false
     field :password, :string, virtual: true, redact: true
     field :hashed_password, :string, redact: true
     field :confirmed_at, :utc_datetime

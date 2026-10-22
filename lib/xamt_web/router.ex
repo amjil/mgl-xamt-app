@@ -35,6 +35,12 @@ defmodule XamtWeb.Router do
     post "/messages/sync", MessageApiController, :sync
   end
 
+  scope "/api/v1/bot", XamtWeb do
+    pipe_through :api
+
+    post "/channels/:channel_id/messages", BotApiController, :create_message
+  end
+
   scope "/", XamtWeb do
     pipe_through [:browser]
 

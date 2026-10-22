@@ -7,25 +7,33 @@ defmodule Xamt.Application do
 
   @impl true
   def start(_type, _args) do
-    children = [
-      XamtWeb.Telemetry,
-      Xamt.Repo,
-      {DNSCluster, query: Application.get_env(:xamt, :dns_cluster_query) || :ignore},
-      {Phoenix.PubSub, name: Xamt.PubSub},
-      XamtWeb.Presence,
-      {Task.Supervisor, name: Xamt.TaskSupervisor},
-      {XamtWeb.TypingTracker, Application.get_env(:xamt, XamtWeb.TypingTracker, [])},
-      Xamt.Channels.LastMessageCache,
-      Xamt.Channels.ChannelListCache,
-      Xamt.Servers.ServerCache,
-      Xamt.Messages.RateLimiter,
-      XamtWeb.Endpoint
-    ]
+    children =
+      [
+        XamtWeb.Telemetry,
+        Xamt.Repo,
+        {DNSCluster, query: Application.get_env(:xamt, :dns_cluster_query) || :ignore},
+        {Phoenix.PubSub, name: Xamt.PubSub},
+        XamtWeb.Presence,
+        {Task.Supervisor, name: Xamt.TaskSupervisor},
+        {XamtWeb.TypingTracker, Application.get_env(:xamt, XamtWeb.TypingTracker, [])},
+        Xamt.Channels.LastMessageCache,
+        Xamt.Channels.ChannelListCache,
+        Xamt.Servers.ServerCache,
+        Xamt.Messages.RateLimiter
+      ] ++ bot_delivery_children() ++ [XamtWeb.Endpoint]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Xamt.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  defp bot_delivery_children do
+    if Application.get_env(:xamt, :start_bot_delivery_worker, true) do
+      [Xamt.Bots.DeliveryWorker]
+    else
+      []
+    end
   end
 
   # Tell Phoenix to update the endpoint configuration

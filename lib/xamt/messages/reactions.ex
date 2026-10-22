@@ -16,11 +16,17 @@ defmodule Xamt.Messages.Reactions do
       Repo.get_by(Reaction, message_id: message.id, user_id: user.id, emoji: emoji)
 
     if existing do
-      Repo.delete(existing)
+      case Repo.delete(existing) do
+        {:ok, reaction} -> {:ok, :removed, reaction}
+        error -> error
+      end
     else
-      %Reaction{}
-      |> Reaction.changeset(%{message_id: message.id, user_id: user.id, emoji: emoji})
-      |> Repo.insert()
+      case %Reaction{}
+           |> Reaction.changeset(%{message_id: message.id, user_id: user.id, emoji: emoji})
+           |> Repo.insert() do
+        {:ok, reaction} -> {:ok, :added, reaction}
+        error -> error
+      end
     end
   end
 

@@ -187,6 +187,7 @@ defmodule Xamt.Servers do
       {:ok, member} ->
         member = Repo.preload(member, :user)
         broadcast_server(server_id, {:member_joined, member})
+        maybe_enqueue_member_joined_bot_event(server_id, member.user)
         {:ok, member}
 
       other ->
@@ -570,5 +571,19 @@ defmodule Xamt.Servers do
     else
       candidate
     end
+  end
+
+  defp maybe_enqueue_member_joined_bot_event(server_id, user) do
+    Xamt.Bots.Dispatcher.enqueue_event(%{
+      server_id: server_id,
+      channel_id: nil,
+      event_type: "member.joined",
+      actor_is_bot: user.is_bot,
+      payload: %{
+        "member" => %{"id" => user.id, "username" => user.username}
+      }
+    })
+
+    Xamt.Bots.DeliveryWorker.trigger_sweep()
   end
 end

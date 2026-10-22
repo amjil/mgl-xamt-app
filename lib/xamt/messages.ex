@@ -66,6 +66,7 @@ defmodule Xamt.Messages do
       broadcast(channel_id, :new_message, strip_for_broadcast(message))
       Xamt.Messages.LinkPreview.maybe_fetch_and_update(message)
       Xamt.Notifications.WebPush.notify_mentions(message)
+      maybe_enqueue_message_created_bot_event(user, channel_id, message)
       {:ok, message}
     end
   end
@@ -631,7 +632,7 @@ defmodule Xamt.Messages do
       if match?(%DateTime{}, message.deleted_at) do
         {:error, :deleted}
       else
-        with {:ok, _} <- Reactions.toggle_on(message, user, emoji) do
+        with {:ok, action, _reaction} <- Reactions.toggle_on(message, user, emoji) do
           summary = Map.get(Reactions.summary([message.id]), message.id, %{})
 
           Phoenix.PubSub.broadcast(
@@ -640,6 +641,7 @@ defmodule Xamt.Messages do
             {:reaction_changed, strip_for_broadcast(message), summary}
           )
 
+          maybe_enqueue_reaction_added_bot_event(user, message, emoji, summary, action)
           {:ok, summary}
         end
       end
@@ -1039,5 +1041,61 @@ defmodule Xamt.Messages do
       limit: Keyword.get(conf, :"#{kind}_limit", fallback_limit),
       window_seconds: Keyword.get(conf, :"#{kind}_window_seconds", fallback_window)
     ]
+  end
+
+  defp maybe_enqueue_message_created_bot_event(user, channel_id, message) do
+    case channel_server_id(channel_id) do
+      nil ->
+        :ok
+
+      server_id ->
+        Xamt.Bots.Dispatcher.enqueue_event(%{
+          server_id: server_id,
+          channel_id: channel_id,
+          event_type: "message.created",
+          actor_is_bot: user.is_bot,
+          payload: %{
+            "message" => %{
+              "id" => message.id,
+              "body" => plain_text(message),
+              "author" => %{"id" => user.id, "username" => user.username}
+            }
+          }
+        })
+
+        Xamt.Bots.DeliveryWorker.trigger_sweep()
+    end
+  end
+
+  defp maybe_enqueue_reaction_added_bot_event(_user, _message, _emoji, _summary, :removed),
+    do: :ok
+
+  defp maybe_enqueue_reaction_added_bot_event(user, message, emoji, summary, :added) do
+    current_count = summary |> Map.get(emoji, []) |> length()
+
+    case channel_server_id(message.channel_id) do
+      nil ->
+        :ok
+
+      server_id ->
+        Xamt.Bots.Dispatcher.enqueue_event(%{
+          server_id: server_id,
+          channel_id: message.channel_id,
+          event_type: "reaction.added",
+          actor_is_bot: user.is_bot,
+          payload: %{
+            "emoji" => emoji,
+            "reaction_count" => current_count,
+            "reactor_id" => user.id,
+            "message" => %{
+              "id" => message.id,
+              "body" => plain_text(message),
+              "author_id" => message.user_id
+            }
+          }
+        })
+
+        Xamt.Bots.DeliveryWorker.trigger_sweep()
+    end
   end
 end
