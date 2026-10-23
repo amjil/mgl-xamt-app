@@ -785,7 +785,11 @@ defmodule XamtWeb.ServerLive do
 
         {:error, _, _, _} ->
           {:noreply,
-           put_flash(socket, :error, gettext("Could not create bot. Check the name or webhook URL"))}
+           put_flash(
+             socket,
+             :error,
+             gettext("Could not create bot. Check the name or webhook URL")
+           )}
       end
     else
       {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}

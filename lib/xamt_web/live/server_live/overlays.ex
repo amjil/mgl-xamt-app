@@ -440,89 +440,77 @@ defmodule XamtWeb.ServerLive.Overlays do
 
   def bot_management_sheet(assigns) do
     ~H"""
-    <div
-      :if={@show}
-      class="fixed inset-0 z-50 bg-[var(--xamt-shade)]/50 backdrop-blur-sm flex items-center justify-center p-4"
-      phx-window-keydown="close_bot_manager"
-      phx-key="Escape"
+    <.drawer
+      id="bot-manager-drawer"
+      class="xamt-sheet--bot"
+      show={@show}
+      on_cancel={JS.push("close_bot_manager")}
     >
-      <div
-        class="bg-[var(--xamt-bg)] border border-[var(--xamt-line)] rounded-2xl shadow-2xl h-[82vh] max-w-[92vw] overflow-x-auto overflow-y-hidden flex flex-row p-6 gap-6"
-        style="writing-mode: vertical-lr;"
-        phx-hook="MongolianScroll"
-        id="bot-manager-modal"
-      >
-        <div class="flex flex-row gap-4 border-r border-[var(--xamt-line)] pr-6 shrink-0">
-          <div class="flex flex-col justify-between items-center">
-            <h2 class="text-xl font-bold text-[var(--xamt-text)] tracking-wider">
-              {gettext("Bot integrations and permissions")}
-            </h2>
-            <button
-              type="button"
-              phx-click="close_bot_manager"
-              class="p-2 rounded-full hover:bg-[var(--xamt-bg-2)] text-[var(--xamt-muted)]"
-            >
-              <.icon name="hero-x-mark" class="w-6 h-6" />
-            </button>
-          </div>
+      <div class="xamt-sheet-form xamt-bot-manager" id="bot-manager-modal">
+        <aside class="xamt-bot-manager__rail">
+          <h2 id="bot-manager-title" class="xamt-section-title mongol-text">
+            {gettext("Bot integrations and permissions")}
+          </h2>
 
           <button
             type="button"
+            id="bot-register-toggle"
             phx-click="toggle_bot_create_form"
-            class="px-3 py-4 rounded-xl bg-[var(--xamt-accent)] text-white font-bold flex items-center gap-2 hover:opacity-90 transition-opacity shrink-0"
+            class="xamt-btn xamt-btn--primary mongol-text"
           >
-            <.icon name="hero-plus-circle" class="w-5 h-5" />
-            <span>{gettext("Register new bot")}</span>
+            <span class="xamt-upright" aria-hidden="true">
+              <.icon name="hero-plus-circle" class="size-5" />
+            </span>
+            {gettext("Register new bot")}
           </button>
 
-          <div class="flex flex-row gap-3">
-            <div
+          <div class="xamt-bot-manager__installations" role="list" aria-labelledby="bot-manager-title">
+            <button
               :for={inst <- @installations}
+              type="button"
+              role="listitem"
               phx-click="select_bot_installation"
               phx-value-id={inst.id}
               class={[
-                "p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between",
+                "xamt-bot-manager__inst-card",
                 @selected_installation && @selected_installation.id == inst.id &&
-                  "border-[var(--xamt-accent)] bg-[var(--xamt-bg-2)] shadow-sm",
-                (!@selected_installation || @selected_installation.id != inst.id) &&
-                  "border-[var(--xamt-line)] hover:bg-[var(--xamt-bg-3)]"
+                  "is-selected",
+                (!@selected_installation || @selected_installation.id != inst.id) && "is-idle"
               ]}
             >
-              <div class="flex items-center gap-2">
-                <span class={[
-                  "w-2.5 h-2.5 rounded-full shrink-0",
-                  inst.status == "enabled" && "bg-emerald-500",
-                  inst.status != "enabled" && "bg-zinc-400"
-                ]} />
-                <span class="font-bold text-[var(--xamt-text)]">{inst.bot.name}</span>
-              </div>
-              <span class="text-xs text-[var(--xamt-muted)] mt-2">
+              <span
+                class={[
+                  "xamt-bot-manager__inst-dot",
+                  inst.status == "enabled" && "is-enabled",
+                  inst.status != "enabled" && "is-disabled"
+                ]}
+                aria-hidden="true"
+              />
+              <span class="xamt-bot-manager__inst-name mongol-text">
+                {upright_text(inst.bot.name)}
+              </span>
+              <span class="xamt-bot-manager__inst-status mongol-text">
                 {if inst.status == "enabled", do: gettext("Enabled"), else: gettext("Disabled")}
               </span>
-            </div>
+            </button>
           </div>
-        </div>
+        </aside>
 
-        <div
-          :if={@newly_issued_token}
-          class="p-4 rounded-xl bg-amber-500/10 border border-amber-500/40 flex flex-col gap-3 shrink-0"
-        >
-          <div class="font-bold text-amber-600 flex items-center gap-1">
-            <.icon name="hero-key" class="w-5 h-5" />
-            <span>{gettext("Copy the bot token now (shown once)")}</span>
+        <div :if={@newly_issued_token} class="xamt-bot-manager__token-banner" role="alert">
+          <div class="xamt-bot-manager__token-head">
+            <span class="xamt-upright" aria-hidden="true">
+              <.icon name="hero-key" class="size-5" />
+            </span>
+            <span class="mongol-text">{gettext("Copy the bot token now (shown once)")}</span>
           </div>
-          <div
-            class="bg-[var(--xamt-bg-2)] p-3 rounded-lg border border-[var(--xamt-line)]"
-            style="writing-mode: horizontal-tb;"
-          >
-            <code class="text-xs font-mono select-all break-all text-[var(--xamt-text)]">
-              {@newly_issued_token}
-            </code>
+          <div class="xamt-bot-manager__tech xamt-bot-manager__token-value">
+            <code>{@newly_issued_token}</code>
           </div>
           <button
             type="button"
+            id="dismiss-bot-token"
             phx-click="dismiss_bot_token"
-            class="text-xs text-[var(--xamt-muted)] hover:text-[var(--xamt-text)] underline self-end"
+            class="xamt-btn xamt-btn--soft mongol-text"
           >
             {gettext("I saved it — dismiss")}
           </button>
@@ -530,255 +518,292 @@ defmodule XamtWeb.ServerLive.Overlays do
 
         <form
           :if={@show_create_form}
+          id="bot-create-form"
           phx-submit="create_and_install_bot"
-          class="flex flex-row gap-6 items-stretch shrink-0"
+          class="xamt-form xamt-form--vertical xamt-bot-manager__create"
         >
-          <div class="flex flex-col gap-3 border-r border-[var(--xamt-line)] pr-6">
-            <h3 class="font-bold text-lg text-[var(--xamt-accent)]">{gettext("Create new bot")}</h3>
+          <h3 class="xamt-section-title mongol-text">{gettext("Create new bot")}</h3>
 
-            <label class="text-xs text-[var(--xamt-muted)]">{gettext("Bot name")}</label>
+          <label class="xamt-field">
+            <span class="xamt-field__label mongol-text">{gettext("Bot name")}</span>
             <input
               type="text"
               name="bot[name]"
+              id="bot-create-name"
               required
               placeholder={gettext("e.g. Idiom collector")}
-              class="xamt-input py-3 px-2"
-              style="writing-mode: vertical-lr;"
+              class="xamt-input mongol-input"
+              phx-hook="MongolianIME"
+              autocomplete="off"
             />
+          </label>
 
-            <label class="text-xs text-[var(--xamt-muted)] mt-2">{gettext("Description")}</label>
+          <label class="xamt-field">
+            <span class="xamt-field__label mongol-text">{gettext("Description")}</span>
             <input
               type="text"
               name="bot[description]"
+              id="bot-create-description"
               placeholder={gettext("Collects popular idioms automatically…")}
-              class="xamt-input py-3 px-2"
-              style="writing-mode: vertical-lr;"
+              class="xamt-input mongol-input"
+              phx-hook="MongolianIME"
+              autocomplete="off"
             />
+          </label>
 
-            <div class="mt-2" style="writing-mode: horizontal-tb;">
-              <label class="block text-xs text-[var(--xamt-muted)] mb-1">
-                Webhook Callback URL (HTTPS)
-              </label>
-              <input
-                type="url"
-                name="bot[webhook_url]"
-                required
-                placeholder="https://bot.example.com/xamt/events"
-                class="xamt-input w-72 px-3 py-2 text-sm font-mono"
-              />
-            </div>
-
-            <button type="submit" class="xamt-btn--primary py-4 px-3 rounded-xl font-bold mt-4">
-              {gettext("Create and install on this server")}
-            </button>
+          <div class="xamt-bot-manager__tech xamt-field">
+            <span class="xamt-field__label">Webhook Callback URL (HTTPS)</span>
+            <input
+              type="url"
+              name="bot[webhook_url]"
+              id="bot-create-webhook"
+              required
+              placeholder="https://bot.example.com/xamt/events"
+              class="xamt-input xamt-input--latin"
+              autocomplete="off"
+            />
           </div>
+
+          <button type="submit" id="bot-create-submit" class="xamt-btn xamt-btn--primary mongol-text">
+            {gettext("Create and install on this server")}
+          </button>
         </form>
 
         <form
           :if={@selected_installation && !@show_create_form}
+          id="bot-config-form"
           phx-submit="save_bot_installation_config"
-          class="flex flex-row gap-8 items-stretch shrink-0"
+          class="xamt-bot-manager__config"
         >
           <input type="hidden" name="installation_id" value={@selected_installation.id} />
 
-          <div class="flex flex-col justify-between border-r border-[var(--xamt-line)] pr-6">
-            <div class="flex flex-row gap-4">
-              <div>
-                <h3 class="text-lg font-bold">{@selected_installation.bot.name}</h3>
-                <p class="text-xs text-[var(--xamt-muted)] mt-2">
-                  {@selected_installation.bot.description}
+          <div class="xamt-bot-manager__sections">
+            <section class="xamt-bot-manager__section" aria-labelledby="bot-config-overview">
+              <div class="xamt-bot-manager__section-head">
+                <h3 id="bot-config-overview" class="xamt-bot-manager__section-title mongol-text">
+                  {upright_text(@selected_installation.bot.name)}
+                </h3>
+                <p
+                  :if={@selected_installation.bot.description}
+                  class="xamt-bot-manager__desc mongol-text"
+                >
+                  {upright_text(@selected_installation.bot.description)}
+                </p>
+
+                <label class="xamt-field xamt-bot-manager__status">
+                  <span class="xamt-field__label mongol-text">{gettext("Status")}</span>
+                  <select name="status" id="bot-config-status" class="xamt-input mn-select-native">
+                    <option value="enabled" selected={@selected_installation.status == "enabled"}>
+                      {gettext("Enabled")}
+                    </option>
+                    <option value="disabled" selected={@selected_installation.status == "disabled"}>
+                      {gettext("Disabled")}
+                    </option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="xamt-bot-manager__tech xamt-bot-manager__credentials">
+                <p>
+                  <strong>Webhook URL:</strong>
+                  <span class="xamt-bot-manager__mono">{@selected_installation.bot.webhook_url}</span>
+                </p>
+                <p>
+                  <strong>Signing Secret (HMAC):</strong>
+                  <code class="xamt-bot-manager__mono">
+                    {@selected_installation.bot.signing_secret}
+                  </code>
+                </p>
+                <p class="xamt-bot-manager__token-row">
+                  <span>
+                    Token:
+                    <code class="xamt-bot-manager__mono">
+                      {if token = List.first(@selected_installation.tokens),
+                        do: token.token_prefix <> "...",
+                        else: gettext("None")}
+                    </code>
+                  </span>
+                  <button
+                    type="button"
+                    id="bot-rotate-token"
+                    phx-click="rotate_bot_token"
+                    phx-value-id={@selected_installation.id}
+                    data-confirm={
+                      gettext("The current token will stop working immediately. Continue?")
+                    }
+                    class="xamt-link-hint mongol-text"
+                  >
+                    {gettext("Rotate token")}
+                  </button>
                 </p>
               </div>
+            </section>
 
-              <div class="flex flex-col gap-2">
-                <label class="text-xs font-bold text-[var(--xamt-muted)]">{gettext("Status")}</label>
-                <select name="status" class="xamt-input p-2">
-                  <option value="enabled" selected={@selected_installation.status == "enabled"}>
-                    {gettext("Enabled")}
-                  </option>
-                  <option value="disabled" selected={@selected_installation.status == "disabled"}>
-                    {gettext("Disabled")}
-                  </option>
-                </select>
-              </div>
-            </div>
+            <% current_events = Enum.map(@selected_installation.subscriptions, & &1.event_type) %>
+            <section class="xamt-bot-manager__section" aria-labelledby="bot-config-events">
+              <h4 id="bot-config-events" class="xamt-bot-manager__section-title mongol-text">
+                {gettext("1. Event subscriptions (what to deliver)")}
+              </h4>
 
-            <div
-              class="bg-[var(--xamt-bg-2)] p-3 rounded-xl border border-[var(--xamt-line)] w-72 space-y-2"
-              style="writing-mode: horizontal-tb;"
-            >
-              <div class="text-xs text-[var(--xamt-muted)]">
-                <span class="font-bold">Webhook URL:</span>
-                <span class="font-mono break-all block mt-0.5">
-                  {@selected_installation.bot.webhook_url}
-                </span>
+              <div class="xamt-bot-manager__options">
+                <label class="xamt-bot-manager__option">
+                  <input
+                    type="checkbox"
+                    class="xamt-checkbox"
+                    name="subscribed_events[]"
+                    value="member.joined"
+                    checked={"member.joined" in current_events}
+                  />
+                  <span class="xamt-bot-manager__option-text mongol-text">
+                    {gettext("Member joined (member.joined)")}
+                  </span>
+                  <span class="xamt-bot-manager__option-hint mongol-text">
+                    [{gettext("requires server.members.events")}]
+                  </span>
+                </label>
+
+                <label class="xamt-bot-manager__option">
+                  <input
+                    type="checkbox"
+                    class="xamt-checkbox"
+                    name="subscribed_events[]"
+                    value="message.created"
+                    checked={"message.created" in current_events}
+                  />
+                  <span class="xamt-bot-manager__option-text mongol-text">
+                    {gettext("New channel message (message.created)")}
+                  </span>
+                  <span class="xamt-bot-manager__option-hint mongol-text">
+                    [{gettext("requires channel.messages.read")}]
+                  </span>
+                </label>
+
+                <label class="xamt-bot-manager__option">
+                  <input
+                    type="checkbox"
+                    class="xamt-checkbox"
+                    name="subscribed_events[]"
+                    value="reaction.added"
+                    checked={"reaction.added" in current_events}
+                  />
+                  <span class="xamt-bot-manager__option-text mongol-text">
+                    {gettext("Reaction added (reaction.added)")}
+                  </span>
+                  <span class="xamt-bot-manager__option-hint mongol-text">
+                    [{gettext("requires channel.messages.read")}]
+                  </span>
+                </label>
               </div>
-              <div class="text-xs text-[var(--xamt-muted)]">
-                <span class="font-bold">Signing Secret (HMAC):</span>
-                <code class="font-mono block mt-0.5 select-all bg-[var(--xamt-bg)] p-1 rounded">
-                  {@selected_installation.bot.signing_secret}
-                </code>
+            </section>
+
+            <% granted = @selected_installation.granted_scopes %>
+            <section class="xamt-bot-manager__section" aria-labelledby="bot-config-scopes">
+              <h4 id="bot-config-scopes" class="xamt-bot-manager__section-title mongol-text">
+                {gettext("2. Granted scopes (what actions are allowed)")}
+              </h4>
+
+              <div class="xamt-bot-manager__options">
+                <label class="xamt-bot-manager__option">
+                  <input
+                    type="checkbox"
+                    class="xamt-checkbox"
+                    name="granted_scopes[]"
+                    value="server.members.events"
+                    checked={"server.members.events" in granted}
+                  />
+                  <span class="xamt-bot-manager__option-text mongol-text">
+                    {gettext("Receive member events (server.members.events)")}
+                  </span>
+                </label>
+
+                <label class="xamt-bot-manager__option">
+                  <input
+                    type="checkbox"
+                    class="xamt-checkbox"
+                    name="granted_scopes[]"
+                    value="server.members.read"
+                    checked={"server.members.read" in granted}
+                  />
+                  <span class="xamt-bot-manager__option-text mongol-text">
+                    {gettext("Read member list (server.members.read)")}
+                  </span>
+                </label>
+
+                <label class="xamt-bot-manager__option">
+                  <input
+                    type="checkbox"
+                    class="xamt-checkbox"
+                    name="granted_scopes[]"
+                    value="channel.messages.read"
+                    checked={"channel.messages.read" in granted}
+                  />
+                  <span class="xamt-bot-manager__option-text mongol-text">
+                    {gettext("Read messages and reactions (channel.messages.read)")}
+                  </span>
+                </label>
+
+                <label class="xamt-bot-manager__option">
+                  <input
+                    type="checkbox"
+                    class="xamt-checkbox"
+                    name="granted_scopes[]"
+                    value="channel.messages.send"
+                    checked={"channel.messages.send" in granted}
+                  />
+                  <span class="xamt-bot-manager__option-text mongol-text">
+                    {gettext("Send messages in allowed channels (channel.messages.send)")}
+                  </span>
+                </label>
+
+                <label class="xamt-bot-manager__option">
+                  <input
+                    type="checkbox"
+                    class="xamt-checkbox"
+                    name="granted_scopes[]"
+                    value="channel.messages.manage"
+                    checked={"channel.messages.manage" in granted}
+                  />
+                  <span class="xamt-bot-manager__option-text mongol-text">
+                    {gettext("Manage others' messages (channel.messages.manage)")}
+                  </span>
+                </label>
               </div>
-              <div class="pt-2 border-t border-[var(--xamt-line)] flex items-center justify-between">
-                <span class="text-xs text-[var(--xamt-muted)]">
-                  Token:
-                  <code class="font-mono">
-                    {if token = List.first(@selected_installation.tokens),
-                      do: token.token_prefix <> "...",
-                      else: gettext("None")}
-                  </code>
-                </span>
-                <button
-                  type="button"
-                  phx-click="rotate_bot_token"
-                  phx-value-id={@selected_installation.id}
-                  data-confirm={gettext("The current token will stop working immediately. Continue?")}
-                  class="text-xs text-amber-500 hover:underline font-semibold"
+            </section>
+
+            <% allowed_cids = @selected_installation.allowed_channel_ids %>
+            <section class="xamt-bot-manager__section" aria-labelledby="bot-config-channels">
+              <h4 id="bot-config-channels" class="xamt-bot-manager__section-title mongol-text">
+                {gettext("3. Allowed channels (empty means all channels)")}
+              </h4>
+
+              <div class="xamt-bot-manager__options xamt-bot-manager__channels">
+                <label
+                  :for={ch <- @channels}
+                  class="xamt-bot-manager__option xamt-bot-manager__channel"
                 >
-                  {gettext("Rotate token")}
-                </button>
+                  <input
+                    type="checkbox"
+                    class="xamt-checkbox"
+                    name="allowed_channel_ids[]"
+                    value={ch.id}
+                    checked={ch.id in allowed_cids}
+                  />
+                  <span class="xamt-bot-manager__option-text mongol-text"># {ch.name}</span>
+                </label>
               </div>
-            </div>
-          </div>
 
-          <% current_events = Enum.map(@selected_installation.subscriptions, & &1.event_type) %>
-          <div class="flex flex-row gap-4 border-r border-[var(--xamt-line)] pr-6">
-            <div class="font-bold text-sm text-[var(--xamt-accent)]">
-              {gettext("1. Event subscriptions (what to deliver)")}
-            </div>
-
-            <div class="flex flex-row gap-3">
-              <label class="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-[var(--xamt-bg-2)]">
-                <input
-                  type="checkbox"
-                  name="subscribed_events[]"
-                  value="member.joined"
-                  checked={"member.joined" in current_events}
-                />
-                <span>{gettext("Member joined (member.joined)")}</span>
-                <span class="text-xs text-[var(--xamt-muted)]">
-                  [{gettext("requires server.members.events")}]
-                </span>
-              </label>
-
-              <label class="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-[var(--xamt-bg-2)]">
-                <input
-                  type="checkbox"
-                  name="subscribed_events[]"
-                  value="message.created"
-                  checked={"message.created" in current_events}
-                />
-                <span>{gettext("New channel message (message.created)")}</span>
-                <span class="text-xs text-[var(--xamt-muted)]">
-                  [{gettext("requires channel.messages.read")}]
-                </span>
-              </label>
-
-              <label class="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-[var(--xamt-bg-2)]">
-                <input
-                  type="checkbox"
-                  name="subscribed_events[]"
-                  value="reaction.added"
-                  checked={"reaction.added" in current_events}
-                />
-                <span>{gettext("Reaction added (reaction.added)")}</span>
-                <span class="text-xs text-[var(--xamt-muted)]">
-                  [{gettext("requires channel.messages.read")}]
-                </span>
-              </label>
-            </div>
-          </div>
-
-          <% granted = @selected_installation.granted_scopes %>
-          <div class="flex flex-row gap-4 border-r border-[var(--xamt-line)] pr-6">
-            <div class="font-bold text-sm text-[var(--xamt-accent)]">
-              {gettext("2. Granted scopes (what actions are allowed)")}
-            </div>
-
-            <div class="flex flex-row gap-3">
-              <label class="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-[var(--xamt-bg-2)]">
-                <input
-                  type="checkbox"
-                  name="granted_scopes[]"
-                  value="server.members.events"
-                  checked={"server.members.events" in granted}
-                />
-                <span>{gettext("Receive member events (server.members.events)")}</span>
-              </label>
-
-              <label class="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-[var(--xamt-bg-2)]">
-                <input
-                  type="checkbox"
-                  name="granted_scopes[]"
-                  value="server.members.read"
-                  checked={"server.members.read" in granted}
-                />
-                <span>{gettext("Read member list (server.members.read)")}</span>
-              </label>
-
-              <label class="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-[var(--xamt-bg-2)]">
-                <input
-                  type="checkbox"
-                  name="granted_scopes[]"
-                  value="channel.messages.read"
-                  checked={"channel.messages.read" in granted}
-                />
-                <span>{gettext("Read messages and reactions (channel.messages.read)")}</span>
-              </label>
-
-              <label class="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-[var(--xamt-bg-2)]">
-                <input
-                  type="checkbox"
-                  name="granted_scopes[]"
-                  value="channel.messages.send"
-                  checked={"channel.messages.send" in granted}
-                />
-                <span>{gettext("Send messages in allowed channels (channel.messages.send)")}</span>
-              </label>
-
-              <label class="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-[var(--xamt-bg-2)]">
-                <input
-                  type="checkbox"
-                  name="granted_scopes[]"
-                  value="channel.messages.manage"
-                  checked={"channel.messages.manage" in granted}
-                />
-                <span>{gettext("Manage others' messages (channel.messages.manage)")}</span>
-              </label>
-            </div>
-          </div>
-
-          <% allowed_cids = @selected_installation.allowed_channel_ids %>
-          <div class="flex flex-row gap-4">
-            <div class="font-bold text-sm text-[var(--xamt-accent)]">
-              {gettext("3. Allowed channels (empty means all channels)")}
-            </div>
-
-            <div class="flex flex-row gap-2">
-              <label
-                :for={ch <- @channels}
-                class="flex items-center gap-2 cursor-pointer p-2 rounded-lg border border-[var(--xamt-line)] hover:border-[var(--xamt-accent)]"
+              <button
+                type="submit"
+                id="bot-config-save"
+                class="xamt-btn xamt-btn--primary mongol-text xamt-bot-manager__save"
               >
-                <input
-                  type="checkbox"
-                  name="allowed_channel_ids[]"
-                  value={ch.id}
-                  checked={ch.id in allowed_cids}
-                />
-                <span># {ch.name}</span>
-              </label>
-            </div>
-
-            <button
-              type="submit"
-              class="xamt-btn--primary px-4 py-6 rounded-xl font-bold self-end ml-4"
-            >
-              {gettext("Save permissions and subscriptions")}
-            </button>
+                {gettext("Save permissions and subscriptions")}
+              </button>
+            </section>
           </div>
         </form>
       </div>
-    </div>
+    </.drawer>
     """
   end
 end
