@@ -2673,114 +2673,152 @@ html.xamt-desktop-ime .xamt-composer__emoji {
 }
 
 /* ==========================================================================
-   Bot Platform Manager Modal (Vertical-LR Scroll Layout)
+   Centered Modal Shell (server-driven :if show/hide, no client .hidden)
    ========================================================================== */
 
-.xamt-bot-modal {
+.xamt-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.xamt-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--xamt-shade, #0b1220) 60%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+/* ==========================================================================
+   Bot Platform Manager Modal (Pure Traditional Mongolian Vertical-LR Layout)
+   ========================================================================== */
+
+.xamt-bot-modal-card {
   writing-mode: vertical-lr;
   text-orientation: sideways;
   background: var(--xamt-bg);
-  border: 1px solid var(--xamt-line-strong, var(--xamt-line));
-  border-radius: 1.25rem;
-  box-shadow: var(--xamt-shadow-float, 0 24px 48px rgba(0, 0, 0, 0.28));
-  height: 84vh;
+  color: var(--xamt-text);
+  border: 1px solid var(--xamt-line);
+  border-radius: 1rem;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+  height: 82vh;
   max-width: 92vw;
-  padding: 1.5rem;
-  display: flex;
-  /* In vertical-lr, flex-col flows columns from LEFT to RIGHT! */
-  flex-direction: column;
-  gap: 1.5rem;
+  padding: 1.25rem;
+  /* In vertical-lr, block children naturally stack from LEFT to RIGHT! */
+  display: block;
   overflow-x: auto;
   overflow-y: hidden;
+  white-space: nowrap;
 }
 
-/* Each vertical section column in the scroll */
-.xamt-bot-col {
-  display: flex;
-  /* In vertical-lr, flex-row stacks items TOP to BOTTOM within the column */
+/* Every section is a vertical column standing side-by-side from left to right */
+.xamt-bot-section {
+  display: inline-flex;
+  /* In vertical-lr, flex-direction: row flows from TOP to BOTTOM! */
   flex-direction: row;
   align-items: stretch;
-  gap: 0.75rem;
-  padding-right: 1.5rem;
-  border-right: 1px solid var(--xamt-line);
   height: 100%;
-  flex-shrink: 0;
+  padding-right: 1.25rem;
+  margin-right: 1.25rem;
+  border-right: 1px solid var(--xamt-line);
+  vertical-align: top;
+  white-space: normal;
+  gap: 0.75rem;
 }
 
-.xamt-bot-col:last-child {
+.xamt-bot-section:last-child {
   border-right: none;
-  padding-right: 0.5rem;
+  margin-right: 0;
+  padding-right: 0.25rem;
 }
 
-/* Column Header Pillar */
-.xamt-bot-col__header {
+/* Multi-column wrap container for vertical checkboxes/cards (wraps left-to-right) */
+.xamt-bot-vlist {
   display: flex;
+  /* Flow top-to-bottom, and when full, wrap to the next column on the right */
   flex-direction: row;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  height: 100%;
+  gap: 0.65rem;
+}
+
+/* Vertical Bot Item Strip */
+.xamt-bot-strip {
+  display: flex;
+  flex-direction: row; /* Top to bottom */
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
-  padding: 0.5rem 0.35rem;
-  background: color-mix(in srgb, var(--xamt-bg-2) 70%, transparent);
-  border-radius: 0.75rem;
-  border-left: 3px solid var(--xamt-accent);
-}
-
-/* Bot List Item Card (Vertical Pillar) */
-.xamt-bot-card {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.85rem 0.55rem;
-  border-radius: 0.9rem;
-  border: 1px solid var(--xamt-line);
-  background: var(--xamt-bg-2);
-  cursor: pointer;
-  transition: all 0.18s ease;
-  user-select: none;
-}
-
-.xamt-bot-card:hover {
-  border-color: color-mix(in srgb, var(--xamt-accent) 50%, var(--xamt-line));
-  background: var(--xamt-bg-3);
-}
-
-.xamt-bot-card.is-selected {
-  border-color: var(--xamt-accent);
-  background: var(--xamt-accent-soft, rgba(29, 99, 184, 0.12));
-  box-shadow: -3px 0 12px var(--xamt-accent-soft, rgba(29, 99, 184, 0.12));
-}
-
-/* Vertical Checkbox Option Pill */
-.xamt-bot-check-pill {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 0.6rem;
+  height: 100%;
+  max-height: 22rem;
   padding: 0.75rem 0.5rem;
   border-radius: 0.75rem;
   border: 1px solid var(--xamt-line);
-  background: color-mix(in srgb, var(--xamt-bg-2) 55%, transparent);
+  background: var(--xamt-bg-2);
   cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.xamt-bot-strip:hover {
+  border-color: var(--xamt-accent);
+  background: var(--xamt-bg-3);
+}
+
+.xamt-bot-strip.is-active {
+  border-color: var(--xamt-accent);
+  background: color-mix(in srgb, var(--xamt-accent) 12%, var(--xamt-bg-2));
+  box-shadow: inset 3px 0 0 var(--xamt-accent);
+}
+
+/* Vertical Checkbox Strip (Top-to-bottom checkbox + label + hint) */
+.xamt-bot-vcheck {
+  display: flex;
+  flex-direction: row; /* Top to bottom in vertical-lr */
+  align-items: center;
+  height: 100%;
+  padding: 0.75rem 0.45rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--xamt-line);
+  background: var(--xamt-bg-2);
+  cursor: pointer;
+  gap: 0.5rem;
   transition: all 0.15s ease;
 }
 
-.xamt-bot-check-pill:hover {
-  background: var(--xamt-bg-2);
-  border-color: color-mix(in srgb, var(--xamt-accent) 40%, var(--xamt-line));
+.xamt-bot-vcheck:hover {
+  border-color: color-mix(in srgb, var(--xamt-accent) 50%, var(--xamt-line));
 }
 
-.xamt-bot-check-pill:has(input:checked) {
-  background: var(--xamt-accent-soft, rgba(29, 99, 184, 0.12));
+.xamt-bot-vcheck:has(input:checked) {
   border-color: var(--xamt-accent);
+  background: color-mix(in srgb, var(--xamt-accent) 12%, var(--xamt-bg-2));
 }
 
-/* Horizontal Tech Island for URLs, Secrets, and Tokens */
-.xamt-bot-tech-box {
-  writing-mode: horizontal-tb;
+.xamt-bot-vcheck input[type="checkbox"] {
+  margin: 0;
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--xamt-accent);
+  flex-shrink: 0;
+}
+
+/* Vertical Read-only Code/Token Strip (rotates Latin sideways naturally along vertical column) */
+.xamt-bot-code-strip {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  height: 100%;
+  padding: 0.65rem 0.4rem;
   background: var(--xamt-bg-2);
   border: 1px solid var(--xamt-line);
-  border-radius: 0.85rem;
-  padding: 0.85rem;
-  width: 17.5rem;
+  border-radius: 0.65rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  overflow-y: auto;
+  user-select: all;
 }
 

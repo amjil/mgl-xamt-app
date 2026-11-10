@@ -442,380 +442,323 @@ defmodule XamtWeb.ServerLive.Overlays do
     ~H"""
     <div
       :if={@show}
-      id="bot-manager-backdrop"
-      class="fixed inset-0 z-50 bg-[var(--xamt-shade)]/60 backdrop-blur-sm flex items-center justify-center p-4"
+      id="bot-manager-modal"
+      class="xamt-modal"
       phx-window-keydown="close_bot_manager"
       phx-key="Escape"
     >
-      <div class="fixed inset-0" phx-click="close_bot_manager" aria-hidden="true"></div>
+      <div class="xamt-modal-backdrop" phx-click="close_bot_manager"></div>
 
       <div
-        id="bot-manager-modal"
-        class="xamt-bot-modal relative z-10"
+        id="bot-manager-card"
+        class="xamt-bot-modal-card relative z-10"
         phx-hook="MongolianScroll"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="bot-manager-title"
       >
-        <div class="xamt-bot-col">
-          <div class="flex flex-row justify-between items-center pr-2">
+        <%!-- Column 1: title and close --%>
+        <div class="xamt-bot-section">
+          <div class="flex flex-row items-center justify-between h-full">
             <div class="flex flex-row items-center gap-2">
-              <.icon name="hero-cpu-chip" class="w-6 h-6 text-[var(--xamt-accent)] shrink-0" />
-              <h2
-                id="bot-manager-title"
-                class="text-xl font-bold tracking-wider text-[var(--xamt-text)]"
-              >
-                {gettext("Bot 扩展与授权中心")}
+              <.icon name="hero-cpu-chip" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+              <h2 class="text-lg font-bold tracking-wider">
+                {gettext("Bot Manager")}
               </h2>
             </div>
 
             <button
               type="button"
-              id="bot-manager-close"
               phx-click="close_bot_manager"
-              class="p-2 rounded-full hover:bg-[var(--xamt-bg-3)] text-[var(--xamt-muted)] hover:text-[var(--xamt-text)] transition-colors"
-              title={gettext("关闭")}
+              class="xamt-icon-btn mt-auto"
+              title={gettext("Close")}
             >
               <.icon name="hero-x-mark" class="w-5 h-5" />
             </button>
           </div>
+        </div>
 
+        <%!-- Column 2: installed bots and create entry --%>
+        <div class="xamt-bot-section">
+          <%!-- Create strip --%>
           <button
             type="button"
-            id="bot-register-toggle"
             phx-click="toggle_bot_create_form"
             class={[
-              "px-3 py-4 rounded-xl font-bold flex flex-row items-center justify-center gap-2 transition-all shrink-0 border",
-              @show_create_form &&
-                "bg-[var(--xamt-accent)] text-white border-[var(--xamt-accent)] shadow-md",
-              !@show_create_form &&
-                "bg-[var(--xamt-bg-2)] text-[var(--xamt-text)] border-[var(--xamt-line)] hover:border-[var(--xamt-accent)]"
+              "xamt-bot-strip font-bold justify-center gap-2",
+              @show_create_form && "is-active text-[var(--xamt-accent)]"
             ]}
           >
             <.icon name="hero-plus-circle" class="w-5 h-5 shrink-0" />
-            <span>{gettext("注册并安装新 Bot")}</span>
+            <span>{gettext("Register & Install Bot")}</span>
           </button>
 
-          <div class="flex flex-col gap-2.5 overflow-x-auto py-1">
-            <div :if={@installations == []} class="text-xs text-[var(--xamt-muted)] py-4 px-2">
-              {gettext("当前社区尚未安装任何 Bot")}
+          <%!-- Installation list --%>
+          <div
+            :for={inst <- @installations}
+            phx-click="select_bot_installation"
+            phx-value-id={inst.id}
+            class={[
+              "xamt-bot-strip",
+              @selected_installation && @selected_installation.id == inst.id && !@show_create_form &&
+                "is-active"
+            ]}
+          >
+            <div class="flex flex-row items-center gap-2">
+              <span class={[
+                "w-2.5 h-2.5 rounded-full shrink-0",
+                inst.status == "enabled" && "bg-emerald-500",
+                inst.status != "enabled" && "bg-zinc-400"
+              ]} />
+              <span class="font-bold text-base">{inst.bot.name}</span>
             </div>
 
-            <div
-              :for={inst <- @installations}
-              id={"bot-inst-#{inst.id}"}
-              phx-click="select_bot_installation"
-              phx-value-id={inst.id}
-              class={[
-                "xamt-bot-card",
-                @selected_installation && @selected_installation.id == inst.id && !@show_create_form &&
-                  "is-selected"
-              ]}
-            >
-              <div class="flex flex-row items-center gap-2.5">
-                <span class={[
-                  "w-2.5 h-2.5 rounded-full shrink-0",
-                  inst.status == "enabled" && "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]",
-                  inst.status != "enabled" && "bg-zinc-400"
-                ]} />
-                <span class="font-bold text-base text-[var(--xamt-text)]">{inst.bot.name}</span>
-              </div>
+            <span class="text-xs text-[var(--xamt-muted)]">
+              {if inst.status == "enabled", do: gettext("Enabled"), else: gettext("Disabled")}
+            </span>
+          </div>
 
-              <div class="flex flex-row items-center gap-2">
-                <span class="text-[11px] px-1.5 py-2 rounded bg-[var(--xamt-bg)] text-[var(--xamt-muted)] border border-[var(--xamt-line)]">
-                  {length(inst.subscriptions)} {gettext("事件")} / {length(inst.granted_scopes)} {gettext(
-                    "权限"
-                  )}
-                </span>
-              </div>
-            </div>
+          <div
+            :if={@installations == []}
+            class="flex flex-row items-center justify-center h-full text-xs text-[var(--xamt-muted)] px-2"
+          >
+            {gettext("No bots installed yet")}
           </div>
         </div>
 
+        <%!-- One-time token notice --%>
         <div
           :if={@newly_issued_token}
-          class="xamt-bot-col bg-amber-500/10 border border-amber-500/40 rounded-xl p-4"
+          class="xamt-bot-section bg-amber-500/10 border border-amber-500/40 rounded-xl px-3 py-3"
         >
           <div class="flex flex-row items-center gap-2 text-amber-500 font-bold">
             <.icon name="hero-key" class="w-5 h-5 shrink-0" />
-            <span>{gettext("请立即复制 Bot API Token（关闭后不再显示明文）")}</span>
+            <span>{gettext("Copy this token now (shown once)")}</span>
           </div>
 
-          <div class="xamt-bot-tech-box my-auto space-y-3">
-            <div class="text-xs font-semibold text-[var(--xamt-muted)]">Bearer Token:</div>
-            <code class="block p-2.5 rounded-lg bg-[var(--xamt-bg)] border border-[var(--xamt-line)] text-xs font-mono text-amber-500 select-all break-all">
-              {@newly_issued_token}
-            </code>
-            <button
-              type="button"
-              id="dismiss-bot-token"
-              phx-click="dismiss_bot_token"
-              class="w-full py-1.5 px-3 rounded-lg bg-[var(--xamt-bg-3)] hover:bg-[var(--xamt-accent)] hover:text-white text-xs font-bold transition-colors"
-            >
-              {gettext("我已复制保存")}
-            </button>
+          <div class="xamt-bot-code-strip text-amber-500 border-amber-500/30">
+            {@newly_issued_token}
           </div>
+
+          <button
+            type="button"
+            phx-click="dismiss_bot_token"
+            class="xamt-btn py-3 px-2 text-xs font-bold self-end"
+          >
+            {gettext("Saved — dismiss")}
+          </button>
         </div>
 
+        <%!-- View A: create bot form --%>
         <form
           :if={@show_create_form}
           id="bot-create-form"
           phx-submit="create_and_install_bot"
-          class="flex flex-col gap-6 h-full shrink-0"
+          class="inline-block h-full align-top"
         >
-          <div class="xamt-bot-col">
-            <div class="xamt-bot-col__header">
-              <span class="font-bold text-sm text-[var(--xamt-accent)]">
-                {gettext("填写 Bot 基础信息")}
-              </span>
+          <div class="xamt-bot-section">
+            <div class="font-bold text-sm text-[var(--xamt-accent)]">
+              {gettext("New Bot Details")}
             </div>
 
-            <div class="flex flex-col gap-4 px-2">
-              <div class="flex flex-row items-center gap-2">
-                <label class="text-xs font-bold text-[var(--xamt-muted)] shrink-0">
-                  {gettext("Bot 名称")}
-                </label>
-                <input
-                  type="text"
-                  name="bot[name]"
-                  id="bot-create-name"
-                  required
-                  placeholder={gettext("例如：成语收集助手")}
-                  class="xamt-input py-3 px-2.5 h-64"
-                  phx-hook="MongolianIME"
-                  autocomplete="off"
-                />
-              </div>
+            <label class="xamt-field h-full">
+              <span class="xamt-label">{gettext("Bot Name")}</span>
+              <input
+                id="new-bot-name-input"
+                type="text"
+                name="bot[name]"
+                required
+                placeholder={gettext("Mongolian or general name...")}
+                class="xamt-input h-full"
+                phx-hook="MongolianIME"
+              />
+            </label>
 
-              <div class="flex flex-row items-center gap-2">
-                <label class="text-xs font-bold text-[var(--xamt-muted)] shrink-0">
-                  {gettext("功能简介")}
-                </label>
-                <input
-                  type="text"
-                  name="bot[description]"
-                  id="bot-create-description"
-                  placeholder={gettext("监听点赞并自动收录精华语料...")}
-                  class="xamt-input py-3 px-2.5 h-64"
-                  phx-hook="MongolianIME"
-                  autocomplete="off"
-                />
-              </div>
-            </div>
+            <label class="xamt-field h-full">
+              <span class="xamt-label">{gettext("Description")}</span>
+              <input
+                id="new-bot-desc-input"
+                type="text"
+                name="bot[description]"
+                placeholder={gettext("What this bot does...")}
+                class="xamt-input h-full"
+                phx-hook="MongolianIME"
+              />
+            </label>
 
-            <div class="xamt-bot-tech-box my-auto space-y-3">
-              <div>
-                <label class="block text-xs font-bold text-[var(--xamt-text)] mb-1">
-                  Webhook Callback URL
-                </label>
-                <input
-                  type="url"
-                  name="bot[webhook_url]"
-                  id="bot-create-webhook"
-                  required
-                  placeholder="https://your-bot.example.com/webhook"
-                  class="xamt-input w-full px-3 py-2 text-xs font-mono"
-                  autocomplete="off"
-                />
-                <p class="text-[11px] text-[var(--xamt-muted)] mt-1">
-                  {gettext("Xamt 将以 HMAC-SHA256 签名向该地址推送订阅事件")}
-                </p>
-              </div>
-            </div>
+            <label class="xamt-field h-full">
+              <span class="xamt-label">{gettext("Webhook URL")}</span>
+              <input
+                type="url"
+                name="bot[webhook_url]"
+                required
+                placeholder="https://example.com/webhook"
+                class="xamt-input h-full font-mono text-xs"
+              />
+            </label>
 
-            <button
-              type="submit"
-              id="bot-create-submit"
-              class="xamt-btn--primary px-3.5 py-6 rounded-xl font-bold flex flex-row items-center justify-center gap-2 self-end"
-            >
-              <.icon name="hero-check-badge" class="w-5 h-5" />
-              <span>{gettext("立即创建并生成 Token")}</span>
+            <button type="submit" class="xamt-btn xamt-btn--primary h-full px-3 font-bold">
+              <.icon name="hero-check" class="w-5 h-5 mb-2" />
+              <span>{gettext("Create & Install")}</span>
             </button>
           </div>
         </form>
 
+        <%!-- View B: installed bot config --%>
         <form
           :if={@selected_installation && !@show_create_form}
-          id="bot-config-form"
+          id={"bot-config-form-#{@selected_installation.id}"}
           phx-submit="save_bot_installation_config"
-          class="flex flex-col gap-6 h-full shrink-0"
+          class="inline-block h-full align-top"
         >
           <input type="hidden" name="installation_id" value={@selected_installation.id} />
 
-          <div class="xamt-bot-col">
-            <div class="xamt-bot-col__header">
-              <span class="font-bold text-sm">{@selected_installation.bot.name}</span>
+          <%!-- Sub-column 1: status and credentials --%>
+          <div class="xamt-bot-section">
+            <div class="flex flex-row items-center justify-between h-full">
+              <span class="font-bold text-base text-[var(--xamt-accent)]">
+                {@selected_installation.bot.name}
+              </span>
+              <span class="text-xs text-[var(--xamt-muted)]">
+                {@selected_installation.bot.description}
+              </span>
             </div>
 
-            <div class="flex flex-row items-center gap-3 py-2">
-              <label class="text-xs font-bold text-[var(--xamt-muted)]">{gettext("启用状态")}</label>
+            <label class="xamt-field h-full">
+              <span class="xamt-label">{gettext("Status")}</span>
               <select
+                id={"bot-status-select-#{@selected_installation.id}"}
                 name="status"
-                id="bot-config-status"
-                class="xamt-input py-2 px-1.5 text-sm font-bold"
+                class="xamt-input"
+                phx-hook="MnSelect"
               >
                 <option value="enabled" selected={@selected_installation.status == "enabled"}>
-                  {gettext("运行中 (Enabled)")}
+                  {gettext("Enabled")}
                 </option>
                 <option value="disabled" selected={@selected_installation.status == "disabled"}>
-                  {gettext("已暂停 (Disabled)")}
+                  {gettext("Disabled")}
                 </option>
               </select>
+            </label>
+
+            <div class="xamt-field h-full">
+              <span class="xamt-label">Webhook URL</span>
+              <div class="xamt-bot-code-strip text-[var(--xamt-muted)]">
+                {@selected_installation.bot.webhook_url}
+              </div>
             </div>
 
-            <div class="xamt-bot-tech-box my-auto space-y-2.5">
-              <div>
-                <span class="text-[11px] font-bold uppercase tracking-wider text-[var(--xamt-muted)]">
-                  Webhook Endpoint
-                </span>
-                <div
-                  class="text-xs font-mono truncate text-[var(--xamt-text)] mt-0.5"
-                  title={@selected_installation.bot.webhook_url}
-                >
-                  {@selected_installation.bot.webhook_url}
-                </div>
+            <div class="xamt-field h-full">
+              <span class="xamt-label">{gettext("Signing Secret")}</span>
+              <div class="xamt-bot-code-strip">
+                {@selected_installation.bot.signing_secret}
               </div>
+            </div>
 
-              <div>
-                <span class="text-[11px] font-bold uppercase tracking-wider text-[var(--xamt-muted)]">
-                  Signing Secret (HMAC)
-                </span>
-                <code class="block text-[11px] font-mono bg-[var(--xamt-bg)] px-2 py-1 rounded border border-[var(--xamt-line)] select-all truncate mt-0.5">
-                  {@selected_installation.bot.signing_secret}
-                </code>
-              </div>
-
-              <div class="pt-2 border-t border-[var(--xamt-line)] flex items-center justify-between">
-                <div class="text-xs">
-                  <span class="text-[var(--xamt-muted)]">Token: </span>
-                  <code class="font-mono font-semibold">
-                    {if t = List.first(@selected_installation.tokens),
-                      do: t.token_prefix <> "•••",
-                      else: "None"}
-                  </code>
-                </div>
-                <button
-                  type="button"
-                  id="bot-rotate-token"
-                  phx-click="rotate_bot_token"
-                  phx-value-id={@selected_installation.id}
-                  data-confirm={gettext("重置后旧 Token 将立即失效，确定生成新 Token 吗？")}
-                  class="text-xs px-2 py-1 rounded bg-amber-500/15 text-amber-500 hover:bg-amber-500/25 font-bold transition-colors"
-                >
-                  {gettext("重置密钥")}
-                </button>
-              </div>
+            <div class="xamt-field h-full justify-between">
+              <span class="xamt-label">
+                Token: {if t = List.first(@selected_installation.tokens),
+                  do: t.token_prefix <> "...",
+                  else: "-"}
+              </span>
+              <button
+                type="button"
+                phx-click="rotate_bot_token"
+                phx-value-id={@selected_installation.id}
+                data-confirm={gettext("The old token will stop working immediately. Continue?")}
+                class="xamt-btn text-amber-500 border-amber-500/40 py-3 px-2 text-xs font-bold"
+              >
+                <.icon name="hero-arrow-path" class="w-4 h-4 mb-1" />
+                <span>{gettext("Rotate Token")}</span>
+              </button>
             </div>
           </div>
 
+          <%!-- Sub-column 2: event subscriptions --%>
           <% current_events = Enum.map(@selected_installation.subscriptions, & &1.event_type) %>
-          <div class="xamt-bot-col">
-            <div class="xamt-bot-col__header">
-              <span class="font-bold text-sm">{gettext("1. 事件订阅 (Webhook 推送触发器)")}</span>
+          <div class="xamt-bot-section">
+            <div class="font-bold text-sm text-[var(--xamt-accent)]">
+              {gettext("Event Subscriptions")}
             </div>
 
-            <div class="flex flex-col gap-2.5 py-1">
-              <label
-                :for={
-                  {ev_code, ev_label, req_scope} <- [
-                    {"message.created", gettext("新消息发布 (message.created)"), "channel.messages.read"},
-                    {"message.updated", gettext("消息更新 (message.updated)"), "channel.messages.read"},
-                    {"message.deleted", gettext("消息删除 (message.deleted)"), "channel.messages.read"},
-                    {"reaction.added", gettext("消息被点赞/贴表情 (reaction.added)"),
-                     "channel.messages.read"},
-                    {"member.joined", gettext("新成员加入社区 (member.joined)"), "server.members.events"},
-                    {"member.left", gettext("成员离开社区 (member.left)"), "server.members.events"},
-                    {"channel.created", gettext("新频道创建 (channel.created)"), "server.channels.manage"},
-                    {"bot.mentioned", gettext("Bot 被提及 (bot.mentioned)"), "channel.messages.read"}
-                  ]
-                }
-                class="xamt-bot-check-pill"
-              >
-                <input
-                  type="checkbox"
-                  name="subscribed_events[]"
-                  value={ev_code}
-                  checked={ev_code in current_events}
-                  class="rounded text-[var(--xamt-accent)]"
-                />
-                <span class="font-bold text-sm text-[var(--xamt-text)]">{ev_label}</span>
-                <span class="text-[11px] text-[var(--xamt-muted)] mt-auto">
-                  [{gettext("需")} {req_scope}]
-                </span>
-              </label>
-            </div>
+            <label
+              :for={
+                {ev_code, ev_label, req_scope} <- [
+                  {"message.created", gettext("New channel message (message.created)"),
+                   "channel.messages.read"},
+                  {"reaction.added", gettext("Reaction / like added (reaction.added)"),
+                   "channel.messages.read"},
+                  {"member.joined", gettext("Member joined (member.joined)"), "server.members.events"},
+                  {"member.left", gettext("Member left (member.left)"), "server.members.events"},
+                  {"channel.created", gettext("Channel created (channel.created)"),
+                   "server.channels.manage"}
+                ]
+              }
+              class="xamt-bot-vcheck"
+            >
+              <input
+                type="checkbox"
+                name="subscribed_events[]"
+                value={ev_code}
+                checked={ev_code in current_events}
+              />
+              <span class="font-bold text-sm">{ev_label}</span>
+              <span class="text-xs text-[var(--xamt-muted)] mt-auto">
+                ({gettext("requires")} {req_scope})
+              </span>
+            </label>
           </div>
 
+          <%!-- Sub-column 3: granted scopes --%>
           <% granted = @selected_installation.granted_scopes %>
-          <div class="xamt-bot-col">
-            <div class="xamt-bot-col__header">
-              <span class="font-bold text-sm">{gettext("2. 授权范围 (API 与读取约束)")}</span>
+          <div class="xamt-bot-section">
+            <div class="font-bold text-sm text-[var(--xamt-accent)]">
+              {gettext("Granted Scopes")}
             </div>
 
-            <div class="flex flex-col gap-2.5 py-1">
-              <label
-                :for={
-                  {scope_code, scope_label} <- [
-                    {"channel.messages.read", gettext("读取消息与点赞反应 (channel.messages.read)")},
-                    {"channel.messages.send", gettext("发送与回复频道消息 (channel.messages.send)")},
-                    {"channel.messages.manage", gettext("管理或删除消息 (channel.messages.manage)")},
-                    {"server.members.events", gettext("接收成员加入/离开事件 (server.members.events)")},
-                    {"server.members.read", gettext("查询社区成员列表 (server.members.read)")},
-                    {"server.channels.manage", gettext("管理频道相关能力 (server.channels.manage)")}
-                  ]
-                }
-                class="xamt-bot-check-pill"
-              >
-                <input
-                  type="checkbox"
-                  name="granted_scopes[]"
-                  value={scope_code}
-                  checked={scope_code in granted}
-                  class="rounded text-[var(--xamt-accent)]"
-                />
-                <span class="font-bold text-sm text-[var(--xamt-text)]">{scope_label}</span>
-              </label>
-            </div>
+            <label
+              :for={
+                {scope_code, scope_label} <- [
+                  {"channel.messages.read",
+                   gettext("Read messages & reactions (channel.messages.read)")},
+                  {"channel.messages.send",
+                   gettext("Send & reply to messages (channel.messages.send)")},
+                  {"channel.messages.manage",
+                   gettext("Manage or delete others' messages (channel.messages.manage)")},
+                  {"server.members.events",
+                   gettext("Receive member join/leave events (server.members.events)")},
+                  {"server.members.read", gettext("Read server member list (server.members.read)")}
+                ]
+              }
+              class="xamt-bot-vcheck"
+            >
+              <input
+                type="checkbox"
+                name="granted_scopes[]"
+                value={scope_code}
+                checked={scope_code in granted}
+              />
+              <span class="font-bold text-sm">{scope_label}</span>
+            </label>
           </div>
 
+          <%!-- Sub-column 4: allowed channels and save --%>
           <% allowed_cids = @selected_installation.allowed_channel_ids || [] %>
-          <div class="xamt-bot-col">
-            <div class="xamt-bot-col__header">
-              <span class="font-bold text-sm">{gettext("3. 允许作用的频道 (不选则默认全频道)")}</span>
+          <div class="xamt-bot-section">
+            <div class="font-bold text-sm text-[var(--xamt-accent)]">
+              {gettext("Allowed Channels (none = all)")}
             </div>
 
-            <div class="flex flex-col gap-2 py-1 max-w-[14rem] overflow-x-auto">
-              <label :for={ch <- @channels} class="xamt-bot-check-pill">
-                <input
-                  type="checkbox"
-                  name="allowed_channel_ids[]"
-                  value={ch.id}
-                  checked={ch.id in allowed_cids}
-                  class="rounded text-[var(--xamt-accent)]"
-                />
-                <span class="text-sm font-medium">#{ch.name}</span>
-              </label>
-            </div>
+            <label :for={ch <- @channels} class="xamt-bot-vcheck">
+              <input
+                type="checkbox"
+                name="allowed_channel_ids[]"
+                value={ch.id}
+                checked={ch.id in allowed_cids}
+              />
+              <span class="font-bold text-sm">#{ch.name}</span>
+            </label>
 
-            <button
-              type="submit"
-              id="bot-config-save"
-              class="xamt-btn--primary px-4 py-6 rounded-xl font-bold flex flex-row items-center justify-center gap-2 self-end ml-2 shadow-lg"
-            >
-              <.icon name="hero-check" class="w-5 h-5" />
-              <span>{gettext("保存全部配置")}</span>
-            </button>
-
-            <button
-              type="button"
-              id="bot-uninstall"
-              phx-click="uninstall_bot"
-              phx-value-id={@selected_installation.id}
-              data-confirm={gettext("Uninstall this bot and revoke its tokens?")}
-              class="px-4 py-4 rounded-xl font-bold flex flex-row items-center justify-center gap-2 self-end ml-2 border border-red-500/40 text-red-500 hover:bg-red-500/10 transition-colors"
-            >
-              <.icon name="hero-trash" class="w-5 h-5" />
-              <span>{gettext("卸载 Bot")}</span>
+            <button type="submit" class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold ml-2">
+              <.icon name="hero-check" class="w-5 h-5 mb-2" />
+              <span>{gettext("Save Config")}</span>
             </button>
           </div>
         </form>
