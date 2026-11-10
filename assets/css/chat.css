@@ -2673,7 +2673,8 @@ html.xamt-desktop-ime .xamt-composer__emoji {
 }
 
 /* ==========================================================================
-   Centered Modal Shell (server-driven :if show/hide, no client .hidden)
+   Modal Shell (server-driven :if show/hide, no client .hidden)
+   Desktop: centered panel. Mobile: full-bleed above virtual keyboard.
    ========================================================================== */
 
 .xamt-modal {
@@ -2684,6 +2685,7 @@ html.xamt-desktop-ime .xamt-composer__emoji {
   align-items: center;
   justify-content: center;
   padding: 1rem;
+  box-sizing: border-box;
 }
 
 .xamt-modal-backdrop {
@@ -2693,53 +2695,78 @@ html.xamt-desktop-ime .xamt-composer__emoji {
   backdrop-filter: blur(4px);
 }
 
+/* Desktop bot manager: centered dialog, not full-bleed */
+.xamt-modal:has(.xamt-bot-modal-card) {
+  --xamt-bot-modal-avail: min(42rem, calc(var(--xamt-vh, 100dvh) - 2rem));
+}
+
 /* ==========================================================================
    Bot Platform Manager Modal (Pure Traditional Mongolian Vertical-LR Layout)
+   Columns pack LEFT → RIGHT; overflow scrolls horizontally.
    ========================================================================== */
 
 .xamt-bot-modal-card {
+  --xamt-field-extent: clamp(10rem, calc(var(--xamt-bot-modal-avail, 42rem) - 3rem), 36rem);
+  --xamt-field-extent-lg: clamp(12rem, calc(var(--xamt-bot-modal-avail, 42rem) - 2rem), 40rem);
+  position: relative;
+  z-index: 1;
   writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
   text-orientation: sideways;
   background: var(--xamt-bg);
   color: var(--xamt-text);
   border: 1px solid var(--xamt-line);
   border-radius: 1rem;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
-  height: 82vh;
+  width: min(92vw, 64rem);
   max-width: 92vw;
+  height: var(--xamt-bot-modal-avail);
+  min-height: 0;
   padding: 1.25rem;
-  /* In vertical-lr, block children naturally stack from LEFT to RIGHT! */
-  display: block;
+  box-sizing: border-box;
+  /* flex-direction: column → physical LEFT to RIGHT in vertical-lr */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  white-space: nowrap;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+}
+
+/* Forms unwrap so their sections join the same left→right scroll strip */
+.xamt-bot-modal-card > form {
+  display: contents;
 }
 
 /* Every section is a vertical column standing side-by-side from left to right */
 .xamt-bot-section {
-  display: inline-flex;
-  /* In vertical-lr, flex-direction: row flows from TOP to BOTTOM! */
+  display: flex;
+  /* In vertical-lr, flex-direction: row flows from TOP to BOTTOM */
   flex-direction: row;
   align-items: stretch;
+  flex: 0 0 auto;
   height: 100%;
-  padding-right: 1.25rem;
-  margin-right: 1.25rem;
+  min-height: 0;
+  min-width: 3.25rem;
+  padding-right: 1.1rem;
+  margin-right: 1.1rem;
   border-right: 1px solid var(--xamt-line);
-  vertical-align: top;
-  white-space: normal;
   gap: 0.75rem;
+  box-sizing: border-box;
 }
 
 .xamt-bot-section:last-child {
   border-right: none;
   margin-right: 0;
-  padding-right: 0.25rem;
+  padding-right: 0.35rem;
 }
 
 /* Multi-column wrap container for vertical checkboxes/cards (wraps left-to-right) */
 .xamt-bot-vlist {
   display: flex;
-  /* Flow top-to-bottom, and when full, wrap to the next column on the right */
   flex-direction: row;
   flex-wrap: wrap;
   align-content: flex-start;
@@ -2754,13 +2781,15 @@ html.xamt-desktop-ime .xamt-composer__emoji {
   align-items: center;
   justify-content: space-between;
   height: 100%;
-  max-height: 22rem;
+  min-height: 0;
+  max-height: none;
   padding: 0.75rem 0.5rem;
   border-radius: 0.75rem;
   border: 1px solid var(--xamt-line);
   background: var(--xamt-bg-2);
   cursor: pointer;
   transition: border-color 0.15s ease, background-color 0.15s ease;
+  box-sizing: border-box;
 }
 
 .xamt-bot-strip:hover {
@@ -2780,6 +2809,7 @@ html.xamt-desktop-ime .xamt-composer__emoji {
   flex-direction: row; /* Top to bottom in vertical-lr */
   align-items: center;
   height: 100%;
+  min-height: 0;
   padding: 0.75rem 0.45rem;
   border-radius: 0.75rem;
   border: 1px solid var(--xamt-line);
@@ -2787,6 +2817,7 @@ html.xamt-desktop-ime .xamt-composer__emoji {
   cursor: pointer;
   gap: 0.5rem;
   transition: all 0.15s ease;
+  box-sizing: border-box;
 }
 
 .xamt-bot-vcheck:hover {
@@ -2806,19 +2837,81 @@ html.xamt-desktop-ime .xamt-composer__emoji {
   flex-shrink: 0;
 }
 
-/* Vertical Read-only Code/Token Strip (rotates Latin sideways naturally along vertical column) */
+/* Vertical Read-only Code/Token Strip */
 .xamt-bot-code-strip {
   display: flex;
   flex-direction: row;
   align-items: center;
   height: 100%;
+  min-height: 0;
+  min-width: 2.5rem;
   padding: 0.65rem 0.4rem;
   background: var(--xamt-bg-2);
   border: 1px solid var(--xamt-line);
   border-radius: 0.65rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.75rem;
+  overflow-x: hidden;
   overflow-y: auto;
   user-select: all;
+  box-sizing: border-box;
+}
+
+/* Fields / inputs fill the column height; thickness stays a readable strip */
+.xamt-bot-modal-card .xamt-field {
+  height: 100%;
+  min-height: 0;
+  flex: 0 0 auto;
+}
+
+.xamt-bot-modal-card .xamt-input,
+.xamt-bot-modal-card input.xamt-input,
+.xamt-bot-modal-card select.xamt-input {
+  width: auto;
+  max-width: none;
+  height: auto;
+  min-height: 0;
+  block-size: 2.85rem;
+  inline-size: min(var(--xamt-field-extent), 100%);
+  max-inline-size: none;
+}
+
+/* --------------------------------------------------------------------------
+   Mobile (≤960px): full-bleed width + height above Mongolian virtual keyboard
+   -------------------------------------------------------------------------- */
+@media (max-width: 960px) {
+  .xamt-modal:has(.xamt-bot-modal-card) {
+    --xamt-bot-modal-avail: calc(var(--xamt-vh, 100dvh) - var(--xamt-ime-kb, 0px));
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: auto;
+    width: 100%;
+    height: var(--xamt-bot-modal-avail);
+    max-height: var(--xamt-bot-modal-avail);
+    padding: 0;
+    align-items: stretch;
+    justify-content: stretch;
+  }
+
+  body.mgl-ime-mobile-open .xamt-modal:has(.xamt-bot-modal-card) {
+    padding-top: max(0.35rem, var(--xamt-safe-top, 0px));
+  }
+
+  .xamt-bot-modal-card {
+    --xamt-field-extent: clamp(10rem, calc(var(--xamt-bot-modal-avail) - 3.5rem), 36rem);
+    --xamt-field-extent-lg: clamp(12rem, calc(var(--xamt-bot-modal-avail) - 2.5rem), 40rem);
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding:
+      max(0.85rem, var(--xamt-safe-top, 0px))
+      max(0.85rem, var(--xamt-safe-right, 0px))
+      max(0.85rem, var(--xamt-safe-bottom, 0px))
+      max(0.85rem, var(--xamt-safe-left, 0px));
+  }
 }
 

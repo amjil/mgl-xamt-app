@@ -551,7 +551,6 @@ defmodule XamtWeb.ServerLive.Overlays do
           :if={@show_create_form}
           id="bot-create-form"
           phx-submit="create_and_install_bot"
-          class="inline-block h-full align-top"
         >
           <div class="xamt-bot-section">
             <div class="font-bold text-sm text-[var(--xamt-accent)]">
@@ -606,7 +605,6 @@ defmodule XamtWeb.ServerLive.Overlays do
           :if={@selected_installation && !@show_create_form}
           id={"bot-config-form-#{@selected_installation.id}"}
           phx-submit="save_bot_installation_config"
-          class="inline-block h-full align-top"
         >
           <input type="hidden" name="installation_id" value={@selected_installation.id} />
 

@@ -16,6 +16,7 @@ const SCROLL_CONTAINERS = [
   ".xamt-upload-preview",
   ".xamt-settings-panel",
   ".xamt-sheet__body",
+  ".xamt-bot-modal-card",
 ].join(", ")
 
 /**
