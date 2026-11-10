@@ -14,25 +14,22 @@ defmodule XamtWeb.HomeLiveTest do
     {:ok, view, html} = live(log_in_user(conn, user_fixture()), ~p"/")
 
     assert has_element?(view, "#flash-group")
-    refute has_element?(view, "#toggle-create-server")
+    assert has_element?(view, "#home-canvas")
+    refute has_element?(view, "#home-create-server-form")
     refute has_element?(view, "#create-server-form")
     assert html =~ "Join a public server or wait for an invite"
   end
 
-  test "creators can open the form and create a server", %{conn: conn} do
+  test "creators can create a server from the hall form", %{conn: conn} do
     conn = log_in_user(conn, creator_fixture())
     {:ok, view, _html} = live(conn, ~p"/")
 
-    assert has_element?(view, "#toggle-create-server")
-    refute has_element?(view, "#create-server-form")
-
-    view |> element("#toggle-create-server") |> render_click()
-    assert has_element?(view, "#create-server-drawer")
-    assert has_element?(view, "#create-server-form")
+    assert has_element?(view, "#home-create-server-form")
+    refute has_element?(view, "#create-server-drawer")
 
     assert {:error, {:live_redirect, %{to: to}}} =
              view
-             |> form("#create-server-form", server: %{name: "New Hall"})
+             |> form("#home-create-server-form", server: %{name: "New Hall"})
              |> render_submit()
 
     assert to == "/servers/new-hall"
@@ -44,10 +41,8 @@ defmodule XamtWeb.HomeLiveTest do
     {:ok, view, _html} = live(conn, ~p"/")
     mongolian_name = "\u1830\u1820\u1837\u1820\u1828"
 
-    view |> element("#toggle-create-server") |> render_click()
-
     view
-    |> form("#create-server-form", server: %{name: "New Hall"})
+    |> form("#home-create-server-form", server: %{name: "New Hall"})
     |> render_change()
 
     assert has_element?(view, "#server_slug")
@@ -55,7 +50,7 @@ defmodule XamtWeb.HomeLiveTest do
 
     assert {:error, {:live_redirect, %{to: to}}} =
              view
-             |> form("#create-server-form",
+             |> form("#home-create-server-form",
                server: %{name: mongolian_name, slug: "saran-hall"}
              )
              |> render_submit()
@@ -93,6 +88,7 @@ defmodule XamtWeb.HomeLiveTest do
   test "create query param does not open the form for regular users", %{conn: conn} do
     {:ok, view, _html} = live(log_in_user(conn, user_fixture()), ~p"/?create=1")
     refute has_element?(view, "#create-server-form")
+    refute has_element?(view, "#home-create-server-form")
   end
 
   test "owners can edit a server from the home card", %{conn: conn} do
@@ -198,5 +194,27 @@ defmodule XamtWeb.HomeLiveTest do
     view |> element("#home-open-search") |> render_click()
     assert has_element?(view, "#search-palette")
     assert has_element?(view, "#global-search-q")
+  end
+
+  test "members can join a public server from discovery", %{conn: conn} do
+    owner = creator_fixture()
+    scope = Accounts.Scope.for_user(owner)
+
+    {:ok, server} =
+      Servers.create_server(scope, %{
+        "name" => "Open Hall",
+        "visibility" => "public",
+        "description" => "welcome"
+      })
+
+    member = user_fixture()
+    {:ok, view, _html} = live(log_in_user(conn, member), ~p"/")
+
+    assert has_element?(view, "#public-server-#{server.id}")
+
+    assert {:error, {:live_redirect, %{to: to}}} =
+             view |> element("#join-public-#{server.id}") |> render_click()
+
+    assert to == "/servers/#{server.slug}"
   end
 end

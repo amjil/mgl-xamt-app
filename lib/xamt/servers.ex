@@ -216,19 +216,37 @@ defmodule Xamt.Servers do
 
   @doc """
   Public servers the user has not joined yet, for discovery on the home page.
+
+  Options:
+  - `:limit` — max rows (default 20)
+  - `:query` — optional name/description substring filter
   """
   def list_discoverable_servers(%Scope{user: user}, opts \\ []) do
     limit = Keyword.get(opts, :limit, 20)
+    q = opts |> Keyword.get(:query, "") |> to_string() |> String.trim()
 
     joined =
       from(m in ServerMember, where: m.user_id == ^user.id, select: m.server_id)
 
-    from(s in Server,
-      where: s.visibility == "public" and s.id not in subquery(joined),
-      order_by: [asc: s.name],
-      limit: ^limit
-    )
-    |> Repo.all()
+    base =
+      from(s in Server,
+        where: s.visibility == "public" and s.id not in subquery(joined),
+        order_by: [asc: s.name],
+        limit: ^limit
+      )
+
+    query =
+      if q == "" do
+        base
+      else
+        from(s in base,
+          where:
+            fragment("strpos(lower(?), lower(?)) > 0", s.name, ^q) or
+              fragment("strpos(lower(coalesce(?, '')), lower(?)) > 0", s.description, ^q)
+        )
+      end
+
+    Repo.all(query)
   end
 
   def update_server(%Scope{user: user}, server_id, attrs) do
