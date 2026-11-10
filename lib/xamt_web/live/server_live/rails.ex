@@ -43,6 +43,9 @@ defmodule XamtWeb.ServerLive.Rails do
       >
         <.icon name="hero-star" class="size-5" />
       </.link>
+      <div class="xamt-rail__theme">
+        <Layouts.theme_palette id="xamt-theme-palette-rail" />
+      </div>
     </aside>
     """
   end

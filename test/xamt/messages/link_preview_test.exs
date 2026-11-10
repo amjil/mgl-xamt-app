@@ -372,7 +372,7 @@ defmodule Xamt.Messages.LinkPreviewTest do
     preview = Messages.get_message!(message.id).link_preview
     assert preview["type"] == "audio_book"
     assert preview["provider"] == "MyAudioApp"
-    assert preview["title"] == "江格尔"
+    assert preview["title"] == "Jangar"
     assert preview["cover_url"] == "https://audio-app-domain.com/cover.jpg"
     assert preview["audio_sample_url"] == "https://cdn.example/sample.m4a"
 
@@ -424,7 +424,7 @@ defmodule Xamt.Messages.LinkPreviewTest do
         conn.host == "audio-app-domain.com" ->
           body =
             Jason.encode!(%{
-              "title" => "江格尔",
+              "title" => "Jangar",
               "cover_url" => "/cover.jpg",
               "audio_sample_url" => "https://cdn.example/sample.m4a"
             })

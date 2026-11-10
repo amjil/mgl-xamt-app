@@ -39,6 +39,7 @@ defmodule XamtWeb.ServerLive.MessageItem do
         mentioned?(@message, @current_scope.user) && "xamt-message--mentioned",
         @editing_message_id == @message.id && "xamt-message--editing",
         deleted?(@message) && "xamt-message--deleted",
+        @message.is_pinned && "is-pinned",
         not header_visible?(@message) && "xamt-message--grouped"
       ]}
       data-message-id={@message.id}
@@ -92,7 +93,7 @@ defmodule XamtWeb.ServerLive.MessageItem do
             :if={@message.reply_to}
             type="button"
             id={"quote-#{@message.id}"}
-            class="xamt-quote"
+            class="xamt-quote xamt-reply-snippet"
             phx-click="jump_to_message"
             phx-value-id={@message.reply_to_id}
             title={gettext("Jump to the quoted message")}

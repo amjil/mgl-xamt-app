@@ -230,27 +230,64 @@ defmodule XamtWeb.Layouts do
   defp site_admin?(%{user: user}) when not is_nil(user), do: Xamt.Accounts.User.admin?(user)
 
   @doc """
-  Provides dark vs light theme toggle based on the `.dark` class variant.
+  Four Mongolian aesthetic palette swatches.
 
-  Theme changes are handled in `assets/js/app.js` via the `phx:set-theme` event.
+  Theme changes are client-only via the `xamt:set_theme` CustomEvent
+  (see `root.html.heex` FOUC script and `assets/js/app.js`).
+  """
+  attr :id, :string, default: nil
+
+  def theme_palette(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class="xamt-theme-palette"
+      style="writing-mode: horizontal-tb;"
+      role="group"
+      aria-label={gettext("Theme")}
+    >
+      <button
+        type="button"
+        data-xamt-theme="steppe-light"
+        onclick="window.dispatchEvent(new CustomEvent('xamt:set_theme', {detail: {theme: 'steppe-light'}}))"
+        class="xamt-theme-swatch xamt-theme-swatch--steppe"
+        title={gettext("Steppe parchment (light)")}
+        aria-label={gettext("Steppe parchment (light)")}
+      />
+      <button
+        type="button"
+        data-xamt-theme="night-sky"
+        onclick="window.dispatchEvent(new CustomEvent('xamt:set_theme', {detail: {theme: 'night-sky'}}))"
+        class="xamt-theme-swatch xamt-theme-swatch--night"
+        title={gettext("Night sky (dark)")}
+        aria-label={gettext("Night sky (dark)")}
+      />
+      <button
+        type="button"
+        data-xamt-theme="crimson-felt"
+        onclick="window.dispatchEvent(new CustomEvent('xamt:set_theme', {detail: {theme: 'crimson-felt'}}))"
+        class="xamt-theme-swatch xamt-theme-swatch--crimson"
+        title={gettext("Crimson felt (warm dark)")}
+        aria-label={gettext("Crimson felt (warm dark)")}
+      />
+      <button
+        type="button"
+        data-xamt-theme="jade-meadow"
+        onclick="window.dispatchEvent(new CustomEvent('xamt:set_theme', {detail: {theme: 'jade-meadow'}}))"
+        class="xamt-theme-swatch xamt-theme-swatch--jade"
+        title={gettext("Jade meadow (fresh green)")}
+        aria-label={gettext("Jade meadow (fresh green)")}
+      />
+    </div>
+    """
+  end
+
+  @doc """
+  Legacy light/dark/system toggle. Prefer `theme_palette/1`.
   """
   def theme_toggle(assigns) do
     ~H"""
-    <div class="xamt-theme-toggle">
-      <div class="xamt-theme-toggle__indicator" />
-
-      <button type="button" phx-click={JS.dispatch("phx:set-theme")} data-phx-theme="system">
-        <.icon name="hero-computer-desktop-micro" class="size-4 opacity-75 hover:opacity-100" />
-      </button>
-
-      <button type="button" phx-click={JS.dispatch("phx:set-theme")} data-phx-theme="light">
-        <.icon name="hero-sun-micro" class="size-4 opacity-75 hover:opacity-100" />
-      </button>
-
-      <button type="button" phx-click={JS.dispatch("phx:set-theme")} data-phx-theme="dark">
-        <.icon name="hero-moon-micro" class="size-4 opacity-75 hover:opacity-100" />
-      </button>
-    </div>
+    <.theme_palette />
     """
   end
 end

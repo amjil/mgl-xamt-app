@@ -15,7 +15,8 @@
 @custom-variant phx-submit-loading (.phx-submit-loading&, .phx-submit-loading &);
 @custom-variant phx-change-loading (.phx-change-loading&, .phx-change-loading &);
 
-/* Class-based dark mode (replaces DaisyUI data-theme) */
+/* Class-based dark mode; palette themes live in mongolian.css via [data-theme].
+   Dark palettes (night-sky, crimson-felt) also toggle the `.dark` class. */
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* Make LiveView wrapper divs transparent for layout */

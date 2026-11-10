@@ -202,34 +202,57 @@ window.addEventListener("DOMContentLoaded", () => adoptImeElements())
 liveSocket.connect()
 window.liveSocket = liveSocket
 
-const THEME_COLORS = {dark: "#101412", light: "#f4efe4"}
+const XAMT_THEMES = ["steppe-light", "night-sky", "crimson-felt", "jade-meadow"]
+const XAMT_DARK_THEMES = new Set(["night-sky", "crimson-felt"])
+const THEME_COLORS = {
+  "steppe-light": "#f7f4eb",
+  "night-sky": "#0b101b",
+  "crimson-felt": "#161110",
+  "jade-meadow": "#f2f6f3"
+}
 
-const applyTheme = (theme) => {
+const resolveXamtTheme = (raw) => {
+  if (XAMT_THEMES.includes(raw)) return raw
+
+  const legacy = raw || localStorage.getItem("phx:theme")
+  if (legacy === "light") return "steppe-light"
+  if (legacy === "dark") return "night-sky"
+  if (legacy === "system") {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "night-sky"
+      : "steppe-light"
+  }
+
+  return "steppe-light"
+}
+
+const applyXamtTheme = (theme) => {
+  const next = resolveXamtTheme(theme)
   const root = document.documentElement
-  const mode = theme || "system"
-  root.setAttribute("data-theme-mode", mode)
+  const useDark = XAMT_DARK_THEMES.has(next)
 
-  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
-  const useDark = mode === "dark" || (mode === "system" && prefersDark)
-
+  root.setAttribute("data-theme", next)
   root.classList.toggle("dark", useDark)
 
   const themeColor = document.querySelector("meta[name='theme-color']")
-  if (themeColor) themeColor.setAttribute("content", THEME_COLORS[useDark ? "dark" : "light"])
+  if (themeColor) themeColor.setAttribute("content", THEME_COLORS[next])
 
-  localStorage.setItem("phx:theme", mode)
+  localStorage.setItem("xamt_theme", next)
+
+  document.querySelectorAll("[data-xamt-theme]").forEach((el) => {
+    el.classList.toggle("is-active", el.dataset.xamtTheme === next)
+  })
 }
 
-applyTheme(localStorage.getItem("phx:theme") || "dark")
+applyXamtTheme(localStorage.getItem("xamt_theme") || localStorage.getItem("phx:theme"))
 
-window.addEventListener("phx:set-theme", (event) => {
-  applyTheme(event.target?.dataset?.phxTheme)
+window.addEventListener("xamt:set_theme", (event) => {
+  applyXamtTheme(event.detail?.theme)
 })
 
-window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-  if (localStorage.getItem("phx:theme") === "system") {
-    applyTheme("system")
-  }
+window.addEventListener("phx:set-theme", (event) => {
+  const legacy = event.target?.dataset?.phxTheme
+  applyXamtTheme(resolveXamtTheme(legacy))
 })
 
 const syncBrowserOnline = () => {

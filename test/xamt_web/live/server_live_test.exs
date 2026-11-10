@@ -1093,7 +1093,7 @@ defmodule XamtWeb.ServerLiveTest do
         "video_id" => "BV1NgY5zUEiM",
         "url" =>
           "https://www.bilibili.com/video/BV1NgY5zUEiM/?share_source=copy_web&vd_source=afac77442229c491cfe53a1ce797831d",
-        "title" => "MGL斯琴布和"
+        "title" => "MGL Siqinbuhe"
       })
 
     html = render(view)
@@ -1119,7 +1119,7 @@ defmodule XamtWeb.ServerLiveTest do
         "type" => "audio_book",
         "provider" => "MyAudioApp",
         "url" => "https://audio-app-domain.com/books/jangar",
-        "title" => "江格尔",
+        "title" => "Jangar",
         "cover_url" => "https://cdn.example/cover.jpg",
         "audio_sample_url" => "https://cdn.example/sample.m4a"
       })
@@ -1130,7 +1130,7 @@ defmodule XamtWeb.ServerLiveTest do
            )
 
     html = render(view)
-    assert html =~ "江格尔"
+    assert html =~ "Jangar"
     assert html =~ "xamt-embed-audio"
     assert html =~ ~s(src="https://cdn.example/cover.jpg")
 
@@ -1139,7 +1139,7 @@ defmodule XamtWeb.ServerLiveTest do
         "type" => "audio_book",
         "provider" => "MyAudioApp",
         "url" => "https://audio-app-domain.com/books/jangar",
-        "title" => "江格尔",
+        "title" => "Jangar",
         "audio_sample_url" => "javascript:alert(1)",
         "cover_url" => "https://127.0.0.1/cover.jpg"
       })

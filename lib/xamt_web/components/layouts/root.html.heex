@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="mn-Mong" class="dark">
+<html lang="mn-Mong" data-theme="steppe-light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="csrf-token" content={get_csrf_token()} />
-    <meta name="theme-color" content="#101412" />
+    <meta name="theme-color" content="#f7f4eb" />
     <meta name="ime-base-url" content={ime_base_url()} />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -50,6 +50,35 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
+    <%!-- Zero-delay theme: apply before CSS paint to avoid flash --%>
+    <script>
+      (function () {
+        var valid = ["steppe-light", "night-sky", "crimson-felt", "jade-meadow"];
+        var darkThemes = { "night-sky": true, "crimson-felt": true };
+        var theme = localStorage.getItem("xamt_theme");
+        if (valid.indexOf(theme) === -1) {
+          var legacy = localStorage.getItem("phx:theme");
+          if (legacy === "light") theme = "steppe-light";
+          else if (legacy === "dark") theme = "night-sky";
+          else if (legacy === "system") {
+            theme = window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "night-sky"
+              : "steppe-light";
+          } else {
+            theme = "steppe-light";
+          }
+        }
+        document.documentElement.setAttribute("data-theme", theme);
+        document.documentElement.classList.toggle("dark", !!darkThemes[theme]);
+        window.addEventListener("xamt:set_theme", function (e) {
+          var next = e.detail && e.detail.theme;
+          if (valid.indexOf(next) === -1) return;
+          document.documentElement.setAttribute("data-theme", next);
+          document.documentElement.classList.toggle("dark", !!darkThemes[next]);
+          localStorage.setItem("xamt_theme", next);
+        });
+      })();
+    </script>
     <.live_title default="Xamt" suffix=" · Xamt">
       {assigns[:page_title]}
     </.live_title>
@@ -116,7 +145,7 @@
           </ul>
 
           <div class="xamt-leftnav__foot">
-            <.theme_toggle />
+            <.theme_palette id="xamt-theme-palette-nav" />
           </div>
         </nav>
       </aside>

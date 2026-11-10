@@ -184,6 +184,14 @@ defmodule XamtWeb.SettingsLive do
           </:subtitle>
         </.header>
 
+        <section id="settings-theme" class="xamt-surface xamt-settings-theme">
+          <h2 class="xamt-section-title mongol-text">{gettext("Theme")}</h2>
+          <p class="xamt-settings-theme__copy mongol-text">
+            {gettext("Choose a Mongolian aesthetic palette.")}
+          </p>
+          <Layouts.theme_palette id="xamt-theme-palette-settings" />
+        </section>
+
         <.form
           for={@form}
           id="settings-form"

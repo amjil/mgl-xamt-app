@@ -1,41 +1,141 @@
 /* Xamt product tokens + class aliases on top of mgl-common-ui.
    Font faces live in the library. --xamt-vh follows --mn-vh (visualViewport). */
 
+/* ==========================================================================
+   Xamt Theme Engine - Four Mongolian Aesthetic Palettes
+   ========================================================================== */
+
+:root,
+[data-theme="steppe-light"] {
+  --xamt-bg: #f7f4eb; /* Warm parchment base */
+  --xamt-bg-2: #efeadd; /* Sidebar / secondary surface */
+  --xamt-bg-3: #e5dec9; /* Hover / active card */
+  --xamt-surface-glass: rgba(247, 244, 235, 0.78);
+  --xamt-text: #1e242b; /* Ink primary text */
+  --xamt-muted: #68707a; /* Metadata text */
+  --xamt-line: rgba(30, 36, 43, 0.10);
+  --xamt-line-strong: rgba(30, 36, 43, 0.18);
+  --xamt-accent: #1d63b8; /* Tengri / khata blue */
+  --xamt-accent-2: #d97706; /* Gilded amber */
+  --xamt-accent-soft: rgba(29, 99, 184, 0.12);
+  --xamt-gold-soft: rgba(217, 119, 6, 0.12);
+  /* Soft parchment depth for color-mix surfaces (not a near-black) */
+  --xamt-shade: #d4cbb8;
+  --xamt-error: #dc2626;
+  --xamt-shadow-card: -4px 4px 16px rgba(20, 24, 30, 0.06);
+  --xamt-shadow-float: -12px 0 32px rgba(15, 23, 42, 0.14);
+  --xamt-shadow: var(--xamt-shadow-card);
+  --xamt-glow-1: #c7d8ec;
+  --xamt-glow-2: #ebd6b0;
+  --xamt-glow-3: #d8d2c0;
+  --xamt-role-admin: #b33a2b;
+  --xamt-role-admin-soft: rgba(179, 58, 43, 0.12);
+  --xamt-role-admin-line: rgba(179, 58, 43, 0.28);
+  --xamt-role-creator: #d97706;
+  --xamt-role-creator-soft: rgba(217, 119, 6, 0.14);
+  --xamt-role-creator-line: rgba(217, 119, 6, 0.32);
+  color-scheme: light;
+}
+
+[data-theme="night-sky"] {
+  --xamt-bg: #0b101b; /* Deep night-sky base */
+  --xamt-bg-2: #111827; /* Rail / secondary surface */
+  --xamt-bg-3: #1e293b; /* Card hover */
+  --xamt-surface-glass: rgba(17, 24, 39, 0.75);
+  --xamt-text: #f1f5f9;
+  --xamt-muted: #94a3b8;
+  --xamt-line: rgba(255, 255, 255, 0.08);
+  --xamt-line-strong: rgba(255, 255, 255, 0.16);
+  --xamt-accent: #38bdf8; /* Starlit ice blue */
+  --xamt-accent-2: #fbbf24; /* Full-moon gold */
+  --xamt-accent-soft: rgba(56, 189, 248, 0.14);
+  --xamt-gold-soft: rgba(251, 191, 36, 0.14);
+  --xamt-shade: #020617;
+  --xamt-error: #f87171;
+  --xamt-shadow-card: -4px 4px 20px rgba(0, 0, 0, 0.35);
+  --xamt-shadow-float: -16px 0 40px rgba(0, 0, 0, 0.6);
+  --xamt-shadow: var(--xamt-shadow-card);
+  --xamt-glow-1: #1e3a5f;
+  --xamt-glow-2: #3d3220;
+  --xamt-glow-3: #132033;
+  --xamt-role-admin: #f87171;
+  --xamt-role-admin-soft: rgba(248, 113, 113, 0.16);
+  --xamt-role-admin-line: rgba(248, 113, 113, 0.36);
+  --xamt-role-creator: #fbbf24;
+  --xamt-role-creator-soft: rgba(251, 191, 36, 0.16);
+  --xamt-role-creator-line: rgba(251, 191, 36, 0.36);
+  color-scheme: dark;
+}
+
+[data-theme="crimson-felt"] {
+  --xamt-bg: #161110; /* Warm dark sandalwood */
+  --xamt-bg-2: #211a18;
+  --xamt-bg-3: #2e2421;
+  --xamt-surface-glass: rgba(33, 26, 24, 0.80);
+  --xamt-text: #f5ebe6;
+  --xamt-muted: #a8948b;
+  --xamt-line: rgba(245, 235, 230, 0.09);
+  --xamt-line-strong: rgba(245, 235, 230, 0.18);
+  --xamt-accent: #e14d2a; /* Traditional vermilion */
+  --xamt-accent-2: #eab308; /* Royal gold trim */
+  --xamt-accent-soft: rgba(225, 77, 42, 0.15);
+  --xamt-gold-soft: rgba(234, 179, 8, 0.14);
+  --xamt-shade: #090605;
+  --xamt-error: #ef4444;
+  --xamt-shadow-card: -4px 4px 20px rgba(0, 0, 0, 0.45);
+  --xamt-shadow-float: -16px 0 40px rgba(0, 0, 0, 0.65);
+  --xamt-shadow: var(--xamt-shadow-card);
+  --xamt-glow-1: #4a2218;
+  --xamt-glow-2: #3d3220;
+  --xamt-glow-3: #2a1814;
+  --xamt-role-admin: #ef4444;
+  --xamt-role-admin-soft: rgba(239, 68, 68, 0.16);
+  --xamt-role-admin-line: rgba(239, 68, 68, 0.36);
+  --xamt-role-creator: #eab308;
+  --xamt-role-creator-soft: rgba(234, 179, 8, 0.16);
+  --xamt-role-creator-line: rgba(234, 179, 8, 0.36);
+  color-scheme: dark;
+}
+
+[data-theme="jade-meadow"] {
+  --xamt-bg: #f2f6f3; /* Meadow mist green-white */
+  --xamt-bg-2: #e4ede7;
+  --xamt-bg-3: #d3e2d8;
+  --xamt-surface-glass: rgba(242, 246, 243, 0.80);
+  --xamt-text: #132a1e;
+  --xamt-muted: #526b5c;
+  --xamt-line: rgba(19, 42, 30, 0.09);
+  --xamt-line-strong: rgba(19, 42, 30, 0.18);
+  --xamt-accent: #0d9488; /* Turquoise */
+  --xamt-accent-2: #0284c7;
+  --xamt-accent-soft: rgba(13, 148, 136, 0.12);
+  --xamt-gold-soft: rgba(2, 132, 199, 0.12);
+  /* Soft meadow depth for color-mix surfaces */
+  --xamt-shade: #c5d4ca;
+  --xamt-error: #e11d48;
+  --xamt-shadow-card: -4px 4px 16px rgba(19, 42, 30, 0.06);
+  --xamt-shadow-float: -12px 0 32px rgba(19, 42, 30, 0.12);
+  --xamt-shadow: var(--xamt-shadow-card);
+  --xamt-glow-1: #bfdac9;
+  --xamt-glow-2: #c7dce8;
+  --xamt-glow-3: #cfe0d4;
+  --xamt-role-admin: #e11d48;
+  --xamt-role-admin-soft: rgba(225, 29, 72, 0.12);
+  --xamt-role-admin-line: rgba(225, 29, 72, 0.28);
+  --xamt-role-creator: #0284c7;
+  --xamt-role-creator-soft: rgba(2, 132, 199, 0.14);
+  --xamt-role-creator-line: rgba(2, 132, 199, 0.32);
+  color-scheme: light;
+}
+
 :root {
   --xamt-font-mongol: "Oyun Qagan Tig", "Mongol Fallback", "Noto Sans Mongolian", "Mongolian Baiti",
     "Menksoft Qagan", serif;
   --xamt-font-ui: "IBM Plex Sans", "Source Sans 3", "Noto Sans", sans-serif;
-  --xamt-bg: #f4efe4;
-  --xamt-bg-2: #fbf7ee;
-  --xamt-bg-3: #e7dfcf;
-  --xamt-line: rgba(120, 95, 50, 0.2);
-  --xamt-line-strong: rgba(120, 95, 50, 0.38);
-  --xamt-text: #1c221e;
-  --xamt-muted: #5f6a5c;
-  --xamt-accent: #2f7d5f;
-  --xamt-accent-2: #8a6a2c;
-  --xamt-accent-soft: rgba(47, 125, 95, 0.14);
-  --xamt-gold-soft: rgba(138, 106, 44, 0.12);
-  /* Role nickname / badge tokens (frontend-only; never stored on users) */
-  --xamt-role-admin: #b33a2b;
-  --xamt-role-admin-soft: rgba(179, 58, 43, 0.12);
-  --xamt-role-admin-line: rgba(179, 58, 43, 0.28);
-  --xamt-error: var(--xamt-role-admin);
-  --xamt-role-creator: #8a6a2c;
-  --xamt-role-creator-soft: rgba(138, 106, 44, 0.14);
-  --xamt-role-creator-line: rgba(138, 106, 44, 0.32);
-  --xamt-shadow: 0 18px 44px rgba(72, 58, 32, 0.16);
-  /* Mixed into surfaces to add depth without a second palette */
-  --xamt-shade: #cfc6b2;
-  /* Ambient page glows */
-  --xamt-glow-1: #bfdac9;
-  --xamt-glow-2: #ead9b8;
-  --xamt-glow-3: #cfe0d4;
   --xamt-paper: var(--xamt-bg);
   --xamt-paper-ink: var(--xamt-text);
   --xamt-radius: 0.95rem;
   --mgl-ime-font: var(--xamt-font-mongol);
-  color-scheme: light;
 
   /* Library viewport token; keep --xamt-vh as the alias used across Xamt CSS. */
   --xamt-vh: var(--mn-vh);
@@ -78,40 +178,15 @@
   --xamt-z-mention: 10050;
 }
 
-:root.dark {
-  --xamt-bg: #101412;
-  --xamt-bg-2: #181e1c;
-  --xamt-bg-3: #232b28;
-  --xamt-line: rgba(201, 165, 106, 0.16);
-  --xamt-line-strong: rgba(201, 165, 106, 0.32);
-  --xamt-text: #f1eee6;
-  --xamt-muted: #9aa396;
-  --xamt-accent: #4aa584;
-  --xamt-accent-2: #c9a56a;
-  --xamt-accent-soft: rgba(74, 165, 132, 0.16);
-  --xamt-gold-soft: rgba(201, 165, 106, 0.14);
-  --xamt-role-admin: #e07060;
-  --xamt-role-admin-soft: rgba(224, 112, 96, 0.16);
-  --xamt-role-admin-line: rgba(224, 112, 96, 0.36);
-  --xamt-error: var(--xamt-role-admin);
-  --xamt-role-creator: #c9a56a;
-  --xamt-role-creator-soft: rgba(201, 165, 106, 0.16);
-  --xamt-role-creator-line: rgba(201, 165, 106, 0.36);
-  --xamt-shadow: 0 18px 44px rgba(0, 0, 0, 0.38);
-  --xamt-shade: #0d1110;
-  --xamt-glow-1: #2a4a3e;
-  --xamt-glow-2: #3d3220;
-  --xamt-glow-3: #1c2e28;
-  color-scheme: dark;
-
-  --mn-bg: var(--xamt-bg);
-  --mn-surface: var(--xamt-bg-2);
-  --mn-line: var(--xamt-line);
-  --mn-line-strong: var(--xamt-line-strong);
-  --mn-text: var(--xamt-text);
-  --mn-muted: var(--xamt-muted);
-  --mn-accent: var(--xamt-accent);
-  --mn-accent-deep: var(--xamt-accent-2);
+/* Smooth color transitions when switching themes */
+body,
+.xamt-rail,
+.xamt-channel-sidebar,
+.xamt-rail--channels,
+.xamt-messages,
+.xamt-message,
+.xamt-composer {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.2s ease;
 }
 
 *,
@@ -214,6 +289,7 @@ body {
 .latin-text,
 .xamt-latin,
 .xamt-theme-toggle,
+.xamt-theme-palette,
 .xamt-link-preview {
   writing-mode: horizontal-tb;
   -webkit-writing-mode: horizontal-tb;

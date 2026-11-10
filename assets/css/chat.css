@@ -131,6 +131,13 @@
   padding: 1.25rem 0.5rem 0.85rem;
 }
 
+.xamt-rail__theme {
+  margin-top: auto;
+  padding-top: 0.75rem;
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+}
+
 .xamt-rail__header {
   appearance: none;
   flex: 0 0 auto;
@@ -375,6 +382,22 @@
   flex: 0 0 auto;
   height: 100%;
   min-height: 0;
+  border-radius: 0.75rem;
+  padding: 0.15rem 0.1rem;
+  border: 1px solid transparent;
+  transition: all 0.18s ease;
+}
+
+.xamt-channel-item:hover {
+  background-color: var(--xamt-bg-3);
+}
+
+.xamt-channel-item:has(.xamt-channel-link.is-active),
+.xamt-channel-item.is-active {
+  background-color: var(--xamt-accent-soft);
+  border-color: color-mix(in srgb, var(--xamt-accent) 30%, transparent);
+  color: var(--xamt-accent);
+  font-weight: 700;
 }
 
 .xamt-channel-item .xamt-channel-link {
@@ -469,13 +492,14 @@
   transition: background-color 150ms ease, box-shadow 150ms ease;
 }
 
-.xamt-channel-link.is-active,
 .xamt-channel-link:hover {
-  background: var(--xamt-bg-3);
+  background: transparent;
 }
 
 .xamt-channel-link.is-active {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--xamt-accent-2) 35%, transparent);
+  background: transparent;
+  color: var(--xamt-accent);
+  box-shadow: none;
 }
 
 .xamt-channel-link.has-unread:not(.is-active) {
