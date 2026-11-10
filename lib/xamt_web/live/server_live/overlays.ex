@@ -454,29 +454,27 @@ defmodule XamtWeb.ServerLive.Overlays do
         class="xamt-bot-modal-card relative z-10"
         phx-hook="MongolianScroll"
       >
-        <%!-- Column 1: title and close --%>
-        <div class="xamt-bot-section">
-          <div class="flex flex-row items-center justify-between h-full">
-            <div class="flex flex-row items-center gap-2">
-              <.icon name="hero-cpu-chip" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
-              <h2 class="text-lg font-bold tracking-wider">
-                {gettext("Bot Manager")}
-              </h2>
-            </div>
-
-            <button
-              type="button"
-              phx-click="close_bot_manager"
-              class="xamt-icon-btn mt-auto"
-              title={gettext("Close")}
-            >
-              <.icon name="hero-x-mark" class="w-5 h-5" />
-            </button>
+        <%!-- Column 1: title and close (flex-row = top→bottom in vertical-lr) --%>
+        <div class="xamt-bot-pane !flex-row justify-between items-center">
+          <div class="flex flex-row items-center gap-2">
+            <.icon name="hero-cpu-chip" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+            <h2 class="text-lg font-bold tracking-wider">
+              {gettext("Bot Manager")}
+            </h2>
           </div>
+
+          <button
+            type="button"
+            phx-click="close_bot_manager"
+            class="xamt-icon-btn"
+            title={gettext("Close")}
+          >
+            <.icon name="hero-x-mark" class="w-5 h-5" />
+          </button>
         </div>
 
         <%!-- Column 2: installed bots and create entry --%>
-        <div class="xamt-bot-section">
+        <div class="xamt-bot-pane">
           <%!-- Create strip --%>
           <button
             type="button"
@@ -526,7 +524,7 @@ defmodule XamtWeb.ServerLive.Overlays do
         <%!-- One-time token notice --%>
         <div
           :if={@newly_issued_token}
-          class="xamt-bot-section bg-amber-500/10 border border-amber-500/40 rounded-xl px-3 py-3"
+          class="xamt-bot-pane bg-amber-500/10 border border-amber-500/40 rounded-xl px-3 py-3"
         >
           <div class="flex flex-row items-center gap-2 text-amber-500 font-bold">
             <.icon name="hero-key" class="w-5 h-5 shrink-0" />
@@ -552,12 +550,12 @@ defmodule XamtWeb.ServerLive.Overlays do
           id="bot-create-form"
           phx-submit="create_and_install_bot"
         >
-          <div class="xamt-bot-section">
+          <div class="xamt-bot-pane">
             <div class="font-bold text-sm text-[var(--xamt-accent)]">
               {gettext("New Bot Details")}
             </div>
 
-            <label class="xamt-field h-full">
+            <label class="xamt-bot-field">
               <span class="xamt-label">{gettext("Bot Name")}</span>
               <input
                 id="new-bot-name-input"
@@ -565,31 +563,31 @@ defmodule XamtWeb.ServerLive.Overlays do
                 name="bot[name]"
                 required
                 placeholder={gettext("Mongolian or general name...")}
-                class="xamt-input h-full"
+                class="xamt-bot-input"
                 phx-hook="MongolianIME"
               />
             </label>
 
-            <label class="xamt-field h-full">
+            <label class="xamt-bot-field">
               <span class="xamt-label">{gettext("Description")}</span>
               <input
                 id="new-bot-desc-input"
                 type="text"
                 name="bot[description]"
                 placeholder={gettext("What this bot does...")}
-                class="xamt-input h-full"
+                class="xamt-bot-input"
                 phx-hook="MongolianIME"
               />
             </label>
 
-            <label class="xamt-field h-full">
+            <label class="xamt-bot-field">
               <span class="xamt-label">{gettext("Webhook URL")}</span>
               <input
                 type="url"
                 name="bot[webhook_url]"
                 required
                 placeholder="https://example.com/webhook"
-                class="xamt-input h-full font-mono text-xs"
+                class="xamt-bot-input font-mono text-xs"
               />
             </label>
 
@@ -609,7 +607,7 @@ defmodule XamtWeb.ServerLive.Overlays do
           <input type="hidden" name="installation_id" value={@selected_installation.id} />
 
           <%!-- Sub-column 1: status and credentials --%>
-          <div class="xamt-bot-section">
+          <div class="xamt-bot-pane">
             <div class="flex flex-row items-center justify-between h-full">
               <span class="font-bold text-base text-[var(--xamt-accent)]">
                 {@selected_installation.bot.name}
@@ -619,12 +617,12 @@ defmodule XamtWeb.ServerLive.Overlays do
               </span>
             </div>
 
-            <label class="xamt-field h-full">
+            <label class="xamt-bot-field">
               <span class="xamt-label">{gettext("Status")}</span>
               <select
                 id={"bot-status-select-#{@selected_installation.id}"}
                 name="status"
-                class="xamt-input"
+                class="xamt-bot-input"
                 phx-hook="MnSelect"
               >
                 <option value="enabled" selected={@selected_installation.status == "enabled"}>
@@ -636,21 +634,21 @@ defmodule XamtWeb.ServerLive.Overlays do
               </select>
             </label>
 
-            <div class="xamt-field h-full">
+            <div class="xamt-bot-field">
               <span class="xamt-label">Webhook URL</span>
               <div class="xamt-bot-code-strip text-[var(--xamt-muted)]">
                 {@selected_installation.bot.webhook_url}
               </div>
             </div>
 
-            <div class="xamt-field h-full">
+            <div class="xamt-bot-field">
               <span class="xamt-label">{gettext("Signing Secret")}</span>
               <div class="xamt-bot-code-strip">
                 {@selected_installation.bot.signing_secret}
               </div>
             </div>
 
-            <div class="xamt-field h-full justify-between">
+            <div class="xamt-bot-field justify-between">
               <span class="xamt-label">
                 Token: {if t = List.first(@selected_installation.tokens),
                   do: t.token_prefix <> "...",
@@ -671,7 +669,7 @@ defmodule XamtWeb.ServerLive.Overlays do
 
           <%!-- Sub-column 2: event subscriptions --%>
           <% current_events = Enum.map(@selected_installation.subscriptions, & &1.event_type) %>
-          <div class="xamt-bot-section">
+          <div class="xamt-bot-pane">
             <div class="font-bold text-sm text-[var(--xamt-accent)]">
               {gettext("Event Subscriptions")}
             </div>
@@ -707,7 +705,7 @@ defmodule XamtWeb.ServerLive.Overlays do
 
           <%!-- Sub-column 3: granted scopes --%>
           <% granted = @selected_installation.granted_scopes %>
-          <div class="xamt-bot-section">
+          <div class="xamt-bot-pane">
             <div class="font-bold text-sm text-[var(--xamt-accent)]">
               {gettext("Granted Scopes")}
             </div>
@@ -740,7 +738,7 @@ defmodule XamtWeb.ServerLive.Overlays do
 
           <%!-- Sub-column 4: allowed channels and save --%>
           <% allowed_cids = @selected_installation.allowed_channel_ids || [] %>
-          <div class="xamt-bot-section">
+          <div class="xamt-bot-pane">
             <div class="font-bold text-sm text-[var(--xamt-accent)]">
               {gettext("Allowed Channels (none = all)")}
             </div>

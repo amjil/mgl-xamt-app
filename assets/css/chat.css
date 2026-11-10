@@ -2741,27 +2741,96 @@ html.xamt-desktop-ime .xamt-composer__emoji {
   display: contents;
 }
 
-/* Every section is a vertical column standing side-by-side from left to right */
-.xamt-bot-section {
+/* ==========================================================================
+   Fixed: Pure Vertical-LR Column Progression (Left-to-Right Columns)
+   ========================================================================== */
+
+/* 1. 每个分区容器：内部的子列必须从左向右（column）排列，而不是从上到下挤压！ */
+.xamt-bot-pane {
   display: flex;
-  /* In vertical-lr, flex-direction: row flows from TOP to BOTTOM */
-  flex-direction: row;
+  /* CRITICAL: In vertical-lr, flex-direction: column places children side-by-side from LEFT to RIGHT! */
+  flex-direction: column;
   align-items: stretch;
-  flex: 0 0 auto;
   height: 100%;
-  min-height: 0;
-  min-width: 3.25rem;
-  padding-right: 1.1rem;
-  margin-right: 1.1rem;
-  border-right: 1px solid var(--xamt-line);
   gap: 0.75rem;
-  box-sizing: border-box;
+  padding-right: 1.25rem;
+  border-right: 1px solid var(--xamt-line);
+  flex-shrink: 0;
 }
 
-.xamt-bot-section:last-child {
+.xamt-bot-pane:last-child {
   border-right: none;
-  margin-right: 0;
-  padding-right: 0.35rem;
+  padding-right: 0.25rem;
+}
+
+/* 2. 单个表单字段：支持标签在左列、输入框在右列，或者同一列内顶部标签+下方输入框 */
+.xamt-bot-field {
+  display: flex;
+  /* Label on the left strip, Input box right next to it on the right strip */
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+  height: 100%;
+  flex-shrink: 0;
+}
+
+.xamt-bot-field > .xamt-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--xamt-muted);
+  padding-top: 0.25rem;
+  flex-shrink: 0;
+}
+
+/* Emoji under the label strip, left of the input (same pattern as .xamt-form--vertical). */
+.xamt-bot-field:has(> .xamt-ime-emoji) {
+  display: grid;
+  /* vertical-lr: rows = left→right, columns = top→bottom */
+  grid-template-rows: auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 0.35rem;
+  row-gap: 0.4rem;
+  align-items: start;
+}
+
+.xamt-bot-field:has(> .xamt-ime-emoji) > .xamt-label {
+  grid-row: 1;
+  grid-column: 1;
+  align-self: start;
+}
+
+.xamt-bot-field > .xamt-ime-emoji,
+.xamt-bot-field > button.xamt-ime-emoji {
+  grid-row: 1;
+  grid-column: 2;
+  align-self: end;
+  justify-self: center;
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+}
+
+.xamt-bot-field:has(> .xamt-ime-emoji) > :is(input, textarea, select, .xamt-ime-mirror) {
+  grid-row: 2;
+  grid-column: 1 / -1;
+}
+
+.xamt-bot-input {
+  writing-mode: vertical-lr;
+  text-orientation: sideways;
+  height: 100%;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  padding: 0.65rem 0.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--xamt-line);
+  background: var(--xamt-bg-2);
+  color: var(--xamt-text);
+  font-size: 0.95rem;
+  flex-shrink: 0;
 }
 
 /* Multi-column wrap container for vertical checkboxes/cards (wraps left-to-right) */
@@ -2857,24 +2926,6 @@ html.xamt-desktop-ime .xamt-composer__emoji {
   box-sizing: border-box;
 }
 
-/* Fields / inputs fill the column height; thickness stays a readable strip */
-.xamt-bot-modal-card .xamt-field {
-  height: 100%;
-  min-height: 0;
-  flex: 0 0 auto;
-}
-
-.xamt-bot-modal-card .xamt-input,
-.xamt-bot-modal-card input.xamt-input,
-.xamt-bot-modal-card select.xamt-input {
-  width: auto;
-  max-width: none;
-  height: auto;
-  min-height: 0;
-  block-size: 2.85rem;
-  inline-size: min(var(--xamt-field-extent), 100%);
-  max-inline-size: none;
-}
 
 /* --------------------------------------------------------------------------
    Mobile (≤960px): full-bleed width + height above Mongolian virtual keyboard

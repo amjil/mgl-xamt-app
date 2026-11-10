@@ -73,7 +73,8 @@ export function attachFieldEmojiTrigger(ime, input, {label = "Emoji"} = {}) {
 
   const existing = fieldEmojiTrigger(input)
   const button = existing || createFieldButton(input, label)
-  if (!existing) placeFieldButton(input, button)
+  // Always (re)place so LiveView morphs / alternate label class names stay correct.
+  placeFieldButton(input, button)
 
   const unbind = bindEmojiTrigger(ime, button)
   const detachMirror = attachEmojiMirror(input)
@@ -112,12 +113,13 @@ function createFieldButton(input, label) {
 
 function placeFieldButton(input, button) {
   const host = emojiHost(input)
-  const label = host?.querySelector(":scope > .xamt-field__label")
+  // Caption may be `.xamt-field__label` (core forms) or `span.xamt-label` (bot fields).
+  const label = host?.querySelector(":scope > .xamt-field__label, :scope > span.xamt-label")
   if (label) {
     label.insertAdjacentElement("afterend", button)
     return
   }
-  input.insertAdjacentElement("afterend", button)
+  input.insertAdjacentElement("beforebegin", button)
 }
 
 function emojiHost(input) {
