@@ -212,10 +212,15 @@ defmodule Xamt.Bots.DeliveryWorker do
     with true <- uri.scheme in ["http", "https"],
          host when is_binary(host) <- uri.host,
          {:ok, ips} <- :inet.getaddrs(String.to_charlist(host), :inet) do
-      if Enum.any?(ips, &private_ip?/1) do
-        {:error, :ssrf_blocked_private_ip}
-      else
-        :ok
+      cond do
+        allow_private_hosts?() ->
+          :ok
+
+        Enum.any?(ips, &private_ip?/1) ->
+          {:error, :ssrf_blocked_private_ip}
+
+        true ->
+          :ok
       end
     else
       _ -> {:error, :invalid_webhook_host}
@@ -230,5 +235,11 @@ defmodule Xamt.Bots.DeliveryWorker do
   defp private_ip?({0, 0, 0, 0}), do: true
   defp private_ip?(_), do: false
 
+  # Local Echo Bot / tunnel-less development only. Keep false in production.
+  defp allow_private_hosts? do
+    Keyword.get(worker_config(), :allow_private_hosts, false) == true
+  end
+
   defp worker_config, do: Application.get_env(:xamt, __MODULE__, [])
 end
+

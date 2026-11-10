@@ -114,4 +114,65 @@ defmodule Xamt.Bots.DeliveryWorkerTest do
 
     assert length(jobs) == 1
   end
+
+  test "blocks private webhook hosts unless allow_private_hosts is enabled", %{
+    owner_scope: scope,
+    channel: channel,
+    installation: inst
+  } do
+    bot = Repo.preload(inst, :bot).bot
+
+    {:ok, %{bot: _updated}} =
+      Bots.update_bot(bot, %{"webhook_url" => "http://127.0.0.1:4001/webhooks/xamt/#{bot.id}"})
+
+    Application.put_env(:xamt, DeliveryWorker,
+      max_attempts: 5,
+      timeout_ms: 5_000,
+      allow_private_hosts: false,
+      req_options: [plug: {Req.Test, DeliveryWorker}]
+    )
+
+    assert {:ok, _message} =
+             Messages.create_message(scope, channel.id, %{"content_html" => "<p>ssrf</p>"})
+
+    blocked =
+      Repo.one!(
+        from e in BotEvent,
+          where: e.bot_installation_id == ^inst.id and e.event_type == "message.created",
+          order_by: [desc: e.inserted_at],
+          limit: 1
+      )
+
+    result = Oban.drain_queue(queue: :bot_webhook_delivery)
+    assert result.failure >= 1
+    assert Repo.get!(BotEvent, blocked.id).status in ["failed", "dead", "processing"]
+
+    Application.put_env(:xamt, DeliveryWorker,
+      max_attempts: 5,
+      timeout_ms: 5_000,
+      allow_private_hosts: true,
+      req_options: [plug: {Req.Test, DeliveryWorker}]
+    )
+
+    Req.Test.stub(DeliveryWorker, fn conn ->
+      Req.Test.json(conn, %{ok: true})
+    end)
+
+    assert {:ok, _message} =
+             Messages.create_message(scope, channel.id, %{"content_html" => "<p>local</p>"})
+
+    allowed =
+      Repo.one!(
+        from e in BotEvent,
+          where: e.bot_installation_id == ^inst.id and e.event_type == "message.created",
+          order_by: [desc: e.inserted_at],
+          limit: 1
+      )
+
+    assert %{success: success} = Oban.drain_queue(queue: :bot_webhook_delivery)
+    assert success >= 1
+    assert Repo.get!(BotEvent, allowed.id).status == "delivered"
+  end
 end
+
+

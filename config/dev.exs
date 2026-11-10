@@ -52,6 +52,10 @@ config :xamt, XamtWeb.Endpoint,
 # Enable dev routes for dashboard and mailbox
 config :xamt, dev_routes: true
 
+# Allow webhook delivery to loopback / private IPs so a local xamt-bot
+# (e.g. http://127.0.0.1:4001/webhooks/xamt/:id) can receive events.
+config :xamt, Xamt.Bots.DeliveryWorker, allow_private_hosts: true
+
 # Uploads: export XAMT_S3_* then start the server, e.g.
 #   export XAMT_S3_ENDPOINT=http://127.0.0.1:8333
 #   export XAMT_S3_BUCKET=xamt

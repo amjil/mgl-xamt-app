@@ -57,7 +57,9 @@ config :xamt,
 
 config :xamt, Xamt.Bots.DeliveryWorker,
   max_attempts: 5,
-  timeout_ms: 5_000
+  timeout_ms: 5_000,
+  # Override in config/dev.exs for local xamt-bot on 127.0.0.1.
+  allow_private_hosts: false
 
 # Durable background jobs (bot webhooks, link previews, web push).
 config :xamt, Oban,

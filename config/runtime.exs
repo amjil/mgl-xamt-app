@@ -54,6 +54,10 @@ if timeout = System.get_env("BOT_WEBHOOK_TIMEOUT") do
   config :xamt, Xamt.Bots.DeliveryWorker, timeout_ms: String.to_integer(timeout)
 end
 
+if System.get_env("BOT_WEBHOOK_ALLOW_PRIVATE_HOSTS") in ~w(true 1) do
+  config :xamt, Xamt.Bots.DeliveryWorker, allow_private_hosts: true
+end
+
 vapid_public_key = System.get_env("VAPID_PUBLIC_KEY")
 vapid_private_key = System.get_env("VAPID_PRIVATE_KEY")
 
