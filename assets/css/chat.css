@@ -2700,6 +2700,16 @@ html.xamt-desktop-ime .xamt-composer__emoji {
   --xamt-bot-modal-avail: min(42rem, calc(var(--xamt-vh, 100dvh) - 2rem));
 }
 
+/* Keep the sheet above the Mongolian virtual keyboard when it opens */
+body.mgl-ime-mobile-open .xamt-modal:has(.xamt-bot-modal-card),
+body:has(mgl-keyboard[visible]) .xamt-modal:has(.xamt-bot-modal-card) {
+  align-items: flex-start;
+  padding-top: max(0.5rem, var(--xamt-safe-top, 0px));
+  --xamt-bot-modal-avail: calc(
+    var(--xamt-vh, 100dvh) - var(--xamt-ime-kb, 250px) - 0.5rem
+  );
+}
+
 /* ==========================================================================
    Bot Platform Manager Modal (Pure Traditional Mongolian Vertical-LR Layout)
    Columns pack LEFT → RIGHT; overflow scrolls horizontally.
@@ -2734,10 +2744,16 @@ html.xamt-desktop-ime .xamt-composer__emoji {
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x;
+  transition: height 0.2s ease;
 }
 
 /* Forms unwrap so their sections join the same left→right scroll strip */
 .xamt-bot-modal-card > form {
+  display: contents;
+}
+
+/* Installation strips stay siblings of the create button via display:contents */
+.xamt-bot-installs {
   display: contents;
 }
 
@@ -2945,8 +2961,11 @@ html.xamt-desktop-ime .xamt-composer__emoji {
     justify-content: stretch;
   }
 
-  body.mgl-ime-mobile-open .xamt-modal:has(.xamt-bot-modal-card) {
+  body.mgl-ime-mobile-open .xamt-modal:has(.xamt-bot-modal-card),
+  body:has(mgl-keyboard[visible]) .xamt-modal:has(.xamt-bot-modal-card) {
+    align-items: flex-start;
     padding-top: max(0.35rem, var(--xamt-safe-top, 0px));
+    --xamt-bot-modal-avail: calc(var(--xamt-vh, 100dvh) - var(--xamt-ime-kb, 230px));
   }
 
   .xamt-bot-modal-card {
@@ -2963,6 +2982,11 @@ html.xamt-desktop-ime .xamt-composer__emoji {
       max(0.85rem, var(--xamt-safe-right, 0px))
       max(0.85rem, var(--xamt-safe-bottom, 0px))
       max(0.85rem, var(--xamt-safe-left, 0px));
+  }
+
+  /* Create mode: collapse installation list to free horizontal space */
+  .xamt-bot-pane--hide-mobile {
+    display: none;
   }
 }
 

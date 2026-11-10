@@ -1201,8 +1201,6 @@ defmodule Xamt.Messages do
     end)
   end
 
-  defp bot_ids_for_user_ids([]), do: []
-
   defp bot_ids_for_user_ids(user_ids) when is_list(user_ids) do
     from(b in Xamt.Bots.Bot, where: b.bot_user_id in ^user_ids, select: b.id)
     |> Repo.all()

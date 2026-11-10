@@ -475,7 +475,7 @@ defmodule XamtWeb.ServerLive.Overlays do
 
         <%!-- Column 2: installed bots and create entry --%>
         <div class="xamt-bot-pane">
-          <%!-- Create strip --%>
+          <%!-- Create strip (stays visible so mobile create mode can return to list) --%>
           <button
             type="button"
             phx-click="toggle_bot_create_form"
@@ -485,39 +485,45 @@ defmodule XamtWeb.ServerLive.Overlays do
             ]}
           >
             <.icon name="hero-plus-circle" class="w-5 h-5 shrink-0" />
-            <span>{gettext("Register & Install Bot")}</span>
+            <span>
+              {if @show_create_form,
+                do: gettext("Back to list"),
+                else: gettext("Register & Install Bot")}
+            </span>
           </button>
 
-          <%!-- Installation list --%>
-          <div
-            :for={inst <- @installations}
-            phx-click="select_bot_installation"
-            phx-value-id={inst.id}
-            class={[
-              "xamt-bot-strip",
-              @selected_installation && @selected_installation.id == inst.id && !@show_create_form &&
-                "is-active"
-            ]}
-          >
-            <div class="flex flex-row items-center gap-2">
-              <span class={[
-                "w-2.5 h-2.5 rounded-full shrink-0",
-                inst.status == "enabled" && "bg-emerald-500",
-                inst.status != "enabled" && "bg-zinc-400"
-              ]} />
-              <span class="font-bold text-base">{inst.bot.name}</span>
+          <%!-- Installation list: collapse on mobile while creating to free horizontal space --%>
+          <div class={["xamt-bot-installs", @show_create_form && "xamt-bot-pane--hide-mobile"]}>
+            <div
+              :for={inst <- @installations}
+              phx-click="select_bot_installation"
+              phx-value-id={inst.id}
+              class={[
+                "xamt-bot-strip",
+                @selected_installation && @selected_installation.id == inst.id && !@show_create_form &&
+                  "is-active"
+              ]}
+            >
+              <div class="flex flex-row items-center gap-2">
+                <span class={[
+                  "w-2.5 h-2.5 rounded-full shrink-0",
+                  inst.status == "enabled" && "bg-emerald-500",
+                  inst.status != "enabled" && "bg-zinc-400"
+                ]} />
+                <span class="font-bold text-base">{inst.bot.name}</span>
+              </div>
+
+              <span class="text-xs text-[var(--xamt-muted)]">
+                {if inst.status == "enabled", do: gettext("Enabled"), else: gettext("Disabled")}
+              </span>
             </div>
 
-            <span class="text-xs text-[var(--xamt-muted)]">
-              {if inst.status == "enabled", do: gettext("Enabled"), else: gettext("Disabled")}
-            </span>
-          </div>
-
-          <div
-            :if={@installations == []}
-            class="flex flex-row items-center justify-center h-full text-xs text-[var(--xamt-muted)] px-2"
-          >
-            {gettext("No bots installed yet")}
+            <div
+              :if={@installations == []}
+              class="flex flex-row items-center justify-center h-full text-xs text-[var(--xamt-muted)] px-2"
+            >
+              {gettext("No bots installed yet")}
+            </div>
           </div>
         </div>
 

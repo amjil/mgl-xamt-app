@@ -40,6 +40,23 @@ export function attachMongolianWheelScroll(_el) {
 }
 
 export const MongolianScroll = {
-  mounted() {},
-  destroyed() {},
+  mounted() {
+    if (!this.el.classList.contains("xamt-bot-modal-card")) return
+
+    // Keep focused bot-manager fields visible above the Mongolian virtual keyboard.
+    this._onFocusIn = (event) => {
+      const target = event.target
+      if (!(target instanceof HTMLElement)) return
+      if (!target.matches("input, textarea, select")) return
+
+      window.setTimeout(() => {
+        target.scrollIntoView({behavior: "smooth", inline: "center", block: "nearest"})
+      }, 150)
+    }
+
+    this.el.addEventListener("focusin", this._onFocusIn)
+  },
+  destroyed() {
+    if (this._onFocusIn) this.el.removeEventListener("focusin", this._onFocusIn)
+  },
 }

@@ -16,7 +16,6 @@ defmodule Xamt.Bots.DeliveryWorker do
       states: [:available, :scheduled, :executing, :retryable]
     ]
 
-  require Logger
   import Ecto.Query
   alias Xamt.Repo
   alias Xamt.Bots.BotEvent

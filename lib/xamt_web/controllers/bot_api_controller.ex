@@ -322,12 +322,6 @@ defmodule XamtWeb.BotApiController do
         |> put_status(:unauthorized)
         |> json(%{ok: false, error: "invalid_or_revoked_token"})
         |> halt()
-
-      _ ->
-        conn
-        |> put_status(:unauthorized)
-        |> json(%{ok: false, error: "invalid_or_revoked_token"})
-        |> halt()
     end
   end
 
