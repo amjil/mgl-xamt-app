@@ -78,6 +78,16 @@ defmodule Xamt.BotsTest do
     assert length(events) == 1
     assert hd(events).payload["message"]["id"] == message.id
     assert hd(events).status == "pending"
+
+    jobs =
+      Repo.all(
+        from j in Oban.Job,
+          where: j.worker == "Xamt.Bots.DeliveryWorker",
+          where: fragment("?->>'event_id' = ?", j.args, ^hd(events).id)
+      )
+
+    assert length(jobs) == 1
+    assert hd(jobs).queue == "bot_webhook_delivery"
   end
 
   test "rotate_installation_token invalidates old token", %{

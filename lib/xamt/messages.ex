@@ -63,7 +63,6 @@ defmodule Xamt.Messages do
       broadcast(channel_id, :new_message, strip_for_broadcast(message))
       Xamt.Messages.LinkPreview.maybe_fetch_and_update(message)
       Xamt.Notifications.WebPush.notify_mentions(message)
-      Xamt.Bots.DeliveryWorker.trigger_sweep()
       {:ok, message}
     end
   end
@@ -102,7 +101,6 @@ defmodule Xamt.Messages do
         broadcast(message.channel_id, :updated_message, strip_for_broadcast(message))
         Xamt.Messages.LinkPreview.maybe_fetch_and_update(message)
         Xamt.Notifications.WebPush.notify_mentions(message, except: previous_mention_ids)
-        Xamt.Bots.DeliveryWorker.trigger_sweep()
         {:ok, message}
       end
     end
@@ -133,7 +131,6 @@ defmodule Xamt.Messages do
           deleted = preload_message!(deleted)
           LastMessageCache.refresh(deleted.channel_id)
           broadcast(deleted.channel_id, :deleted_message, strip_for_broadcast(deleted))
-          Xamt.Bots.DeliveryWorker.trigger_sweep()
           {:ok, deleted}
 
         {:error, _op, value, _changes} ->
@@ -1238,8 +1235,6 @@ defmodule Xamt.Messages do
             }
           }
         })
-
-        Xamt.Bots.DeliveryWorker.trigger_sweep()
     end
   end
 end

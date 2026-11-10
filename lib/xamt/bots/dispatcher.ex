@@ -149,7 +149,16 @@ defmodule Xamt.Bots.Dispatcher do
     if events_to_insert == [] do
       []
     else
-      {_count, inserted} = repo.insert_all(BotEvent, events_to_insert, returning: [:id])
+      {_count, inserted} =
+        repo.insert_all(BotEvent, events_to_insert, returning: [:id, :max_retries])
+
+      jobs =
+        Enum.map(inserted, fn event ->
+          Xamt.Bots.DeliveryWorker.enqueue_changeset(event.id, max_attempts: event.max_retries)
+        end)
+
+      # Same Repo transaction as the outbox insert when called from Multi/transact.
+      _ = Oban.insert_all(jobs)
       inserted
     end
   end

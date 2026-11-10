@@ -1,135 +1,156 @@
 defmodule Xamt.Bots.DeliveryWorker do
-  @moduledoc false
+  @moduledoc """
+  Delivers a single `bot_events` row to the bot webhook over HTTPS.
 
-  use GenServer
+  Jobs are inserted in the same DB transaction as the outbox row (see
+  `Xamt.Bots.Dispatcher`). Retries and backoff are handled by Oban; the
+  event row mirrors status for the admin UI.
+  """
+
+  use Oban.Worker,
+    queue: :bot_webhook_delivery,
+    max_attempts: 5,
+    unique: [
+      period: :infinity,
+      keys: [:event_id],
+      states: [:available, :scheduled, :executing, :retryable]
+    ]
+
   require Logger
   import Ecto.Query
   alias Xamt.Repo
   alias Xamt.Bots.BotEvent
 
-  @poll_interval_ms 2_000
-  @batch_size 20
-  @http_timeout_ms 5_000
+  @doc """
+  Builds an Oban job changeset for a pending bot event.
+  """
+  def enqueue_changeset(event_id, opts \\ []) when is_binary(event_id) do
+    max_attempts =
+      Keyword.get_lazy(opts, :max_attempts, fn ->
+        Keyword.get(worker_config(), :max_attempts, 5)
+      end)
 
-  def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+    %{"event_id" => event_id}
+    |> new(max_attempts: max_attempts)
   end
 
-  @doc "Wakes the worker to deliver queued events immediately."
-  def trigger_sweep do
-    if Process.whereis(__MODULE__) do
-      send(__MODULE__, :sweep)
-    end
+  @doc """
+  Inserts (or re-inserts) a delivery job for a bot event.
+  """
+  def enqueue(event_id, opts \\ []) when is_binary(event_id) do
+    event_id
+    |> enqueue_changeset(opts)
+    |> Oban.insert()
   end
 
-  @impl true
-  def init(_opts) do
-    schedule_sweep()
-    {:ok, %{}}
+  @impl Oban.Worker
+  def backoff(%Oban.Job{attempt: attempt}) do
+    trunc(:math.pow(2, attempt - 1) * 15)
   end
 
-  @impl true
-  def handle_info(:sweep, state) do
+  @impl Oban.Worker
+  def perform(%Oban.Job{
+        args: %{"event_id" => event_id},
+        attempt: attempt,
+        max_attempts: max_attempts
+      }) do
     if Application.get_env(:xamt, :bot_webhook_delivery_enabled, true) do
-      claim_and_dispatch_events()
+      deliver_event(event_id, attempt, max_attempts)
+    else
+      {:cancel, :webhook_delivery_disabled}
     end
-
-    schedule_sweep()
-    {:noreply, state}
   end
 
-  defp schedule_sweep do
-    Process.send_after(self(), :sweep, @poll_interval_ms)
-  end
-
-  defp claim_and_dispatch_events do
+  defp deliver_event(event_id, attempt, max_attempts) do
     now = DateTime.utc_now()
 
-    events =
-      case Repo.transact(fn ->
-             ids =
-               from(e in BotEvent,
-                 where: e.status in ["pending", "failed"] and e.next_attempt_at <= ^now,
-                 order_by: [asc: e.next_attempt_at],
-                 limit: @batch_size,
-                 lock: "FOR UPDATE SKIP LOCKED",
-                 select: e.id
-               )
-               |> Repo.all()
+    case Repo.get(BotEvent, event_id) |> maybe_preload_bot() do
+      nil ->
+        {:cancel, :event_not_found}
 
-             events =
-               if ids == [] do
-                 []
-               else
-                 from(e in BotEvent, where: e.id in ^ids)
-                 |> Repo.update_all(set: [status: "processing", updated_at: now])
+      %BotEvent{status: "delivered"} ->
+        :ok
 
-                 from(e in BotEvent, where: e.id in ^ids, preload: [:bot])
-                 |> Repo.all()
-               end
+      %BotEvent{bot: nil} ->
+        mark_dead(event_id, %{"error" => "bot_missing"}, now)
+        {:cancel, :bot_missing}
 
-             {:ok, events}
-           end) do
-        {:ok, list} -> list
-        _ -> []
-      end
+      %BotEvent{bot: bot} = event ->
+        mark_processing(event_id, attempt, now)
 
-    Enum.each(events, fn event ->
-      Task.Supervisor.start_child(Xamt.TaskSupervisor, fn ->
-        deliver_single_event(event)
-      end)
-    end)
+        start_time = System.monotonic_time(:millisecond)
+
+        with :ok <- validate_ssrf_safe_url(bot.webhook_url),
+             {:ok, status_code, resp_body} <- send_signed_webhook(bot, event),
+             true <- status_code in 200..299 do
+          duration = System.monotonic_time(:millisecond) - start_time
+
+          from(e in BotEvent, where: e.id == ^event.id)
+          |> Repo.update_all(
+            set: [
+              status: "delivered",
+              delivered_at: DateTime.utc_now(),
+              retry_count: attempt - 1,
+              execution_result: %{
+                "http_status" => status_code,
+                "duration_ms" => duration,
+                "response_snippet" => String.slice(resp_body, 0, 200)
+              },
+              updated_at: DateTime.utc_now()
+            ]
+          )
+
+          :ok
+        else
+          error_reason ->
+            handle_delivery_failure(event, attempt, max_attempts, error_reason)
+        end
+    end
   end
 
-  defp deliver_single_event(%BotEvent{bot: bot} = event) do
-    start_time = System.monotonic_time(:millisecond)
+  defp maybe_preload_bot(nil), do: nil
+  defp maybe_preload_bot(event), do: Repo.preload(event, :bot)
 
-    with :ok <- validate_ssrf_safe_url(bot.webhook_url),
-         {:ok, status_code, resp_body} <- send_signed_webhook(bot, event),
-         true <- status_code in 200..299 do
-      duration = System.monotonic_time(:millisecond) - start_time
-
-      from(e in BotEvent, where: e.id == ^event.id)
-      |> Repo.update_all(
-        set: [
-          status: "delivered",
-          delivered_at: DateTime.utc_now(),
-          execution_result: %{
-            "http_status" => status_code,
-            "duration_ms" => duration,
-            "response_snippet" => String.slice(resp_body, 0, 200)
-          },
-          updated_at: DateTime.utc_now()
-        ]
-      )
-    else
-      error_reason ->
-        handle_delivery_failure(event, error_reason)
-    end
+  defp mark_processing(event_id, attempt, now) do
+    from(e in BotEvent, where: e.id == ^event_id)
+    |> Repo.update_all(
+      set: [
+        status: "processing",
+        retry_count: max(attempt - 1, 0),
+        updated_at: now
+      ]
+    )
   end
 
   defp send_signed_webhook(bot, event) do
     timestamp = DateTime.utc_now() |> DateTime.to_unix() |> Integer.to_string()
     body_json = Jason.encode!(event.payload)
+    timeout_ms = Keyword.get(worker_config(), :timeout_ms, 5_000)
 
     mac =
       :crypto.mac(:hmac, :sha256, bot.signing_secret, "#{timestamp}.#{body_json}")
       |> Base.encode16(case: :lower)
 
-    case Req.post(bot.webhook_url,
-           body: body_json,
-           headers: [
-             {"content-type", "application/json"},
-             {"user-agent", "Xamt-Bot-Webhook/1.0"},
-             {"x-xamt-event", event.event_type},
-             {"x-xamt-delivery", event.id},
-             {"x-xamt-timestamp", timestamp},
-             {"x-xamt-signature-256", "sha256=" <> mac}
-           ],
-           receive_timeout: @http_timeout_ms,
-           connect_options: [timeout: 3_000],
-           redirect: false
-         ) do
+    req_opts =
+      Keyword.merge(
+        [
+          body: body_json,
+          headers: [
+            {"content-type", "application/json"},
+            {"user-agent", "Xamt-Bot-Webhook/1.0"},
+            {"x-xamt-event", event.event_type},
+            {"x-xamt-delivery", event.id},
+            {"x-xamt-timestamp", timestamp},
+            {"x-xamt-signature-256", "sha256=" <> mac}
+          ],
+          receive_timeout: timeout_ms,
+          connect_options: [timeout: 3_000],
+          redirect: false
+        ],
+        Keyword.get(worker_config(), :req_options, [])
+      )
+
+    case Req.post(bot.webhook_url, req_opts) do
       {:ok, %Req.Response{status: status_code, body: resp_body}} ->
         {:ok, status_code, response_body_to_string(resp_body)}
 
@@ -141,17 +162,10 @@ defmodule Xamt.Bots.DeliveryWorker do
   defp response_body_to_string(body) when is_binary(body), do: body
   defp response_body_to_string(body), do: inspect(body)
 
-  defp handle_delivery_failure(event, reason) do
-    new_retry = event.retry_count + 1
+  defp handle_delivery_failure(event, attempt, max_attempts, reason) do
     now = DateTime.utc_now()
-
-    {new_status, next_attempt} =
-      if new_retry >= event.max_retries do
-        {"dead", now}
-      else
-        backoff_seconds = Integer.pow(2, new_retry - 1) * 15
-        {"failed", DateTime.add(now, backoff_seconds, :second)}
-      end
+    event_max = event.max_retries || max_attempts
+    exhausted? = attempt >= max_attempts or attempt >= event_max
 
     error_detail =
       case reason do
@@ -160,12 +174,32 @@ defmodule Xamt.Bots.DeliveryWorker do
         other -> %{"error" => inspect(other)}
       end
 
-    from(e in BotEvent, where: e.id == ^event.id)
+    if exhausted? do
+      mark_dead(event.id, error_detail, now)
+    else
+      backoff_seconds = trunc(:math.pow(2, attempt - 1) * 15)
+
+      from(e in BotEvent, where: e.id == ^event.id)
+      |> Repo.update_all(
+        set: [
+          status: "failed",
+          retry_count: attempt,
+          next_attempt_at: DateTime.add(now, backoff_seconds, :second),
+          execution_result: error_detail,
+          updated_at: now
+        ]
+      )
+    end
+
+    {:error, error_detail}
+  end
+
+  defp mark_dead(event_id, error_detail, now) do
+    from(e in BotEvent, where: e.id == ^event_id)
     |> Repo.update_all(
       set: [
-        status: new_status,
-        retry_count: new_retry,
-        next_attempt_at: next_attempt,
+        status: "dead",
+        next_attempt_at: now,
         execution_result: error_detail,
         updated_at: now
       ]
@@ -195,4 +229,6 @@ defmodule Xamt.Bots.DeliveryWorker do
   defp private_ip?({169, 254, _, _}), do: true
   defp private_ip?({0, 0, 0, 0}), do: true
   defp private_ip?(_), do: false
+
+  defp worker_config, do: Application.get_env(:xamt, __MODULE__, [])
 end

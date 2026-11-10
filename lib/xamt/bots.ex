@@ -522,7 +522,7 @@ defmodule Xamt.Bots do
             resource_id: event.id
           })
 
-        Xamt.Bots.DeliveryWorker.trigger_sweep()
+        _ = Xamt.Bots.DeliveryWorker.enqueue(event.id, max_attempts: event.max_retries)
         {:ok, Repo.get!(BotEvent, event.id)}
 
       _ ->

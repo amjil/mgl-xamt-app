@@ -3,8 +3,8 @@ defmodule Xamt.Notifications.WebPush do
   Sends Web Push notifications when a user is @mentioned.
 
   Encryption and VAPID signing are done by `web_push_ex`; the HTTP POST uses
-  Req. Work runs under `Xamt.TaskSupervisor` so `create_message/3` is not
-  blocked by slow push services.
+  Req. Work is enqueued on Oban's `web_push` queue so `create_message/3` is
+  not blocked by slow push services.
   """
 
   use Gettext, backend: XamtWeb.Gettext
@@ -41,13 +41,22 @@ defmodule Xamt.Notifications.WebPush do
   def notify_mentions(_, _), do: :ok
 
   @doc """
-  Puts a mention push on the background supervisor.
+  Enqueues a mention push (or runs inline when `async: false`).
   """
   def send_mention_notification(mentioned_user, message) do
     user_id = user_id(mentioned_user)
 
-    run(fn -> deliver_mention(user_id, message) end)
+    if async?() do
+      %{user_id: user_id, message_id: message.id}
+      |> Xamt.Workers.WebPushWorker.new()
+      |> Oban.insert()
+    else
+      deliver_mention(user_id, message)
+    end
   end
+
+  @doc false
+  def deliver_mention_now(user_id, message), do: deliver_mention(user_id, message)
 
   defp deliver_mention(user_id, message) do
     subs = Notifications.list_user_subscriptions(user_id)
@@ -144,14 +153,6 @@ defmodule Xamt.Notifications.WebPush do
 
   defp user_id(%{id: id}) when is_binary(id), do: id
   defp user_id(id) when is_binary(id), do: id
-
-  defp run(fun) do
-    if async?() do
-      Task.Supervisor.start_child(Xamt.TaskSupervisor, fun)
-    else
-      fun.()
-    end
-  end
 
   defp enabled?, do: Keyword.get(config(), :enabled, true)
   defp async?, do: Keyword.get(config(), :async, true)

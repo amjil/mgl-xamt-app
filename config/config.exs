@@ -53,8 +53,26 @@ config :xamt, :ets_cache_warmup, true
 # Bot platform feature flags (overridable via runtime env).
 config :xamt,
   bot_api_enabled: true,
-  bot_webhook_delivery_enabled: true,
-  start_bot_delivery_worker: true
+  bot_webhook_delivery_enabled: true
+
+config :xamt, Xamt.Bots.DeliveryWorker,
+  max_attempts: 5,
+  timeout_ms: 5_000
+
+# Durable background jobs (bot webhooks, link previews, web push).
+config :xamt, Oban,
+  engine: Oban.Engines.Basic,
+  notifier: Oban.Notifiers.Postgres,
+  repo: Xamt.Repo,
+  queues: [
+    bot_webhook_delivery: 20,
+    link_preview: 10,
+    web_push: 10
+  ],
+  plugins: [
+    {Oban.Plugins.Pruner, max_age: 60 * 60 * 24 * 7},
+    {Oban.Plugins.Lifeline, rescue_after: :timer.minutes(30)}
+  ]
 
 # User media storage. Override to S3/SeaweedFS via XAMT_S3_* in runtime.exs.
 config :xamt, Xamt.Storage, adapter: Xamt.Storage.Local

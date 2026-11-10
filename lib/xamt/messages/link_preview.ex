@@ -6,8 +6,8 @@ defmodule Xamt.Messages.LinkPreview do
   Bilibili become video cards, configured audiobook hosts become player
   cards, and everything else stays an Open Graph article. HTTP fetches never
   auto-follow redirects: each `Location` hop is re-validated with the same
-  public-host checks as the initial URL (SSRF defense). Work runs under
-  `Xamt.TaskSupervisor` so `create_message/3` is not blocked by slow or
+  public-host checks as the initial URL (SSRF defense). Work is enqueued on
+  Oban's `link_preview` queue so `create_message/3` is not blocked by slow or
   failing remote sites. Fetch failures are silent: the original message
   stays visible without a card.
 
@@ -122,11 +122,24 @@ defmodule Xamt.Messages.LinkPreview do
         :ok
 
       true ->
-        run(fn -> unfurl(message, url) end)
+        enqueue_or_run(message, url)
     end
   end
 
   def maybe_fetch_and_update(_), do: :ok
+
+  @doc false
+  def unfurl_now(%Message{} = message, url) when is_binary(url), do: unfurl(message, url)
+
+  defp enqueue_or_run(message, url) do
+    if async?() do
+      %{message_id: message.id, url: url}
+      |> Xamt.Workers.LinkPreviewWorker.new()
+      |> Oban.insert()
+    else
+      unfurl(message, url)
+    end
+  end
 
   defp unfurl(message, url) do
     case classify(url) do
@@ -920,14 +933,6 @@ defmodule Xamt.Messages.LinkPreview do
   defp public_ip?({a, _, _, _, _, _, _, _}) when a in 0xFC00..0xFDFF, do: false
   defp public_ip?({a, _, _, _, _, _, _, _}) when a in 0xFE80..0xFEBF, do: false
   defp public_ip?({_, _, _, _, _, _, _, _}), do: true
-
-  defp run(fun) do
-    if async?() do
-      Task.Supervisor.start_child(Xamt.TaskSupervisor, fun)
-    else
-      fun.()
-    end
-  end
 
   defp audio_book_hosts do
     hosts = Keyword.get(config(), :audio_book_hosts, ["audio-app-domain.com"])

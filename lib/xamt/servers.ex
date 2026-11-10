@@ -590,8 +590,6 @@ defmodule Xamt.Servers do
         "member" => member_payload(user)
       }
     })
-
-    Xamt.Bots.DeliveryWorker.trigger_sweep()
   end
 
   defp maybe_enqueue_member_left_bot_event(server_id, left_user, actor) do
@@ -611,8 +609,6 @@ defmodule Xamt.Servers do
         "member" => member_payload(left_user)
       }
     })
-
-    Xamt.Bots.DeliveryWorker.trigger_sweep()
   end
 
   defp member_payload(%{id: id, username: username} = user) do

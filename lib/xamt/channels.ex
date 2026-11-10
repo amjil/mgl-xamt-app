@@ -371,7 +371,6 @@ defmodule Xamt.Channels do
       }
     })
 
-    Xamt.Bots.DeliveryWorker.trigger_sweep()
     {:ok, channel}
   end
 
