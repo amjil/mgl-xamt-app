@@ -85,8 +85,12 @@ config :xamt, XamtWeb.Endpoint,
 # at the `config/runtime.exs`.
 config :xamt, Xamt.Mailer, adapter: Swoosh.Adapters.Local
 
-# Override with MGL_COMMON_UI_PATH if the library is not a sibling of this app.
+# Sibling front-end packages copied by `mix xamt.vendor`. Override with
+# MGL_COMMON_UI_PATH / MGL_WEB_IME_PATH / MONGOLIAN_EDITOR_PATH when the
+# libraries are not checked out next to this app.
 config :xamt, :mgl_common_ui_path, Path.expand("../../mgl-common-ui.js", __DIR__)
+config :xamt, :mgl_web_ime_path, Path.expand("../../mgl-web-ime.js", __DIR__)
+config :xamt, :mongolian_editor_path, Path.expand("../../richtext-editor.js", __DIR__)
 
 # Configure esbuild (the version is required)
 config :esbuild,

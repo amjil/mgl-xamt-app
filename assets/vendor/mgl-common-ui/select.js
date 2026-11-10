@@ -8,7 +8,14 @@
  *
  * For LiveView, wrap the <select> in an element with phx-update="ignore" and
  * call enhanceSelect from a hook on that wrapper (or on the select).
+ *
+ * Account menus: set `data-account-menu` on the host with optional
+ * `data-avatar-url`, `data-avatar-initial`, and `label`. The trigger shows an
+ * avatar instead of the selected option label; the list is portaled to
+ * `document.body` so it is not clipped by `overflow: hidden` ancestors.
  */
+
+import {portal} from "./portal.js"
 
 const HOST_CLASS = "mn-select-host"
 const OPEN_CLASS = "mn-select-host--open"
@@ -60,6 +67,7 @@ export function enhanceSelect(select) {
   const list = document.createElement("ul")
   list.className = "mn-select-list"
   list.setAttribute("role", "listbox")
+  list.dataset.mnScrollX = ""
   list.tabIndex = -1
   list.hidden = true
   // Inline layout beats stale/cached stylesheets: options run left→right.
@@ -101,7 +109,101 @@ export function enhanceSelect(select) {
   let open = false
   /** @type {string|null} */
   let activeValue = null
+  /** @type {(() => void)|null} */
+  let releasePortal = null
   const margin = 8
+
+  const isAccountMenu = () => host.hasAttribute("data-account-menu")
+
+  const renderAccountTrigger = () => {
+    const label = host.getAttribute("label") || "Account"
+    trigger.setAttribute("aria-label", label)
+    trigger.replaceChildren()
+    const url = host.dataset.avatarUrl
+    const initial = (host.dataset.avatarInitial || "").trim()
+    if (url) {
+      const img = document.createElement("img")
+      img.src = url
+      img.alt = ""
+      img.className = "mn-account-avatar"
+      img.decoding = "async"
+      trigger.appendChild(img)
+      return
+    }
+    const shell = document.createElement("span")
+    shell.className = "mn-account-avatar"
+    shell.setAttribute("aria-hidden", "true")
+    if (initial) {
+      shell.textContent = initial
+    } else {
+      const ns = "http://www.w3.org/2000/svg"
+      const svg = document.createElementNS(ns, "svg")
+      svg.setAttribute("viewBox", "0 0 24 24")
+      svg.setAttribute("fill", "none")
+      svg.setAttribute("stroke", "currentColor")
+      svg.setAttribute("stroke-width", "1.75")
+      const path = document.createElementNS(ns, "path")
+      path.setAttribute("d", "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2")
+      const circle = document.createElementNS(ns, "circle")
+      circle.setAttribute("cx", "12")
+      circle.setAttribute("cy", "7")
+      circle.setAttribute("r", "4")
+      svg.append(path, circle)
+      shell.appendChild(svg)
+    }
+    trigger.appendChild(shell)
+  }
+
+  const restoreListToHost = () => {
+    if (releasePortal) {
+      releasePortal()
+      releasePortal = null
+    }
+    if (list.parentNode !== host) host.appendChild(list)
+    list.classList.remove("mn-overlay")
+    list.style.position = ""
+    list.style.left = ""
+    list.style.top = ""
+    list.style.right = ""
+    list.style.bottom = ""
+    list.style.margin = ""
+    list.style.zIndex = ""
+  }
+
+  const mountListPortal = () => {
+    if (releasePortal) return
+    releasePortal = portal(list, {className: "mn-account-list"})
+  }
+
+  const positionAccountList = () => {
+    list.classList.remove("mn-select-list--flip-block", "mn-select-list--flip-inline")
+    list.style.position = "fixed"
+    list.style.margin = "0"
+    list.style.zIndex = "200"
+    const gap = 6
+    void list.offsetWidth
+    const triggerRect = trigger.getBoundingClientRect()
+    const listRect = list.getBoundingClientRect()
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+
+    let left = triggerRect.right + gap
+    if (left + listRect.width + margin > vw && triggerRect.left - listRect.width - gap >= margin) {
+      left = triggerRect.left - listRect.width - gap
+      list.classList.add("mn-select-list--flip-block")
+    }
+
+    let top = triggerRect.top
+    if (top + listRect.height + margin > vh) {
+      top = Math.max(margin, triggerRect.bottom - listRect.height)
+      list.classList.add("mn-select-list--flip-inline")
+    }
+
+    list.style.left = `${Math.round(left)}px`
+    list.style.top = `${Math.round(top)}px`
+    list.style.right = "auto"
+    list.style.bottom = "auto"
+  }
 
   const syncHostClasses = () => {
     const extra = Array.from(select.classList).filter((c) => c !== "mn-select-native")
@@ -192,7 +294,12 @@ export function enhanceSelect(select) {
 
   const sync = () => {
     rebuildOptions()
-    trigger.textContent = selectedLabel()
+    if (isAccountMenu()) {
+      list.classList.add("mn-account-list")
+      renderAccountTrigger()
+    } else {
+      trigger.textContent = selectedLabel()
+    }
     trigger.disabled = select.disabled
     host.toggleAttribute("aria-disabled", select.disabled)
     activeValue = select.value
@@ -216,6 +323,7 @@ export function enhanceSelect(select) {
 
   const setOpen = (next) => {
     if (select.disabled) next = false
+    if (!next && open && isAccountMenu()) restoreListToHost()
     open = next
     list.hidden = !open
     trigger.setAttribute("aria-expanded", String(open))
@@ -223,18 +331,26 @@ export function enhanceSelect(select) {
     if (open) {
       activeValue = select.value
       markActive()
-      positionList()
+      if (isAccountMenu()) {
+        mountListPortal()
+        positionAccountList()
+      } else {
+        positionList()
+      }
       list.querySelector(".mn-select-option--active")?.scrollIntoView?.({
         block: "nearest",
         inline: "nearest",
       })
     } else {
       list.classList.remove("mn-select-list--flip-block", "mn-select-list--flip-inline")
+      if (isAccountMenu()) restoreListToHost()
     }
   }
 
   const onViewportChange = () => {
-    if (open) positionList()
+    if (!open) return
+    if (isAccountMenu()) positionAccountList()
+    else positionList()
   }
 
   const choose = (value) => {
@@ -277,7 +393,8 @@ export function enhanceSelect(select) {
 
   const onDocPointer = (event) => {
     if (!open) return
-    if (host.contains(/** @type {Node} */ (event.target))) return
+    const target = /** @type {Node} */ (event.target)
+    if (host.contains(target) || list.contains(target)) return
     setOpen(false)
   }
 
@@ -332,6 +449,7 @@ export function enhanceSelect(select) {
     close: () => setOpen(false),
     destroy() {
       setOpen(false)
+      restoreListToHost()
       trigger.removeEventListener("click", onTriggerClick)
       list.removeEventListener("click", onListClick)
       document.removeEventListener("pointerdown", onDocPointer, true)

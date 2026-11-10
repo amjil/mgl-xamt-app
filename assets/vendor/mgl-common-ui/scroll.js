@@ -8,6 +8,7 @@
 
 const DEFAULT_SELECTOR = ".mn-surface"
 const VERTICAL_ALLOW = "[data-mn-scroll-y], .mn-latin, .mn-overlay"
+const HORIZONTAL_ALLOW = "[data-mn-scroll-x]"
 const EDITABLE =
   "textarea, input, select, [contenteditable], .mn-input, .mn-textarea, .mgl-editor-scope"
 const DRAG_THRESHOLD = 6
@@ -34,6 +35,60 @@ function hasNestedVerticalIntent(target, scrollContainer) {
   while (node && node !== scrollContainer) {
     if (overflowsY(node)) return true
     node = node.parentElement
+  }
+  return false
+}
+
+/** Vertical scroll column / nested Y overflow (for history-swipe guard). */
+function hasAnyVerticalScrollIntent(target) {
+  return hasNestedVerticalIntent(target, null)
+}
+
+function overflowsX(el) {
+  if (!(el instanceof Element)) return false
+  const style = getComputedStyle(el)
+  const ox = style.overflowX
+  if (ox === "hidden" || ox === "clip" || ox === "visible") return false
+  return el.scrollWidth > el.clientWidth + 1
+}
+
+/**
+ * Vertical-lr menus (overflow-x only): map wheel deltaY → scrollLeft on the island,
+ * not on the page .mn-surface.
+ */
+function findHorizontalWheelTarget(target, surfaceSelector) {
+  if (!(target instanceof Element)) return null
+  if (target.closest(VERTICAL_ALLOW)) return null
+
+  let node = target
+  while (node && node !== document.documentElement) {
+    if (node.matches?.(surfaceSelector)) return null
+    const marked =
+      node.matches?.(HORIZONTAL_ALLOW) || node.hasAttribute?.("data-mn-scroll-x")
+    if (marked && overflowsX(node)) return node
+    if (overflowsX(node) && !canScrollAxis(node, "y")) return node
+    node = node.parentElement
+  }
+  return null
+}
+
+function handleVerticalWheel(event, surfaceSelector) {
+  if (isEditable(event.target)) return false
+  const delta = wheelDelta(event)
+  if (!delta) return false
+
+  const island = findHorizontalWheelTarget(event.target, surfaceSelector)
+  if (island && applyWheel(island, delta)) {
+    event.preventDefault()
+    return true
+  }
+
+  const el = closestSurface(event.target, surfaceSelector)
+  if (!el) return false
+  if (hasNestedVerticalIntent(event.target, el)) return false
+  if (applyWheel(el, delta)) {
+    event.preventDefault()
+    return true
   }
   return false
 }
@@ -108,14 +163,7 @@ function installWheel(selector) {
 
   const onWheel = (event) => {
     if (event.ctrlKey) return
-    const el = closestSurface(event.target, selector)
-    if (!el) return
-    if (hasNestedVerticalIntent(event.target, el)) return
-    if (isEditable(event.target)) return
-
-    const delta = wheelDelta(event)
-    if (!delta) return
-    if (applyWheel(el, delta)) event.preventDefault()
+    handleVerticalWheel(event, selector)
   }
 
   window.addEventListener("wheel", onWheel, {passive: false})
@@ -137,6 +185,9 @@ function installHistorySwipeGuard() {
     if (event.ctrlKey || event.defaultPrevented) return
     const dx = axisDelta(event, "x")
     if (!dx) return
+    const dy = axisDelta(event, "y")
+    if (Math.abs(dy) > Math.abs(dx)) return
+    if (hasAnyVerticalScrollIntent(event.target)) return
     if (!canConsumeScrollXFrom(event.target, dx)) event.preventDefault()
   }
 
@@ -420,9 +471,16 @@ export function bindSurface(el, options = {}) {
 
   if (options.wheel !== false) {
     const onWheel = (event) => {
-      if (hasNestedVerticalIntent(event.target, el) || isEditable(event.target)) return
+      if (event.ctrlKey) return
+      if (isEditable(event.target)) return
       const delta = wheelDelta(event)
       if (!delta) return
+      const island = findHorizontalWheelTarget(event.target, selector)
+      if (island && island !== el && applyWheel(island, delta)) {
+        event.preventDefault()
+        return
+      }
+      if (hasNestedVerticalIntent(event.target, el)) return
       if (applyWheel(el, delta)) event.preventDefault()
     }
     el.addEventListener("wheel", onWheel, {passive: false})

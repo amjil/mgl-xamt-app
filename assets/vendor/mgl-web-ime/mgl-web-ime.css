@@ -74,7 +74,7 @@ body.mgl-ime-mobile-open {
 
 /* Candidate bar sits above the keyboard; long-press popup stacks over it */
 mgl-candidates[variant="bar"] {
-  z-index: 10001;
+  z-index: 10015;
   pointer-events: auto;
 }
 

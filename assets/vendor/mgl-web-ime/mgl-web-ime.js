@@ -91,13 +91,16 @@ var LATIN_TO_MONGOL = {
   // MVS
   "-": "\u180E",
   "=": "\u180E",
+  "\\": "\u180E",
   // FVS
   "[": "\u180B",
   "]": "\u180C",
-  "\\": "\u180D",
+  "|": "\u180D",
   // Punctuation
   ",": "\u1802",
   ".": "\u1803",
+  ";": "\u1801",
+  ":": "\u1804",
   "?": "\uFF1F",
   "!": "\uFF01"
 };
@@ -114,10 +117,23 @@ function directCharFromKey(ev) {
   const { key, code, shiftKey } = ev;
   if (shiftKey && (key === " " || code === "Space")) return "\u202F";
   if (code === "BracketLeft" || key === "[") return "\u180B";
-  if (code === "BracketRight" || key === "]") return "\u180C";
-  if (code === "Backslash" || key === "\\") return "\u180D";
+  if (code === "BracketRight" || key === "]" || key === "}") {
+    if (shiftKey) return "\u180A";
+    return "\u180C";
+  }
+  if (key === "|" || code === "Backslash" && shiftKey) return "\u180D";
+  if (shiftKey && (key === "<" || key === "\u300A" || key === "\u3008" || code === "Comma")) {
+    return "\u300A";
+  }
+  if (shiftKey && (key === ">" || key === "\u300B" || key === "\u3009" || code === "Period")) {
+    return "\u300B";
+  }
   if (key === "," || code === "Comma") return "\u1802";
   if (key === "." || code === "Period") return "\u1803";
+  if (shiftKey && (key === ":" || key === "\uFF1A" || code === "Semicolon")) {
+    return "\u1804";
+  }
+  if (key === ";" || key === "\uFF1B" || code === "Semicolon") return "\u1801";
   if (key === "?" || key === "\uFF1F" || code === "Slash" && shiftKey) {
     return "\uFF1F";
   }
@@ -140,7 +156,7 @@ function previewFromBuffer(buffer) {
   return translate(buffer ?? "");
 }
 function isCompositionChar(char) {
-  return typeof char === "string" && /^[a-zA-Z\-=+]$/.test(char);
+  return typeof char === "string" && /^[a-zA-Z\-=+\\]$/.test(char);
 }
 
 // src/core/candidate.js
@@ -530,7 +546,7 @@ var RemoteCandidateProvider = class extends CandidateProvider {
   /** @param {RemoteOptions} [options] */
   constructor(options = {}) {
     super();
-    this.baseUrl = (options.baseUrl ?? "").replace(/\/+$/, "");
+    this.baseUrl = (options.baseUrl ?? "http://dev1:3003").replace(/\/+$/, "");
     this.candidatesPath = options.candidatesPath ?? "/api/next_word/candidates";
     this.nextWordsPath = options.nextWordsPath ?? "/api/next_word/list";
     this.timeoutMs = options.timeoutMs ?? 2500;
@@ -686,7 +702,7 @@ var ImeCore = class {
     const { key, code, shiftKey, ctrlKey } = ev;
     const hasComp = this.state.composition.length > 0 || this.state.candidates.length > 0;
     if (ctrlKey && (key === " " || code === "Space")) return true;
-    if (ctrlKey) return false;
+    if (ctrlKey || ev.altKey) return false;
     if (key === "_" || key === "\u2014" || key === "\u2013" || key === "\uFF0D" || shiftKey && (key === "-" || code === "Minus")) {
       return true;
     }
@@ -903,7 +919,7 @@ var ImeCore = class {
       this.setState({ enabled: !this.state.enabled });
       return true;
     }
-    if (ctrlKey) return false;
+    if (ctrlKey || ev.altKey) return false;
     if (key === "_" || key === "\u2014" || key === "\u2013" || key === "\uFF0D" || shiftKey && (key === "-" || code === "Minus")) {
       return this._showSuffixes();
     }
@@ -969,6 +985,12 @@ var ImeCore = class {
     if (this.state.composition) {
       const nb = backspaceBuffer(this.state.composition);
       await this.updateComposition(nb);
+      return true;
+    }
+    if (this.state.profile === "mobile") {
+      this.adapter.deleteBackward();
+      this._session.next();
+      this.setState(clearCompositionFields(this.state));
       return true;
     }
     const ctx = this.adapter.getTextBeforeCaret?.() ?? "";
@@ -1451,6 +1473,7 @@ function resolveKeyboardMode(keyboardMode, profile) {
 function attachDesktopController(core, options = {}) {
   const target = options.target ?? window;
   const editorEl = options.editorEl ?? null;
+  const textField = editorEl instanceof HTMLInputElement || editorEl instanceof HTMLTextAreaElement;
   const shouldHandle = options.shouldHandle ?? (() => true);
   let shiftAlone = false;
   let chain = Promise.resolve();
@@ -1462,12 +1485,14 @@ function attachDesktopController(core, options = {}) {
     if (!shouldHandle()) return;
     if (!core.state.enabled) return;
     if (e.isComposing || e.key === "Process") return;
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && e.key !== " " && e.code !== "Space") return;
     const ev = {
       type: "key",
       key: e.key,
       code: e.code,
       shiftKey: e.shiftKey,
-      ctrlKey: e.ctrlKey || e.metaKey,
+      ctrlKey: mod,
       altKey: e.altKey
     };
     if (!core.willHandleKey(ev)) return;
@@ -1486,11 +1511,12 @@ function attachDesktopController(core, options = {}) {
     }
   };
   const onBeforeInput = (e) => {
+    if (textField) return;
     if (!shouldHandle() || !core.state.enabled) return;
     if (core.state.mode === "latin") return;
     if (e.isComposing) return;
     const type = e.inputType || "";
-    if (type.startsWith("insert")) {
+    if (type.startsWith("insert") && type !== "insertFromPaste" && type !== "insertFromDrop" && type !== "insertFromYank") {
       e.preventDefault();
     }
   };
@@ -5425,7 +5451,7 @@ var MglIME = class {
     this.targetEl = resolveTarget(options.target);
     this.adapter = adapterForElement(this.targetEl, options.adapter);
     this.provider = options.provider ?? createDefaultProvider({
-      baseUrl: options.remote?.baseUrl ?? options.baseUrl ?? "",
+      baseUrl: options.remote?.baseUrl ?? options.baseUrl ?? "http://dev1:3003",
       ...options.remote
     });
     this.core = new ImeCore({
@@ -5486,6 +5512,11 @@ var MglIME = class {
     if (this.keyboardMode === "virtual") {
       this.showKeyboard();
     }
+    this._boundKbLayout = () => {
+      if (this.profile === "mobile") this._positionMobileCandidates();
+    };
+    this.keyboardEl?.addEventListener("mgl-ime-keyboard-show", this._boundKbLayout);
+    this.keyboardEl?.addEventListener("mgl-ime-keyboard-hide", this._boundKbLayout);
   }
   _attachProfile() {
     this._desktop?.detach?.();
@@ -5504,6 +5535,8 @@ var MglIME = class {
         }
       });
       this.candidatesEl.setAttribute("variant", "popup");
+      this._mobileKbObserver?.disconnect();
+      this._mobileKbObserver = null;
       this._clearMobileCandidatePosition();
       if (this.keyboardMode !== "virtual") this.hideKeyboard();
     } else {
@@ -5511,14 +5544,27 @@ var MglIME = class {
         editorEl: this.targetEl
       });
       this.candidatesEl.setAttribute("variant", "bar");
+      this._observeMobileKeyboard();
       this._positionMobileCandidates();
       if (this.keyboardMode === "virtual") this.showKeyboard();
     }
   }
+  _observeMobileKeyboard() {
+    this._mobileKbObserver?.disconnect();
+    this._mobileKbObserver = null;
+    if (this.profile !== "mobile" || !this.keyboardEl) return;
+    this._mobileKbObserver = new ResizeObserver(() => {
+      if (this.profile === "mobile") this._positionMobileCandidates();
+    });
+    this._mobileKbObserver.observe(this.keyboardEl);
+  }
   /** Fixed, horizontally centered, just above the virtual keyboard. */
   _positionMobileCandidates() {
-    if (!this.candidatesEl) return;
-    const kbH = this.keyboardEl?.offsetHeight || 240;
+    if (!this.candidatesEl || this.profile !== "mobile") return;
+    const kb = this.keyboardEl;
+    let kbH = 0;
+    if (kb?.visible) kbH = kb.offsetHeight;
+    if (!kbH) kbH = 280;
     const gap = 8;
     const el = this.candidatesEl;
     el.style.position = "fixed";
@@ -5527,7 +5573,12 @@ var MglIME = class {
     el.style.transform = "translateX(-50%)";
     el.style.bottom = `${kbH + gap}px`;
     el.style.top = "auto";
+    el.style.zIndex = "10015";
     el.style.width = "";
+  }
+  /** Reposition the mobile candidate bar (e.g. after shell --app-ime-kb updates). */
+  syncMobileChrome() {
+    if (this.profile === "mobile") this._positionMobileCandidates();
   }
   /** Clear mobile positioning when switching to desktop. */
   _clearMobileCandidatePosition() {
@@ -5599,6 +5650,9 @@ var MglIME = class {
     this.core.setState({ keyboardVisible: true });
     if (this.profile === "mobile") {
       requestAnimationFrame(() => this._positionMobileCandidates());
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => this._positionMobileCandidates());
+      });
     }
   }
   hideKeyboard() {
@@ -5673,6 +5727,10 @@ var MglIME = class {
   destroy() {
     if (this._destroyed) return;
     this._destroyed = true;
+    this._mobileKbObserver?.disconnect();
+    this._mobileKbObserver = null;
+    this.keyboardEl?.removeEventListener("mgl-ime-keyboard-show", this._boundKbLayout);
+    this.keyboardEl?.removeEventListener("mgl-ime-keyboard-hide", this._boundKbLayout);
     this._desktop?.detach?.();
     this._mobile?.detach?.();
     this.core.destroy();

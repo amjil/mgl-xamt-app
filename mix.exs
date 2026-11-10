@@ -88,11 +88,11 @@ defmodule Xamt.MixProject do
       "assets.setup": [
         "tailwind.install --if-missing",
         "esbuild.install --if-missing",
-        "xamt.vendor_mgl_common_ui"
+        "xamt.vendor"
       ],
-      "assets.build": ["compile", "xamt.vendor_mgl_common_ui", "tailwind xamt", "esbuild xamt"],
+      "assets.build": ["compile", "xamt.vendor", "tailwind xamt", "esbuild xamt"],
       "assets.deploy": [
-        "xamt.vendor_mgl_common_ui",
+        "xamt.vendor",
         "tailwind xamt --minify",
         "esbuild xamt --minify",
         "phx.digest"

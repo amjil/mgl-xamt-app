@@ -83,25 +83,35 @@ export function createMongolianEditor(containerSelector) {
                 writing-mode: vertical-lr;
                 -webkit-writing-mode: vertical-lr;
                 font-family: "Mongolian Baiti", "MenksoftQagan", "OyunQaganTig", sans-serif;
-                font-size: 20px; line-height: 2; flex: 1; height: auto; min-height: 300px; width: 100%;
+                font-size: 20px; line-height: 2; flex: 1;
+                height: 100%; min-height: 0; max-height: 100%;
+                width: 100%;
                 padding: var(--editor-padding); overflow-y: hidden; overflow-x: auto;
                 outline: none; text-align: left; cursor: text;
                 overscroll-behavior-x: none; -webkit-overflow-scrolling: touch;
+                box-sizing: border-box;
             }
 
             /* ==========================================
                Nested block scaffolding
                ========================================== */
-            .mgl-editor-scope .block-wrapper { display: block; margin: 0; }
+            .mgl-editor-scope .block-wrapper { display: block; margin: 0; max-height: 100%; }
             .mgl-editor-scope .block-content {
                 display: block; margin: 0 var(--block-gap) 0 0; padding: 0;
-                outline: none; min-height: 1em; white-space: pre-wrap;
+                outline: none; min-height: 1em; max-height: 100%;
+                white-space: pre-wrap; overflow-wrap: anywhere;
+                box-sizing: border-box;
+            }
+            /* Body paragraphs: first-line indent along vertical flow (same as reader text-indent: 2em). */
+            .mgl-editor-scope .editor-content [data-block-type="paragraph"] > .block-content {
+                text-indent: 2em;
             }
             /* In vertical mode, "indent" = shift text downward via padding-top */
             .mgl-editor-scope .block-children {
-                display: block; margin: 0;
+                display: block; margin: 0; max-height: 100%;
                 padding-top: var(--block-indent);
                 border-top: 1px solid #ececec;
+                box-sizing: border-box;
             }
             .mgl-editor-scope .block-children:empty { display: none; padding: 0; border: 0; }
 
@@ -292,6 +302,15 @@ export function createMongolianEditor(containerSelector) {
 
     function normalizeContentHtml(html) {
         return html.replace(/\u200b/g, '').replace(/(?:<br\s*\/?>)+$/i, '').trim();
+    }
+
+    /** Drop a single outer wrapper tag so we do not nest <p> inside <p> when loading JSON. */
+    function unwrapOuterTag(html, tagName) {
+        const s = String(html == null ? '' : html).trim();
+        if (!s || !tagName) return s;
+        const re = new RegExp(`^<${tagName}(\\s[^>]*)?>([\\s\\S]*)<\\/${tagName}>$`, 'i');
+        const m = s.match(re);
+        return m ? m[2] : s;
     }
 
     // ------------------------------------------
@@ -645,7 +664,10 @@ export function createMongolianEditor(containerSelector) {
         const el = document.createElement(PLAIN_BLOCK_TAGS[blockType] || 'div');
 
         if (PLAIN_BLOCK_TAGS[blockType]) {
-            el.innerHTML = html || '<br>';
+            let inner = html || '';
+            const tag = PLAIN_BLOCK_TAGS[blockType];
+            inner = unwrapOuterTag(inner, tag);
+            el.innerHTML = inner || '<br>';
             return el;
         }
 
@@ -1125,6 +1147,78 @@ export function createMongolianEditor(containerSelector) {
         refreshToolbarState();
     }
 
+    function truthyDataset(value) {
+        return value === true || value === 'true';
+    }
+
+    function appendJsonChildren(wrapper, children) {
+        const list = Array.isArray(children) ? children : [];
+        if (!list.length) return;
+        const box = childrenOf(wrapper, true);
+        list.forEach((child) => box.append(buildBlockFromJson(child)));
+    }
+
+    function buildBlockFromJson(node) {
+        if (!node || typeof node !== 'object') return buildBlock('paragraph', '');
+
+        const type = node.type || 'paragraph';
+
+        if (type === 'image') {
+            const url = node.url || safeUrl(node.html, { allowDataImage: true });
+            if (url) {
+                const wrapper = createImageBlock(url);
+                appendJsonChildren(wrapper, node.children);
+                return wrapper;
+            }
+        }
+
+        if (type === 'bookmark') {
+            const url = safeUrl(node.url) || '';
+            const title = node.title != null ? String(node.title) : '';
+            const desc = node.desc != null ? String(node.desc) : '';
+
+            const card = document.createElement('div');
+            if (url) card.dataset.url = url;
+            if (title) card.dataset.title = title;
+            if (desc) card.dataset.desc = desc;
+            card.append(
+                bookmarkPart('bm-domain', domainInitial(url || '#')),
+                bookmarkPart('bm-title', title || url || 'Bookmark')
+            );
+            if (desc) card.append(bookmarkPart('bm-desc', desc));
+            if (url) card.append(bookmarkPart('bm-url', url));
+
+            const wrapper = wrapContent('bookmark', card);
+            appendJsonChildren(wrapper, node.children);
+            return wrapper;
+        }
+
+        const html = node.html != null ? String(node.html) : '';
+        const wrapper = buildBlock(type, html);
+
+        if (node.checked != null) wrapper.dataset.checked = truthyDataset(node.checked) ? 'true' : 'false';
+        if (node.collapsed != null) wrapper.dataset.collapsed = truthyDataset(node.collapsed) ? 'true' : 'false';
+
+        appendJsonChildren(wrapper, node.children);
+        return wrapper;
+    }
+
+    function setJson(nodes) {
+        deselectImage();
+        const list = Array.isArray(nodes) ? nodes : [];
+        editor.replaceChildren();
+
+        if (list.length) {
+            list.forEach((node) => editor.append(buildBlockFromJson(node)));
+        } else {
+            editor.append(buildBlock('paragraph', ''));
+        }
+
+        hydrate(editor);
+        scheduleRenumber();
+        refreshToolbarState();
+    }
+
     function printHtml() {
         const html = getCleanHtml();
         console.log('------------------- Editor content -------------------');
@@ -1132,28 +1226,9 @@ export function createMongolianEditor(containerSelector) {
         alert('HTML has been printed to the console (F12)');
     }
 
-    function snapshotSelection() {
-        const sel = window.getSelection();
-        if (!sel || !sel.rangeCount) return null;
-        const range = sel.getRangeAt(0);
-        return { sel, range: range.cloneRange(), collapsed: range.collapsed };
-    }
-
-    function restoreSelection(snap) {
-        if (!snap || snap.collapsed) return;
-        if (snap.sel.rangeCount && !snap.sel.isCollapsed) return;
-        try {
-            snap.sel.removeAllRanges();
-            snap.sel.addRange(snap.range);
-        } catch {
-            /* range detached */
-        }
-    }
-
     function refreshToolbarState() {
         const sel = window.getSelection();
-        const inEditor = !!sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode);
-        const snap = inEditor ? snapshotSelection() : null;
+        const inEditor = !!sel && editor.contains(sel.anchorNode);
         const block = inEditor ? currentBlock() : null;
         const type = block && block.nodeType === Node.ELEMENT_NODE ? block.dataset.blockType : null;
 
@@ -1170,10 +1245,6 @@ export function createMongolianEditor(containerSelector) {
         toolbar.querySelectorAll('button[data-block]').forEach((btn) => {
             btn.classList.toggle('active', !!type && btn.dataset.block === type);
         });
-
-        // queryCommandState can collapse a range that starts at offset 0
-        // inside a vertical-lr contenteditable (first glyph).
-        restoreSelection(snap);
     }
 
     // ------------------------------------------
@@ -1215,19 +1286,20 @@ export function createMongolianEditor(containerSelector) {
         }
     });
 
-    function insertBreak() {
+    function handleEnter(e) {
         const sel = window.getSelection();
-        if (!sel.rangeCount) return false;
+        if (!sel.rangeCount) return;
 
         if (!sel.isCollapsed) {
             const range = sel.getRangeAt(0);
-            if (blockOf(range.startContainer) !== blockOf(range.endContainer)) return false;
+            if (blockOf(range.startContainer) !== blockOf(range.endContainer)) return;
             document.execCommand('delete');
         }
 
         const block = currentBlock();
-        if (!block || isAtomic(block) || !block.dataset.blockType) return false;
+        if (!block || isAtomic(block) || !block.dataset.blockType) return;
 
+        e.preventDefault();
         const type = block.dataset.blockType;
 
         if (type === 'toggle') {
@@ -1241,36 +1313,19 @@ export function createMongolianEditor(containerSelector) {
             } else {
                 appendAfter(block, buildBlock('paragraph', ''));
             }
-            return true;
+            return;
         }
 
         // Empty nested block: Enter = outdent one level
-        if (isBlockEmpty(block) && isNested(block) && outdentBlock(block)) return true;
+        if (isBlockEmpty(block) && isNested(block) && outdentBlock(block)) return;
 
         if (CONTINUING.has(type) && type !== 'paragraph' && isBlockEmpty(block)) {
             convertBlock('paragraph', { caret: 'start', block });
-            return true;
+            return;
         }
 
         const tail = extractTailHtml(block);
         appendAfter(block, buildBlock(CONTINUING.has(type) ? type : 'paragraph', tail));
-        return true;
-    }
-
-    function handleEnter(e) {
-        const sel = window.getSelection();
-        if (!sel.rangeCount) return;
-
-        if (!sel.isCollapsed) {
-            const range = sel.getRangeAt(0);
-            if (blockOf(range.startContainer) !== blockOf(range.endContainer)) return;
-        }
-
-        const block = currentBlock();
-        if (!block || isAtomic(block) || !block.dataset.blockType) return;
-
-        e.preventDefault();
-        insertBreak();
     }
 
     /**
@@ -1362,40 +1417,37 @@ export function createMongolianEditor(containerSelector) {
         placeCaretAtEnd(prev);
     }
 
-    function deleteAtBoundary() {
+    function handleBackspace(e) {
         const block = currentBlock();
-        if (!block || isAtomic(block) || !block.dataset.blockType) return false;
-        // Empty new paragraphs only have a placeholder <br>; treat that as
-        // "at start" so IME backspace can merge the line away.
-        if (!caretAtContentStart(block) && !isBlockEmpty(block)) return false;
+        if (!block || isAtomic(block) || !block.dataset.blockType) return;
+        if (!caretAtContentStart(block)) return;
 
         if (block.dataset.blockType !== 'paragraph') {
+            e.preventDefault();
             convertBlock('paragraph', { caret: 'start', block });
-            return true;
+            return;
         }
 
         const prev = block.previousElementSibling;
 
         if (!prev) {
-            if (isNested(block)) return Boolean(outdentBlock(block));
-            return false;
+            if (isNested(block)) {
+                e.preventDefault();
+                outdentBlock(block);
+            }
+            return;
         }
 
+        e.preventDefault();
         if (isAtomic(prev)) {
             if (contentOf(prev) === selectedImage) deselectImage();
             const box = childrenOf(prev);
             if (box && box.children.length) prev.replaceWith(...Array.from(box.children));
             else prev.remove();
             scheduleRenumber();
-            return true;
+            return;
         }
         mergeIntoPrevious(block, prev);
-        return true;
-    }
-
-    function handleBackspace(e) {
-        if (!deleteAtBoundary()) return;
-        e.preventDefault();
     }
 
     editor.addEventListener('keydown', (e) => {
@@ -1425,10 +1477,9 @@ export function createMongolianEditor(containerSelector) {
         if (e.key === 'Backspace') handleBackspace(e);
     });
 
-    function onDocumentEscape(e) {
+    document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') deselectImage();
-    }
-    document.addEventListener('keydown', onDocumentEscape);
+    });
 
     editor.addEventListener('click', (e) => {
         const arrow = e.target.closest('.toggle-arrow');
@@ -1456,13 +1507,9 @@ export function createMongolianEditor(containerSelector) {
         }
         deselectImage();
 
-        // Outer container is not editable; clicking empty space moves the caret
-        // into the nearest block. In vertical-lr the first glyph sits against
-        // this padding, so a drag that includes it mouseups here — keep the range.
+        // Outer container is not editable; clicking empty space moves the caret into the nearest block
         if (e.target === editor || e.target.classList.contains('block-children') ||
             e.target.classList.contains('block-wrapper')) {
-            const sel = window.getSelection();
-            if (sel && !sel.isCollapsed && editor.contains(sel.anchorNode)) return;
             const block = e.target === editor ? lastBlock() : blockOf(e.target);
             if (block && !isAtomic(block)) placeCaretAtEnd(block);
         }
@@ -1530,10 +1577,9 @@ export function createMongolianEditor(containerSelector) {
     editor.addEventListener('mousedown', handleResizeStart);
     editor.addEventListener('touchstart', handleResizeStart, { passive: false });
 
-    function onDocumentMouseDown(e) {
+    document.addEventListener('mousedown', (e) => {
         if (!editor.contains(e.target) && !toolbar.contains(e.target)) deselectImage();
-    }
-    document.addEventListener('mousedown', onDocumentMouseDown);
+    });
 
     document.addEventListener('mousemove', handleResizeMove);
     document.addEventListener('touchmove', handleResizeMove, { passive: false });
@@ -1571,26 +1617,12 @@ export function createMongolianEditor(containerSelector) {
 
     document.addEventListener('selectionchange', refreshToolbarState);
 
-    const observer = new MutationObserver(() => scheduleRenumber());
-    observer.observe(editor, { childList: true, subtree: true });
+    new MutationObserver(() => scheduleRenumber())
+        .observe(editor, { childList: true, subtree: true });
 
     hydrate(editor);
     renumberOrderedLists();
     refreshToolbarState();
-
-    function destroy() {
-        document.removeEventListener('keydown', onDocumentEscape);
-        document.removeEventListener('mousedown', onDocumentMouseDown);
-        document.removeEventListener('mousemove', handleResizeMove);
-        document.removeEventListener('touchmove', handleResizeMove);
-        document.removeEventListener('mouseup', handleResizeEnd);
-        document.removeEventListener('touchend', handleResizeEnd);
-        document.removeEventListener('touchcancel', handleResizeEnd);
-        document.removeEventListener('selectionchange', refreshToolbarState);
-        observer.disconnect();
-        resizing = null;
-        selectedImage = null;
-    }
 
     // ==========================================
     // 4. Public API
@@ -1598,15 +1630,13 @@ export function createMongolianEditor(containerSelector) {
     return {
         getHtml: getCleanHtml,
         setHtml: setHtml,
+        setJson: setJson,
         getJson: () => getJson(editor),
-        insertBreak,
-        deleteAtBoundary,
         indent: () => indentBlock(currentBlock()),
         outdent: () => outdentBlock(currentBlock()),
         focus: () => {
             const block = editor.querySelector(':scope > .block-wrapper');
             if (block) placeCaretAtEnd(block);
-        },
-        destroy
+        }
     };
 }
