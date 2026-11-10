@@ -683,7 +683,8 @@ defmodule XamtWeb.ServerLive.Overlays do
                    "channel.messages.read"},
                   {"reaction.added", gettext("Reaction / like added (reaction.added)"),
                    "channel.messages.read"},
-                  {"member.joined", gettext("Member joined (member.joined)"), "server.members.events"},
+                  {"member.joined", gettext("Member joined (member.joined)"),
+                   "server.members.events"},
                   {"member.left", gettext("Member left (member.left)"), "server.members.events"},
                   {"channel.created", gettext("Channel created (channel.created)"),
                    "server.channels.manage"}

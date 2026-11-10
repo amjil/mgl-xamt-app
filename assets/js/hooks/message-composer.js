@@ -677,6 +677,9 @@ export const MessageComposer = {
 
     this.ime?.hideEmojiPicker?.()
     this.pushEvent(event, payload)
+    if (event === "send_message") {
+      window.dispatchEvent(new CustomEvent("xamt:composer:sent"))
+    }
     // Online clear is driven by server push_event("composer:clear")
   },
 }
