@@ -124,7 +124,6 @@ defmodule XamtWeb.ServerLive.Components do
           show={@show_bot_manager}
           installations={@bot_installations}
           selected_installation={@selected_bot_installation}
-          delivery_events={@bot_delivery_events}
           channels={@channels}
           newly_issued_token={@newly_issued_bot_token}
           show_create_form={@show_bot_create_form}

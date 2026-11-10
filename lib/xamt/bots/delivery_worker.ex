@@ -242,4 +242,3 @@ defmodule Xamt.Bots.DeliveryWorker do
 
   defp worker_config, do: Application.get_env(:xamt, __MODULE__, [])
 end
-

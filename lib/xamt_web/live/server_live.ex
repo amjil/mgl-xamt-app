@@ -723,16 +723,23 @@ defmodule XamtWeb.ServerLive do
 
   def handle_event("open_bot_manager", _params, socket) do
     if can_manage_server?(socket) do
-      installations = Bots.list_server_installations(socket.assigns.server.id)
-      first_inst = List.first(installations)
-      events = if first_inst, do: Bots.list_installation_events(first_inst.id), else: []
+      server_id = socket.assigns.server.id
+      installations = Bots.list_server_installations(server_id)
+
+      selected =
+        case socket.assigns[:selected_bot_installation] do
+          %{id: prev_id} ->
+            Enum.find(installations, List.first(installations), &(&1.id == prev_id))
+
+          _ ->
+            List.first(installations)
+        end
 
       {:noreply,
        socket
        |> assign(:show_bot_manager, true)
        |> assign(:bot_installations, installations)
-       |> assign(:selected_bot_installation, first_inst)
-       |> assign(:bot_delivery_events, events)
+       |> assign(:selected_bot_installation, selected)
        |> assign(:show_bot_create_form, Enum.empty?(installations))}
     else
       {:noreply, put_flash(socket, :error, gettext("You do not have permission to manage bots"))}

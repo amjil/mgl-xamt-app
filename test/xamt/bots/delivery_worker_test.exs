@@ -174,5 +174,3 @@ defmodule Xamt.Bots.DeliveryWorkerTest do
     assert Repo.get!(BotEvent, allowed.id).status == "delivered"
   end
 end
-
-
