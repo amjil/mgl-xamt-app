@@ -41,6 +41,19 @@ if base_url = System.get_env("XAMT_IME_BASE_URL") do
   config :xamt, :ime_base_url, base_url
 end
 
+config :xamt,
+  bot_api_enabled: System.get_env("BOT_API_ENABLED", "true") in ~w(true 1),
+  bot_webhook_delivery_enabled:
+    System.get_env("BOT_WEBHOOK_DELIVERY_ENABLED", "true") in ~w(true 1)
+
+if max_attempts = System.get_env("BOT_WEBHOOK_MAX_ATTEMPTS") do
+  config :xamt, Xamt.Bots.DeliveryWorker, max_attempts: String.to_integer(max_attempts)
+end
+
+if timeout = System.get_env("BOT_WEBHOOK_TIMEOUT") do
+  config :xamt, Xamt.Bots.DeliveryWorker, timeout_ms: String.to_integer(timeout)
+end
+
 vapid_public_key = System.get_env("VAPID_PUBLIC_KEY")
 vapid_private_key = System.get_env("VAPID_PRIVATE_KEY")
 

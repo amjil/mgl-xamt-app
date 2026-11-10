@@ -5,8 +5,6 @@ defmodule Xamt.Bots.BotSubscription do
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
 
-  @valid_events ["message.created", "member.joined", "reaction.added"]
-
   schema "bot_subscriptions" do
     field :event_type, :string
     field :filter, :map, default: %{}
@@ -22,6 +20,6 @@ defmodule Xamt.Bots.BotSubscription do
     sub
     |> cast(attrs, [:bot_installation_id, :channel_id, :event_type, :filter, :is_enabled])
     |> validate_required([:bot_installation_id, :event_type])
-    |> validate_inclusion(:event_type, @valid_events)
+    |> validate_inclusion(:event_type, Xamt.Bots.Permissions.known_event_types())
   end
 end

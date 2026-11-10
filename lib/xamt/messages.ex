@@ -43,30 +43,27 @@ defmodule Xamt.Messages do
          :ok <- validate_reply_to(reply_to_id, channel_id),
          :ok <- validate_media_content(content, type),
          :ok <- validate_text_body(type, content_html),
-         {:ok, message} <-
-           Repo.transact(fn ->
-             with {:ok, message} <-
-                    %Message{}
-                    |> Message.changeset(%{
-                      channel_id: channel_id,
-                      user_id: user.id,
-                      content: content,
-                      content_type: type,
-                      content_html: content_html,
-                      search_text: Search.normalize(index_text(content_html, content)),
-                      reply_to_id: reply_to_id
-                    })
-                    |> Repo.insert(),
-                  :ok <- Mentions.replace(message.id, mention_ids) do
-               {:ok, message}
-             end
-           end) do
+         {:ok, %{message: message}} <-
+           insert_message_with_bot_outbox(
+             user,
+             channel_id,
+             %{
+               channel_id: channel_id,
+               user_id: user.id,
+               content: content,
+               content_type: type,
+               content_html: content_html,
+               search_text: Search.normalize(index_text(content_html, content)),
+               reply_to_id: reply_to_id
+             },
+             mention_ids
+           ) do
       message = preload_message!(message)
       LastMessageCache.put(channel_id, message.id, message.inserted_at)
       broadcast(channel_id, :new_message, strip_for_broadcast(message))
       Xamt.Messages.LinkPreview.maybe_fetch_and_update(message)
       Xamt.Notifications.WebPush.notify_mentions(message)
-      maybe_enqueue_message_created_bot_event(user, channel_id, message)
+      Xamt.Bots.DeliveryWorker.trigger_sweep()
       {:ok, message}
     end
   end
@@ -88,25 +85,24 @@ defmodule Xamt.Messages do
            type <- content_type(attrs, content),
            :ok <- validate_media_content(content, type),
            :ok <- validate_text_body(type, content_html),
-           {:ok, message} <-
-             Repo.transact(fn ->
-               with {:ok, message} <-
-                      message
-                      |> Message.changeset(%{
-                        content: content,
-                        content_type: type,
-                        content_html: content_html,
-                        search_text: Search.normalize(index_text(content_html, content))
-                      })
-                      |> Repo.update(),
-                    :ok <- Mentions.replace(message.id, mention_ids) do
-                 {:ok, message}
-               end
-             end) do
+           {:ok, %{message: message}} <-
+             update_message_with_bot_outbox(
+               user,
+               message,
+               %{
+                 content: content,
+                 content_type: type,
+                 content_html: content_html,
+                 search_text: Search.normalize(index_text(content_html, content))
+               },
+               mention_ids,
+               previous_mention_ids
+             ) do
         message = preload_message!(message)
         broadcast(message.channel_id, :updated_message, strip_for_broadcast(message))
         Xamt.Messages.LinkPreview.maybe_fetch_and_update(message)
         Xamt.Notifications.WebPush.notify_mentions(message, except: previous_mention_ids)
+        Xamt.Bots.DeliveryWorker.trigger_sweep()
         {:ok, message}
       end
     end
@@ -130,12 +126,14 @@ defmodule Xamt.Messages do
       Ecto.Multi.new()
       |> Ecto.Multi.update(:message, Message.delete_changeset(message))
       |> maybe_insert_message_deleted_log(moderated?, message, user, reason)
+      |> maybe_enqueue_message_lifecycle_bot_event(user, message, "message.deleted")
       |> Repo.transaction()
       |> case do
         {:ok, %{message: deleted}} ->
           deleted = preload_message!(deleted)
           LastMessageCache.refresh(deleted.channel_id)
           broadcast(deleted.channel_id, :deleted_message, strip_for_broadcast(deleted))
+          Xamt.Bots.DeliveryWorker.trigger_sweep()
           {:ok, deleted}
 
         {:error, _op, value, _changes} ->
@@ -1068,28 +1066,149 @@ defmodule Xamt.Messages do
     ]
   end
 
-  defp maybe_enqueue_message_created_bot_event(user, channel_id, message) do
-    case channel_server_id(channel_id) do
-      nil ->
-        :ok
+  defp insert_message_with_bot_outbox(user, channel_id, message_attrs, mention_ids) do
+    multi =
+      Ecto.Multi.new()
+      |> Ecto.Multi.insert(:message, Message.changeset(%Message{}, message_attrs))
+      |> Ecto.Multi.run(:mentions, fn _repo, %{message: message} ->
+        :ok = Mentions.replace(message.id, mention_ids)
+        {:ok, mention_ids}
+      end)
+      |> maybe_enqueue_message_lifecycle_bot_event(user, channel_id, "message.created")
+      |> maybe_enqueue_bot_mentioned_events(user, channel_id, mention_ids)
 
-      server_id ->
-        Xamt.Bots.Dispatcher.enqueue_event(%{
-          server_id: server_id,
-          channel_id: channel_id,
-          event_type: "message.created",
-          actor_is_bot: user.is_bot,
-          payload: %{
-            "message" => %{
-              "id" => message.id,
-              "body" => plain_text(message),
-              "author" => %{"id" => user.id, "username" => user.username}
+    case Repo.transaction(multi) do
+      {:ok, result} -> {:ok, result}
+      {:error, _op, value, _changes} -> {:error, value}
+    end
+  end
+
+  defp update_message_with_bot_outbox(user, message, attrs, mention_ids, previous_mention_ids) do
+    newly_mentioned = mention_ids -- previous_mention_ids
+
+    multi =
+      Ecto.Multi.new()
+      |> Ecto.Multi.update(:message, Message.changeset(message, attrs))
+      |> Ecto.Multi.run(:mentions, fn _repo, %{message: updated} ->
+        :ok = Mentions.replace(updated.id, mention_ids)
+        {:ok, mention_ids}
+      end)
+      |> maybe_enqueue_message_lifecycle_bot_event(user, message.channel_id, "message.updated")
+      |> maybe_enqueue_bot_mentioned_events(user, message.channel_id, newly_mentioned)
+
+    case Repo.transaction(multi) do
+      {:ok, result} -> {:ok, result}
+      {:error, _op, value, _changes} -> {:error, value}
+    end
+  end
+
+  defp maybe_enqueue_message_lifecycle_bot_event(multi, user, %Message{} = message, event_type) do
+    maybe_enqueue_message_lifecycle_bot_event(
+      multi,
+      user,
+      message.channel_id,
+      event_type,
+      message
+    )
+  end
+
+  defp maybe_enqueue_message_lifecycle_bot_event(multi, user, channel_id, event_type)
+       when is_binary(channel_id) do
+    maybe_enqueue_message_lifecycle_bot_event(multi, user, channel_id, event_type, nil)
+  end
+
+  defp maybe_enqueue_message_lifecycle_bot_event(
+         multi,
+         user,
+         channel_id,
+         event_type,
+         seed_message
+       ) do
+    Xamt.Bots.Dispatcher.enqueue_event_multi(multi, :bot_events, fn changes ->
+      message = Map.get(changes, :message) || seed_message
+      server_id = channel_server_id(channel_id)
+
+      author_type = if user.is_bot, do: "bot", else: "user"
+
+      %{
+        server_id: server_id,
+        channel_id: channel_id,
+        event_type: event_type,
+        actor_is_bot: user.is_bot,
+        payload: %{
+          "data" => %{
+            "message_id" => message && message.id,
+            "channel_id" => channel_id,
+            "server_id" => server_id,
+            "author" => %{
+              "type" => author_type,
+              "id" => user.id,
+              "username" => user.username
+            },
+            "content" => message && plain_text(message)
+          },
+          "message" => %{
+            "id" => message && message.id,
+            "body" => message && plain_text(message),
+            "author" => %{
+              "type" => author_type,
+              "id" => user.id,
+              "username" => user.username
             }
           }
-        })
+        }
+      }
+    end)
+  end
 
-        Xamt.Bots.DeliveryWorker.trigger_sweep()
-    end
+  defp maybe_enqueue_bot_mentioned_events(multi, _user, _channel_id, []), do: multi
+
+  defp maybe_enqueue_bot_mentioned_events(multi, user, channel_id, mention_ids)
+       when is_list(mention_ids) do
+    Xamt.Bots.Dispatcher.enqueue_event_multi(multi, :bot_mention_events, fn changes ->
+      message = Map.fetch!(changes, :message)
+      server_id = channel_server_id(channel_id)
+      mentioned_bot_ids = bot_ids_for_user_ids(mention_ids)
+      author_type = if user.is_bot, do: "bot", else: "user"
+
+      %{
+        server_id: server_id,
+        channel_id: channel_id,
+        event_type: "bot.mentioned",
+        actor_is_bot: user.is_bot,
+        only_bot_ids: mentioned_bot_ids,
+        payload: %{
+          "data" => %{
+            "message_id" => message.id,
+            "channel_id" => channel_id,
+            "server_id" => server_id,
+            "mentioned_bot_ids" => mentioned_bot_ids,
+            "author" => %{
+              "type" => author_type,
+              "id" => user.id,
+              "username" => user.username
+            },
+            "content" => plain_text(message)
+          },
+          "message" => %{
+            "id" => message.id,
+            "body" => plain_text(message),
+            "author" => %{
+              "type" => author_type,
+              "id" => user.id,
+              "username" => user.username
+            }
+          }
+        }
+      }
+    end)
+  end
+
+  defp bot_ids_for_user_ids([]), do: []
+
+  defp bot_ids_for_user_ids(user_ids) when is_list(user_ids) do
+    from(b in Xamt.Bots.Bot, where: b.bot_user_id in ^user_ids, select: b.id)
+    |> Repo.all()
   end
 
   defp maybe_enqueue_reaction_added_bot_event(_user, _message, _emoji, _summary, :removed),

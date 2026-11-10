@@ -428,9 +428,12 @@ defmodule Xamt.Servers do
   def kick_member(%Scope{user: actor}, server_id, user_id) do
     with :ok <- authorize_kick(server_id, actor.id, user_id),
          %ServerMember{} = member <- get_member(server_id, user_id) do
+      member = Repo.preload(member, :user)
+
       case Repo.delete(member) do
         {:ok, deleted} ->
           broadcast_server(server_id, {:member_removed, deleted})
+          maybe_enqueue_member_left_bot_event(server_id, member.user, actor)
           {:ok, deleted}
 
         other ->
@@ -580,10 +583,45 @@ defmodule Xamt.Servers do
       event_type: "member.joined",
       actor_is_bot: user.is_bot,
       payload: %{
-        "member" => %{"id" => user.id, "username" => user.username}
+        "data" => %{
+          "server_id" => server_id,
+          "member" => member_payload(user)
+        },
+        "member" => member_payload(user)
       }
     })
 
     Xamt.Bots.DeliveryWorker.trigger_sweep()
   end
+
+  defp maybe_enqueue_member_left_bot_event(server_id, left_user, actor) do
+    Xamt.Bots.Dispatcher.enqueue_event(%{
+      server_id: server_id,
+      channel_id: nil,
+      event_type: "member.left",
+      # Actor is the kicker; still deliver even when a bot account leaves.
+      actor_is_bot: false,
+      payload: %{
+        "data" => %{
+          "server_id" => server_id,
+          "member" => member_payload(left_user),
+          "removed_by" => member_payload(actor),
+          "reason" => "kicked"
+        },
+        "member" => member_payload(left_user)
+      }
+    })
+
+    Xamt.Bots.DeliveryWorker.trigger_sweep()
+  end
+
+  defp member_payload(%{id: id, username: username} = user) do
+    %{
+      "id" => id,
+      "username" => username,
+      "type" => if(Map.get(user, :is_bot, false), do: "bot", else: "user")
+    }
+  end
+
+  defp member_payload(_), do: %{}
 end

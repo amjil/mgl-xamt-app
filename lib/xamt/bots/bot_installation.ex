@@ -9,6 +9,7 @@ defmodule Xamt.Bots.BotInstallation do
     field :granted_scopes, {:array, :string}, default: []
     field :allowed_channel_ids, {:array, :binary_id}, default: []
     field :status, :string, default: "enabled"
+    field :uninstalled_at, :utc_datetime_usec
 
     belongs_to :bot, Xamt.Bots.Bot
     belongs_to :server, Xamt.Servers.Server
@@ -30,9 +31,10 @@ defmodule Xamt.Bots.BotInstallation do
       :installed_by_id,
       :granted_scopes,
       :allowed_channel_ids,
-      :status
+      :status,
+      :uninstalled_at
     ])
     |> validate_required([:bot_id, :server_id])
-    |> validate_inclusion(:status, ["enabled", "disabled"])
+    |> validate_inclusion(:status, ["enabled", "disabled", "uninstalled"])
   end
 end

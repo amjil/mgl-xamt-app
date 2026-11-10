@@ -50,6 +50,12 @@ config :xamt, Xamt.Messages.LinkPreview,
 # Warm ETS community caches from Postgres on boot (disabled under SQL sandbox).
 config :xamt, :ets_cache_warmup, true
 
+# Bot platform feature flags (overridable via runtime env).
+config :xamt,
+  bot_api_enabled: true,
+  bot_webhook_delivery_enabled: true,
+  start_bot_delivery_worker: true
+
 # User media storage. Override to S3/SeaweedFS via XAMT_S3_* in runtime.exs.
 config :xamt, Xamt.Storage, adapter: Xamt.Storage.Local
 

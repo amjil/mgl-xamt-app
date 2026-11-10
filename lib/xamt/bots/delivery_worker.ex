@@ -30,7 +30,10 @@ defmodule Xamt.Bots.DeliveryWorker do
 
   @impl true
   def handle_info(:sweep, state) do
-    claim_and_dispatch_events()
+    if Application.get_env(:xamt, :bot_webhook_delivery_enabled, true) do
+      claim_and_dispatch_events()
+    end
+
     schedule_sweep()
     {:noreply, state}
   end

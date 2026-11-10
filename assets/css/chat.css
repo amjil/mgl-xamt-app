@@ -1833,6 +1833,69 @@ html.xamt-desktop-ime .xamt-composer__emoji {
   margin-block-start: 0.35rem;
 }
 
+.xamt-bot-manager__deliveries {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+  font-family: var(--xamt-font-ui);
+}
+
+.xamt-bot-manager__delivery {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--xamt-line);
+  border-radius: calc(var(--xamt-radius) - 2px);
+  background: var(--xamt-bg-2);
+}
+
+.xamt-bot-manager__delivery-main {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.xamt-bot-manager__delivery-status {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--xamt-muted);
+}
+
+.xamt-bot-manager__delivery-status.is-ok {
+  color: color-mix(in srgb, #1f8a4c 80%, var(--xamt-fg));
+}
+
+.xamt-bot-manager__delivery-status.is-bad {
+  color: color-mix(in srgb, #b42318 80%, var(--xamt-fg));
+}
+
+.xamt-bot-manager__delivery-meta {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--xamt-muted);
+  max-width: 18rem;
+  overflow-wrap: anywhere;
+}
+
+.xamt-bot-manager__empty {
+  margin: 0;
+  color: var(--xamt-muted);
+  font-size: 0.85rem;
+}
+
+.xamt-bot-manager__danger {
+  border-color: color-mix(in srgb, #b42318 35%, var(--xamt-line));
+}
+
+.xamt-bot-manager__uninstall {
+  color: #b42318;
+}
+
 /* Latin / API values stay horizontal for URLs, tokens, and secrets. */
 .xamt-bot-manager__tech {
   writing-mode: horizontal-tb;

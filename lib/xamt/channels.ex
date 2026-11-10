@@ -144,6 +144,7 @@ defmodule Xamt.Channels do
     })
     |> Repo.insert()
     |> with_visible_slug_error()
+    |> tap_enqueue_channel_created(server.id)
     |> tap_invalidate_channels(server.id)
   end
 
@@ -344,6 +345,37 @@ defmodule Xamt.Channels do
       end)
     end
   end
+
+  defp tap_enqueue_channel_created({:ok, %Channel{} = channel}, server_id) do
+    Xamt.Bots.Dispatcher.enqueue_event(%{
+      server_id: server_id,
+      channel_id: channel.id,
+      event_type: "channel.created",
+      actor_is_bot: false,
+      payload: %{
+        "data" => %{
+          "server_id" => server_id,
+          "channel" => %{
+            "id" => channel.id,
+            "name" => channel.name,
+            "slug" => channel.slug,
+            "type" => channel.type
+          }
+        },
+        "channel" => %{
+          "id" => channel.id,
+          "name" => channel.name,
+          "slug" => channel.slug,
+          "type" => channel.type
+        }
+      }
+    })
+
+    Xamt.Bots.DeliveryWorker.trigger_sweep()
+    {:ok, channel}
+  end
+
+  defp tap_enqueue_channel_created(other, _server_id), do: other
 
   defp tap_invalidate_channels({:ok, %Channel{} = channel}, server_id) do
     ChannelListCache.invalidate(server_id)

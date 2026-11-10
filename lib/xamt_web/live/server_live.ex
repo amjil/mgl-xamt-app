@@ -102,6 +102,7 @@ defmodule XamtWeb.ServerLive do
       |> assign(:show_bot_manager, false)
       |> assign(:bot_installations, [])
       |> assign(:selected_bot_installation, nil)
+      |> assign(:bot_delivery_events, [])
       |> assign(:newly_issued_bot_token, nil)
       |> assign(:show_bot_create_form, false)
       |> assign(:pinned_messages, [])
@@ -724,12 +725,14 @@ defmodule XamtWeb.ServerLive do
     if can_manage_server?(socket) do
       installations = Bots.list_server_installations(socket.assigns.server.id)
       first_inst = List.first(installations)
+      events = if first_inst, do: Bots.list_installation_events(first_inst.id), else: []
 
       {:noreply,
        socket
        |> assign(:show_bot_manager, true)
        |> assign(:bot_installations, installations)
        |> assign(:selected_bot_installation, first_inst)
+       |> assign(:bot_delivery_events, events)
        |> assign(:show_bot_create_form, Enum.empty?(installations))}
     else
       {:noreply, put_flash(socket, :error, gettext("You do not have permission to manage bots"))}
@@ -749,10 +752,12 @@ defmodule XamtWeb.ServerLive do
 
   def handle_event("select_bot_installation", %{"id" => id}, socket) do
     selected = Enum.find(socket.assigns.bot_installations, &(&1.id == id))
+    events = if selected, do: Bots.list_installation_events(selected.id), else: []
 
     {:noreply,
      socket
      |> assign(:selected_bot_installation, selected)
+     |> assign(:bot_delivery_events, events)
      |> assign(:show_bot_create_form, false)}
   end
 
@@ -779,6 +784,7 @@ defmodule XamtWeb.ServerLive do
            socket
            |> assign(:bot_installations, installations)
            |> assign(:selected_bot_installation, selected)
+           |> assign(:bot_delivery_events, Bots.list_installation_events(inst.id))
            |> assign(:newly_issued_bot_token, raw_token)
            |> assign(:show_bot_create_form, false)
            |> put_flash(:info, gettext("Bot created and installed. Save the API token now"))}
@@ -829,8 +835,9 @@ defmodule XamtWeb.ServerLive do
   def handle_event("rotate_bot_token", %{"id" => id}, socket) do
     if can_manage_server?(socket) do
       inst = Enum.find(socket.assigns.bot_installations, &(&1.id == id))
+      actor = socket.assigns.current_scope.user
 
-      case inst && Bots.rotate_installation_token(inst) do
+      case inst && Bots.rotate_installation_token(inst, actor) do
         {:ok, %{raw_token: raw_token}} ->
           installations = Bots.list_server_installations(socket.assigns.server.id)
           updated_selected = Enum.find(installations, &(&1.id == inst.id))
@@ -839,11 +846,68 @@ defmodule XamtWeb.ServerLive do
            socket
            |> assign(:bot_installations, installations)
            |> assign(:selected_bot_installation, updated_selected)
-           |> assign(:newly_issued_bot_token, raw_token)}
+           |> assign(:newly_issued_bot_token, raw_token)
+           |> assign(:bot_delivery_events, Bots.list_installation_events(inst.id))}
 
         _ ->
           {:noreply, put_flash(socket, :error, gettext("Could not rotate token"))}
       end
+    else
+      {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+    end
+  end
+
+  def handle_event("uninstall_bot", %{"id" => id}, socket) do
+    if can_manage_server?(socket) do
+      inst = Enum.find(socket.assigns.bot_installations, &(&1.id == id))
+      actor = socket.assigns.current_scope.user
+
+      case inst && Bots.uninstall_bot(inst, actor) do
+        {:ok, _} ->
+          installations = Bots.list_server_installations(socket.assigns.server.id)
+
+          {:noreply,
+           socket
+           |> assign(:bot_installations, installations)
+           |> assign(:selected_bot_installation, List.first(installations))
+           |> assign(:bot_delivery_events, [])
+           |> assign(:show_bot_create_form, Enum.empty?(installations))
+           |> put_flash(:info, gettext("Bot uninstalled"))}
+
+        _ ->
+          {:noreply, put_flash(socket, :error, gettext("Could not uninstall bot"))}
+      end
+    else
+      {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+    end
+  end
+
+  def handle_event("retry_bot_delivery", %{"id" => event_id}, socket) do
+    if can_manage_server?(socket) do
+      actor = socket.assigns.current_scope.user
+
+      case Bots.retry_event_delivery(event_id, actor) do
+        {:ok, event} ->
+          events = Bots.list_installation_events(event.bot_installation_id)
+
+          {:noreply,
+           socket
+           |> assign(:bot_delivery_events, events)
+           |> put_flash(:info, gettext("Delivery queued for retry"))}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, gettext("Could not retry delivery"))}
+      end
+    else
+      {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+    end
+  end
+
+  def handle_event("refresh_bot_deliveries", _params, socket) do
+    if can_manage_server?(socket) do
+      inst = socket.assigns.selected_bot_installation
+      events = if inst, do: Bots.list_installation_events(inst.id), else: []
+      {:noreply, assign(socket, :bot_delivery_events, events)}
     else
       {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
     end

@@ -35,10 +35,22 @@ defmodule XamtWeb.Router do
     post "/messages/sync", MessageApiController, :sync
   end
 
+  # Bot REST API — Bearer bot token auth (not user session cookies).
+  # Kept under /api/v1/bot for compatibility with existing installations.
   scope "/api/v1/bot", XamtWeb do
     pipe_through :api
 
+    get "/me", BotApiController, :me
+    get "/channels", BotApiController, :list_channels
+    get "/channels/:channel_id", BotApiController, :show_channel
+    get "/channels/:channel_id/messages", BotApiController, :list_messages
     post "/channels/:channel_id/messages", BotApiController, :create_message
+    patch "/messages/:message_id", BotApiController, :update_message
+    delete "/messages/:message_id", BotApiController, :delete_message
+    get "/events/subscriptions", BotApiController, :list_event_subscriptions
+    post "/interactions", BotApiController, :create_interaction
+    post "/interactions/respond", BotApiController, :respond_interaction
+    post "/interactions/:interaction_id/respond", BotApiController, :respond_interaction
   end
 
   scope "/", XamtWeb do

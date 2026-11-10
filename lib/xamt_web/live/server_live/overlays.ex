@@ -434,6 +434,7 @@ defmodule XamtWeb.ServerLive.Overlays do
   attr :show, :boolean, default: false
   attr :installations, :list, default: []
   attr :selected_installation, :any, default: nil
+  attr :delivery_events, :list, default: []
   attr :channels, :list, default: []
   attr :newly_issued_token, :string, default: nil
   attr :show_create_form, :boolean, default: false
@@ -667,6 +668,38 @@ defmodule XamtWeb.ServerLive.Overlays do
                     type="checkbox"
                     class="xamt-checkbox"
                     name="subscribed_events[]"
+                    value="member.left"
+                    checked={"member.left" in current_events}
+                  />
+                  <span class="xamt-bot-manager__option-text mongol-text">
+                    {gettext("Member left / kicked (member.left)")}
+                  </span>
+                  <span class="xamt-bot-manager__option-hint mongol-text">
+                    [{gettext("requires server.members.events")}]
+                  </span>
+                </label>
+
+                <label class="xamt-bot-manager__option">
+                  <input
+                    type="checkbox"
+                    class="xamt-checkbox"
+                    name="subscribed_events[]"
+                    value="channel.created"
+                    checked={"channel.created" in current_events}
+                  />
+                  <span class="xamt-bot-manager__option-text mongol-text">
+                    {gettext("Channel created (channel.created)")}
+                  </span>
+                  <span class="xamt-bot-manager__option-hint mongol-text">
+                    [{gettext("requires channel.messages.read")}]
+                  </span>
+                </label>
+
+                <label class="xamt-bot-manager__option">
+                  <input
+                    type="checkbox"
+                    class="xamt-checkbox"
+                    name="subscribed_events[]"
                     value="message.created"
                     checked={"message.created" in current_events}
                   />
@@ -683,11 +716,59 @@ defmodule XamtWeb.ServerLive.Overlays do
                     type="checkbox"
                     class="xamt-checkbox"
                     name="subscribed_events[]"
+                    value="bot.mentioned"
+                    checked={"bot.mentioned" in current_events}
+                  />
+                  <span class="xamt-bot-manager__option-text mongol-text">
+                    {gettext("Bot mentioned (bot.mentioned)")}
+                  </span>
+                  <span class="xamt-bot-manager__option-hint mongol-text">
+                    [{gettext("requires channel.messages.read")}]
+                  </span>
+                </label>
+
+                <label class="xamt-bot-manager__option">
+                  <input
+                    type="checkbox"
+                    class="xamt-checkbox"
+                    name="subscribed_events[]"
                     value="reaction.added"
                     checked={"reaction.added" in current_events}
                   />
                   <span class="xamt-bot-manager__option-text mongol-text">
                     {gettext("Reaction added (reaction.added)")}
+                  </span>
+                  <span class="xamt-bot-manager__option-hint mongol-text">
+                    [{gettext("requires channel.messages.read")}]
+                  </span>
+                </label>
+
+                <label class="xamt-bot-manager__option">
+                  <input
+                    type="checkbox"
+                    class="xamt-checkbox"
+                    name="subscribed_events[]"
+                    value="message.updated"
+                    checked={"message.updated" in current_events}
+                  />
+                  <span class="xamt-bot-manager__option-text mongol-text">
+                    {gettext("Message updated (message.updated)")}
+                  </span>
+                  <span class="xamt-bot-manager__option-hint mongol-text">
+                    [{gettext("requires channel.messages.read")}]
+                  </span>
+                </label>
+
+                <label class="xamt-bot-manager__option">
+                  <input
+                    type="checkbox"
+                    class="xamt-checkbox"
+                    name="subscribed_events[]"
+                    value="message.deleted"
+                    checked={"message.deleted" in current_events}
+                  />
+                  <span class="xamt-bot-manager__option-text mongol-text">
+                    {gettext("Message deleted (message.deleted)")}
                   </span>
                   <span class="xamt-bot-manager__option-hint mongol-text">
                     [{gettext("requires channel.messages.read")}]
@@ -798,6 +879,78 @@ defmodule XamtWeb.ServerLive.Overlays do
                 class="xamt-btn xamt-btn--primary mongol-text xamt-bot-manager__save"
               >
                 {gettext("Save permissions and subscriptions")}
+              </button>
+            </section>
+
+            <section class="xamt-bot-manager__section" aria-labelledby="bot-config-deliveries">
+              <div class="xamt-bot-manager__section-head">
+                <h4 id="bot-config-deliveries" class="xamt-bot-manager__section-title mongol-text">
+                  {gettext("4. Recent webhook deliveries")}
+                </h4>
+                <button
+                  type="button"
+                  id="bot-refresh-deliveries"
+                  phx-click="refresh_bot_deliveries"
+                  class="xamt-link-hint mongol-text"
+                >
+                  {gettext("Refresh")}
+                </button>
+              </div>
+
+              <div class="xamt-bot-manager__deliveries" id="bot-delivery-list">
+                <p :if={@delivery_events == []} class="xamt-bot-manager__empty mongol-text">
+                  {gettext("No delivery attempts yet")}
+                </p>
+
+                <div
+                  :for={event <- @delivery_events}
+                  id={"bot-delivery-#{event.id}"}
+                  class="xamt-bot-manager__delivery"
+                >
+                  <div class="xamt-bot-manager__delivery-main">
+                    <span class="xamt-bot-manager__mono">{event.event_type}</span>
+                    <span class={[
+                      "xamt-bot-manager__delivery-status",
+                      event.status == "delivered" && "is-ok",
+                      event.status in ["failed", "dead"] && "is-bad"
+                    ]}>
+                      {event.status}
+                    </span>
+                  </div>
+                  <p class="xamt-bot-manager__delivery-meta">
+                    {gettext("Retries")}: {event.retry_count}/{event.max_retries}
+                    <%= if event.execution_result["http_status"] do %>
+                      · HTTP {event.execution_result["http_status"]}
+                    <% end %>
+                    <%= if event.execution_result["error"] do %>
+                      · {event.execution_result["error"]}
+                    <% end %>
+                  </p>
+                  <button
+                    :if={event.status in ["failed", "dead"]}
+                    type="button"
+                    id={"bot-retry-#{event.id}"}
+                    phx-click="retry_bot_delivery"
+                    phx-value-id={event.id}
+                    class="xamt-link-hint mongol-text"
+                  >
+                    {gettext("Retry delivery")}
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section class="xamt-bot-manager__section xamt-bot-manager__danger">
+              <h4 class="xamt-bot-manager__section-title mongol-text">{gettext("Danger zone")}</h4>
+              <button
+                type="button"
+                id="bot-uninstall"
+                phx-click="uninstall_bot"
+                phx-value-id={@selected_installation.id}
+                data-confirm={gettext("Uninstall this bot and revoke its tokens?")}
+                class="xamt-btn xamt-btn--soft mongol-text xamt-bot-manager__uninstall"
+              >
+                {gettext("Uninstall bot")}
               </button>
             </section>
           </div>
