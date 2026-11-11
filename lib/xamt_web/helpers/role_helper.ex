@@ -61,4 +61,8 @@ defmodule XamtWeb.RoleHelper do
       icon: nil
     }
   end
+
+  @doc "Localized label for a global role string, or nil for ordinary members."
+  @spec global_role_label(term()) :: String.t() | nil
+  def global_role_label(role), do: get_role_ui_config(role).label
 end

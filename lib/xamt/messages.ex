@@ -191,6 +191,29 @@ defmodule Xamt.Messages do
     end
   end
 
+  @doc """
+  Recent non-deleted messages by `author_id` that `viewer_id` may view.
+
+  Used on profile pages so visitors only see history in shared channels.
+  """
+  def list_user_recent_messages(author_id, viewer_id, opts \\ [])
+      when is_binary(author_id) and is_binary(viewer_id) do
+    limit = Keyword.get(opts, :limit, 10)
+
+    from(m in Message,
+      join: c in Channel,
+      on: c.id == m.channel_id,
+      join: sm in ServerMember,
+      on: sm.server_id == c.server_id and sm.user_id == ^viewer_id,
+      where: m.user_id == ^author_id and is_nil(m.deleted_at),
+      where: has_perm(sm.permissions, :view_channel),
+      order_by: [desc: m.inserted_at, desc: m.id],
+      limit: ^limit,
+      preload: [channel: :server]
+    )
+    |> Repo.all()
+  end
+
   def list_messages(channel_id, opts \\ []) do
     limit = Keyword.get(opts, :limit, @default_limit)
 

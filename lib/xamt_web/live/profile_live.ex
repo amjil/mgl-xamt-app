@@ -2,105 +2,271 @@ defmodule XamtWeb.ProfileLive do
   use XamtWeb, :live_view
 
   alias Xamt.Accounts
+  alias Xamt.Accounts.User
+  alias Xamt.Messages
+  alias Xamt.Servers
+  alias XamtWeb.RoleHelper
 
   @impl true
   def mount(%{"username" => username}, _session, socket) do
-    user = Accounts.get_user_by_username(username)
+    case Accounts.get_user_by_username(username) do
+      nil ->
+        {:ok,
+         socket
+         |> put_flash(:error, gettext("User not found."))
+         |> push_navigate(to: ~p"/")}
 
-    if user do
-      {:ok,
-       socket
-       |> assign(:page_title, user.display_name || user.username)
-       |> assign(:profile_user, user)
-       |> assign(:role_ui, RoleHelper.get_role_ui_config(user))}
-    else
-      {:ok,
-       socket
-       |> assign(:profile_user, nil)
-       |> assign(:role_ui, nil)
-       |> put_flash(:error, gettext("User not found"))
-       |> push_navigate(to: ~p"/")}
+      profile_user ->
+        viewer = socket.assigns.current_scope && socket.assigns.current_scope.user
+
+        {mutual_servers, recent_messages} =
+          if viewer do
+            {
+              Servers.list_mutual_servers(viewer.id, profile_user.id),
+              Messages.list_user_recent_messages(profile_user.id, viewer.id, limit: 10)
+            }
+          else
+            {[], []}
+          end
+
+        {:ok,
+         socket
+         |> assign(:page_title, User.display_name(profile_user))
+         |> assign(:profile_user, profile_user)
+         |> assign(:mutual_servers, mutual_servers)
+         |> assign(:recent_messages, recent_messages)}
     end
   end
 
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app
+    <Layouts.home
       flash={@flash}
       current_scope={@current_scope}
       show_search={@show_search}
       global_search_query={@global_search_query}
       global_search_results={@global_search_results}
     >
-      <section :if={@profile_user} class="xamt-stack" id="profile-panel">
-        <div class="xamt-auth-intro">
-          <span class="xamt-ornament" aria-hidden="true"></span>
-          <p class="xamt-kicker mongol-text">{gettext("Profile")}</p>
-        </div>
+      <main id="user-profile-canvas" class="xamt-home-canvas" phx-hook="MongolianScroll">
+        <%!-- ==================== 第 1 区：返回导航与核心身份旌旗 ==================== --%>
+        <aside class="xamt-home-section" id="profile-panel">
+          <div class="flex flex-row items-center justify-between h-full py-1">
+            <div class="flex flex-row items-center gap-3">
+              <.link
+                navigate={~p"/"}
+                id="profile-back"
+                class="xamt-icon-btn"
+                title={gettext("Back to home")}
+              >
+                <.icon name="hero-arrow-left" class="w-5 h-5" />
+              </.link>
 
-        <article class={["xamt-profile xamt-surface", @role_ui.accent_class]}>
-          <.status_avatar user={@profile_user} class="xamt-avatar xamt-avatar--lg" />
-
-          <div class="xamt-profile__identity">
-            <div class="xamt-profile__names">
-              <h1 class={["xamt-profile__display-name mongol-text", @role_ui.color_class]}>
-                {display_name(@profile_user)}
+              <h1 class="text-xl font-bold tracking-widest">
+                {gettext("User Profile")}
               </h1>
-              <p class="xamt-profile__username">@{@profile_user.username}</p>
             </div>
-            <div
-              :if={@role_ui.label}
-              id="profile-role-badge"
-              class={["xamt-role-badge", @role_ui.bg_class]}
-            >
-              <.icon name={@role_ui.icon} class="w-3 h-3 shrink-0" />
-              <span>{@role_ui.label}</span>
-            </div>
-            <p :if={status_line?(@profile_user)} class="xamt-profile__status">
-              <span :if={@profile_user.status_emoji} class="xamt-emoji">
-                {@profile_user.status_emoji}
-              </span>
-              <span :if={@profile_user.status_text} class="mongol-text">
-                {@profile_user.status_text}
-              </span>
-            </p>
-          </div>
 
-          <div class="xamt-profile__about">
-            <span class="xamt-field__label mongol-text">{gettext("Bio")}</span>
-            <p :if={@profile_user.bio} class="xamt-profile__bio mongol-text">{@profile_user.bio}</p>
-            <p :if={!@profile_user.bio} class="xamt-profile__bio xamt-empty mongol-text">
-              {gettext("No bio yet.")}
-            </p>
-          </div>
-
-          <nav class="xamt-profile__actions">
             <.link
-              :if={own_profile?(@current_scope, @profile_user)}
+              :if={@current_scope.user && @current_scope.user.id == @profile_user.id}
               navigate={~p"/settings"}
               id="profile-edit"
-              class="xamt-btn xamt-btn--primary mongol-text"
+              class="xamt-btn py-3 px-2 text-xs font-bold"
+              title={gettext("Edit Profile")}
             >
-              {gettext("Edit")}
+              <.icon name="hero-pencil-square" class="w-4 h-4 mb-1" />
+              <span>{gettext("Edit")}</span>
             </.link>
-            <.link navigate={~p"/"} id="profile-back" class="xamt-btn mongol-text">
-              {gettext("Back")}
+          </div>
+
+          <%!-- 用户主名片竖条 --%>
+          <div class="xamt-home-card items-center justify-between">
+            <%!-- 左列：头像 + 昵称 + 角色徽章 --%>
+            <div class="flex flex-row items-center gap-3 h-full">
+              <div class="w-14 h-14 rounded-2xl bg-[var(--xamt-accent)]/15 text-[var(--xamt-accent)] flex items-center justify-center font-bold text-xl overflow-hidden border border-[var(--xamt-line)] shadow-sm shrink-0">
+                <img
+                  :if={@profile_user.avatar}
+                  src={@profile_user.avatar}
+                  alt={User.display_name(@profile_user)}
+                  class="w-full h-full object-cover"
+                />
+                <span :if={!@profile_user.avatar}>
+                  {initials(User.display_name(@profile_user))}
+                </span>
+              </div>
+
+              <span class={[
+                "text-xl font-bold tracking-wide text-[var(--xamt-text)] xamt-profile__display-name",
+                RoleHelper.get_role_ui_config(@profile_user).color_class
+              ]}>
+                {User.display_name(@profile_user)}
+              </span>
+
+              <span class="text-xs text-[var(--xamt-muted)] xamt-profile__username">
+                @{@profile_user.username}
+              </span>
+
+              <span :if={@profile_user.is_bot} class="xamt-role-pill xamt-role-pill--bot">
+                BOT
+              </span>
+
+              <span
+                :if={!@profile_user.is_bot && RoleHelper.global_role_label(@profile_user.global_role)}
+                id="profile-role-badge"
+                class={[
+                  "xamt-role-pill",
+                  @profile_user.global_role == "admin" && "xamt-role-pill--admin",
+                  @profile_user.global_role == "creator" && "xamt-role-pill--creator"
+                ]}
+              >
+                {RoleHelper.global_role_label(@profile_user.global_role)}
+              </span>
+            </div>
+
+            <%!-- 右列：自定义状态与加入日期 --%>
+            <div class="flex flex-row items-center justify-between h-full gap-3">
+              <div
+                :if={@profile_user.status_emoji || @profile_user.status_text}
+                class="flex flex-row items-center gap-1.5 px-1.5 py-2.5 rounded-xl bg-[var(--xamt-bg)] border border-[var(--xamt-line)] text-xs"
+              >
+                <span :if={@profile_user.status_emoji}>
+                  {@profile_user.status_emoji}
+                </span>
+                <span :if={@profile_user.status_text} class="text-[var(--xamt-text)]">
+                  {@profile_user.status_text}
+                </span>
+              </div>
+
+              <div class="flex flex-row items-center gap-1.5 text-xs text-[var(--xamt-muted)] mt-auto">
+                <.icon name="hero-calendar-days" class="w-4 h-4 shrink-0" />
+                <span>
+                  {gettext("Joined %{date}",
+                    date: Calendar.strftime(@profile_user.inserted_at, "%Y-%m-%d")
+                  )}
+                </span>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <%!-- ==================== 第 2 区：个人简介 (Bio) 竖卷 ==================== --%>
+        <section :if={@profile_user.bio && @profile_user.bio != ""} class="xamt-home-section">
+          <header class="xamt-home-section__header">
+            <div class="flex flex-row items-center gap-2">
+              <.icon name="hero-document-text" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+              <h2 class="font-bold text-sm">{gettext("Bio")}</h2>
+            </div>
+          </header>
+
+          <div class="xamt-home-card">
+            <p class="text-sm leading-relaxed text-[var(--xamt-text)] whitespace-pre-line h-full">
+              {@profile_user.bio}
+            </p>
+          </div>
+        </section>
+
+        <%!-- ==================== 第 3 区：共同所在的社区 (Mutual Servers) ==================== --%>
+        <section class="xamt-home-section">
+          <header class="xamt-home-section__header">
+            <div class="flex flex-row items-center gap-2">
+              <.icon name="hero-user-group" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+              <h2 class="font-bold text-sm">{gettext("Mutual Servers")}</h2>
+            </div>
+            <span class="text-xs font-bold text-[var(--xamt-muted)]">
+              {length(@mutual_servers)}
+            </span>
+          </header>
+
+          <div class="flex flex-col gap-3 h-full">
+            <div
+              :if={@mutual_servers == []}
+              class="xamt-user-strip justify-center text-xs text-[var(--xamt-muted)] px-3"
+            >
+              {gettext("No mutual servers.")}
+            </div>
+
+            <.link
+              :for={server <- @mutual_servers}
+              navigate={~p"/servers/#{server.slug}"}
+              class="xamt-user-strip justify-between group"
+            >
+              <div class="flex flex-row items-center gap-2.5">
+                <div class="w-8 h-8 rounded-xl bg-[var(--xamt-accent)]/15 text-[var(--xamt-accent)] flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden group-hover:bg-[var(--xamt-accent)] group-hover:text-white transition-colors">
+                  <img :if={server.icon} src={server.icon} class="w-full h-full object-cover" />
+                  <span :if={!server.icon}>
+                    {initials(server.name)}
+                  </span>
+                </div>
+                <span class="font-bold text-sm text-[var(--xamt-text)]">{server.name}</span>
+              </div>
+
+              <.icon
+                name="hero-arrow-right"
+                class="w-4 h-4 text-[var(--xamt-muted)] group-hover:text-[var(--xamt-accent)] shrink-0"
+              />
             </.link>
-          </nav>
-        </article>
-      </section>
-    </Layouts.app>
+          </div>
+        </section>
+
+        <%!-- ==================== 第 4 区：近期消息记录 (Recent Messages) ==================== --%>
+        <section class="xamt-home-section">
+          <header class="xamt-home-section__header">
+            <div class="flex flex-row items-center gap-2">
+              <.icon
+                name="hero-chat-bubble-left-right"
+                class="w-5 h-5 text-[var(--xamt-accent)] shrink-0"
+              />
+              <h2 class="font-bold text-sm">{gettext("Recent Messages")}</h2>
+            </div>
+            <span class="text-xs font-bold text-[var(--xamt-muted)]">
+              {length(@recent_messages)}
+            </span>
+          </header>
+
+          <div class="flex flex-col gap-3 h-full">
+            <div
+              :if={@recent_messages == []}
+              class="xamt-user-strip justify-center text-xs text-[var(--xamt-muted)] px-3"
+            >
+              {gettext("No recent messages.")}
+            </div>
+
+            <.link
+              :for={msg <- @recent_messages}
+              navigate={~p"/servers/#{msg.channel.server.slug}/#{msg.channel.slug}"}
+              class="xamt-home-card group"
+            >
+              <%!-- 左列：社区与频道归属 + 发送时间 --%>
+              <div class="flex flex-row items-center justify-between h-full text-xs text-[var(--xamt-muted)] border-r border-[var(--xamt-line)] pr-2">
+                <span class="font-bold text-[var(--xamt-accent)]">
+                  {msg.channel.server.name} · #{msg.channel.name}
+                </span>
+                <span class="font-mono text-[11px]">
+                  {Calendar.strftime(msg.inserted_at, "%m-%d %H:%M")}
+                </span>
+              </div>
+
+              <%!-- 右列：消息正文预览 --%>
+              <div class="flex flex-row items-center justify-between h-full pl-1">
+                <p class="text-sm text-[var(--xamt-text)] line-clamp-2">
+                  {Messages.plain_text(msg)}
+                </p>
+                <.icon
+                  name="hero-arrow-top-right-on-square"
+                  class="w-4 h-4 text-[var(--xamt-muted)] group-hover:text-[var(--xamt-accent)] shrink-0 mt-auto"
+                />
+              </div>
+            </.link>
+          </div>
+        </section>
+      </main>
+    </Layouts.home>
     """
   end
 
-  defp own_profile?(%{user: %{id: id}}, %{id: id}) when not is_nil(id), do: true
-  defp own_profile?(_, _), do: false
+  defp initials(name) when is_binary(name) and name != "" do
+    name |> String.first() |> String.upcase()
+  end
 
-  defp status_line?(%{status_emoji: emoji}) when is_binary(emoji) and emoji != "", do: true
-  defp status_line?(%{status_text: text}) when is_binary(text) and text != "", do: true
-  defp status_line?(_), do: false
-
-  defp display_name(%{display_name: name}) when is_binary(name) and name != "", do: name
-  defp display_name(%{username: name}), do: name
+  defp initials(_), do: "?"
 end

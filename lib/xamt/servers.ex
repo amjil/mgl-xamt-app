@@ -120,6 +120,32 @@ defmodule Xamt.Servers do
     |> Repo.preload(:channels)
   end
 
+  @doc """
+  Servers shared by both users. When `user_a_id == user_b_id`, returns all
+  servers that user belongs to (own-profile view).
+  """
+  def list_mutual_servers(user_a_id, user_b_id)
+      when is_binary(user_a_id) and is_binary(user_b_id) do
+    if user_a_id == user_b_id do
+      from(s in Server,
+        join: m in ServerMember,
+        on: m.server_id == s.id,
+        where: m.user_id == ^user_a_id,
+        order_by: [asc: s.name]
+      )
+      |> Repo.all()
+    else
+      from(s in Server,
+        join: m1 in ServerMember,
+        on: m1.server_id == s.id and m1.user_id == ^user_a_id,
+        join: m2 in ServerMember,
+        on: m2.server_id == s.id and m2.user_id == ^user_b_id,
+        order_by: [asc: s.name]
+      )
+      |> Repo.all()
+    end
+  end
+
   def get_server!(id) do
     case ServerCache.get(id) do
       %Server{} = server ->

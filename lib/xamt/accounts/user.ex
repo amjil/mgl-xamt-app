@@ -42,6 +42,14 @@ defmodule Xamt.Accounts.User do
   def admin?(%__MODULE__{global_role: "admin"}), do: true
   def admin?(_), do: false
 
+  @doc """
+  Prefer display name; fall back to username (then email) for UI labels.
+  """
+  def display_name(%__MODULE__{display_name: name}) when is_binary(name) and name != "", do: name
+  def display_name(%__MODULE__{username: name}) when is_binary(name) and name != "", do: name
+  def display_name(%__MODULE__{email: email}) when is_binary(email), do: email
+  def display_name(_), do: "?"
+
   @doc false
   def invite_changeset(user, attrs, opts \\ []) do
     user
