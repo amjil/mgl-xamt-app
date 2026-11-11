@@ -1,75 +1,163 @@
-<Layouts.app flash={@flash} current_scope={@current_scope}>
-  <section class="xamt-stack" id="register-panel">
-    <div class="xamt-auth-intro">
-      <span class="xamt-ornament" aria-hidden="true"></span>
-      <p class="xamt-kicker mongol-text">{gettext("New account")}</p>
-    </div>
-    <.header>
-      {gettext("Register")}
-      <:subtitle>
-        {gettext("Already registered?")}
-        <.link href={~p"/login"} class="xamt-link">
-          {gettext("Log in")}
+<Layouts.home flash={@flash} current_scope={@current_scope}>
+  <main id="register-panel" class="xamt-home-canvas" phx-hook="MongolianScroll">
+    <%!-- 第 1 卷：新账号欢迎旌旗 --%>
+    <aside class="xamt-home-section">
+      <header class="xamt-home-section__header">
+        <div class="flex flex-row items-center gap-2">
+          <.icon name="hero-user-plus" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+          <h1 class="font-bold text-base tracking-widest mongol-text">
+            {gettext("Register")}
+          </h1>
+        </div>
+      </header>
+
+      <div class="xamt-home-card justify-between">
+        <div class="flex flex-row items-center gap-3 h-full">
+          <span class="xamt-ornament !h-12" aria-hidden="true"></span>
+          <p class="xamt-kicker mongol-text">{gettext("New account")}</p>
+          <p class="text-sm text-[var(--xamt-muted)] mongol-text leading-relaxed">
+            {gettext("Already registered?")}
+          </p>
+        </div>
+
+        <.link
+          href={~p"/login"}
+          class="xamt-btn xamt-btn--soft py-3 px-2.5 text-xs font-bold mongol-text"
+        >
+          <.icon name="hero-arrow-right-end-on-rectangle" class="w-4 h-4 mb-1.5" />
+          <span>{gettext("Log in")}</span>
         </.link>
-      </:subtitle>
-    </.header>
+      </div>
+    </aside>
 
-    <.form
-      for={@form}
-      action={~p"/register"}
-      id="user-registration-form"
-      class="xamt-form xamt-form--vertical"
-    >
-      <.input
-        field={@form[:display_name]}
-        id="user_display_name"
-        type="text"
-        label={gettext("Display name")}
-        class="xamt-input mongol-input"
-        autocomplete="nickname"
-      />
-      <mgl-ime target="#user_display_name" profile="auto" keyboard="auto"></mgl-ime>
+    <%!-- 第 2 卷：注册表单卡片 --%>
+    <section class="xamt-home-section">
+      <header class="xamt-home-section__header">
+        <div class="flex flex-row items-center gap-2">
+          <.icon name="hero-identification" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+          <h2 class="font-bold text-sm mongol-text">{gettext("Create an account")}</h2>
+        </div>
+      </header>
 
-      <.input
-        field={@form[:username]}
-        type="text"
-        label={gettext("Username")}
-        class="xamt-input xamt-input--latin"
-        autocomplete="username"
-        spellcheck="false"
-        required
-      />
-      <.input
-        field={@form[:email]}
-        type="email"
-        label={gettext("Email")}
-        autocomplete="email"
-        spellcheck="false"
-        required
-      />
-      <.input
-        field={@form[:password]}
-        type="password"
-        label={gettext("Password")}
-        autocomplete="new-password"
-        minlength="8"
-        maxlength="72"
-        required
-      />
-      <p class="xamt-muted mongol-text">
-        {gettext("At least 8 characters, with English letters, a number, and a symbol.")}
-      </p>
-      <.input
-        field={@form[:password_confirmation]}
-        type="password"
-        label={gettext("Confirm password")}
-        autocomplete="new-password"
-        required
-      />
+      <.form
+        for={@form}
+        action={~p"/register"}
+        id="user-registration-form"
+        class="xamt-home-card"
+      >
+        <label class="xamt-bot-field">
+          <span class="xamt-label mongol-text">{gettext("Display name")}</span>
+          <input
+            type="text"
+            name={@form[:display_name].name}
+            id="user_display_name"
+            value={Phoenix.HTML.Form.normalize_value("text", @form[:display_name].value)}
+            autocomplete="nickname"
+            class="xamt-bot-input mongol-input"
+          />
+          <p
+            :for={msg <- Enum.map(@form[:display_name].errors, &translate_error(&1))}
+            class="text-xs text-red-500 mongol-text"
+          >
+            {msg}
+          </p>
+        </label>
+        <mgl-ime target="#user_display_name" profile="auto" keyboard="auto"></mgl-ime>
 
-      <.button variant="primary" class="xamt-btn xamt-btn--primary mongol-text">
-        {gettext("Create an account")}
-      </.button>
-    </.form>
-  </section>
-</Layouts.app>
+        <label class="xamt-bot-field">
+          <span class="xamt-label mongol-text">{gettext("Username")}</span>
+          <input
+            type="text"
+            name={@form[:username].name}
+            id={@form[:username].id}
+            value={Phoenix.HTML.Form.normalize_value("text", @form[:username].value)}
+            autocomplete="username"
+            spellcheck="false"
+            required
+            class="xamt-bot-input xamt-input--latin"
+          />
+          <p
+            :for={msg <- Enum.map(@form[:username].errors, &translate_error(&1))}
+            class="text-xs text-red-500 mongol-text"
+          >
+            {msg}
+          </p>
+        </label>
+
+        <label class="xamt-bot-field">
+          <span class="xamt-label mongol-text">{gettext("Email")}</span>
+          <input
+            type="email"
+            name={@form[:email].name}
+            id={@form[:email].id}
+            value={Phoenix.HTML.Form.normalize_value("email", @form[:email].value)}
+            autocomplete="email"
+            spellcheck="false"
+            required
+            class="xamt-bot-input xamt-input--latin"
+          />
+          <p
+            :for={msg <- Enum.map(@form[:email].errors, &translate_error(&1))}
+            class="text-xs text-red-500 mongol-text"
+          >
+            {msg}
+          </p>
+        </label>
+
+        <label class="xamt-bot-field">
+          <span class="xamt-label mongol-text">{gettext("Password")}</span>
+          <input
+            type="password"
+            name={@form[:password].name}
+            id={@form[:password].id}
+            value={Phoenix.HTML.Form.normalize_value("password", @form[:password].value)}
+            autocomplete="new-password"
+            minlength="8"
+            maxlength="72"
+            required
+            class="xamt-bot-input xamt-input--latin"
+          />
+          <p
+            :for={msg <- Enum.map(@form[:password].errors, &translate_error(&1))}
+            class="text-xs text-red-500 mongol-text"
+          >
+            {msg}
+          </p>
+        </label>
+
+        <p class="text-xs text-[var(--xamt-muted)] mongol-text">
+          {gettext("At least 8 characters, with English letters, a number, and a symbol.")}
+        </p>
+
+        <label class="xamt-bot-field">
+          <span class="xamt-label mongol-text">{gettext("Confirm password")}</span>
+          <input
+            type="password"
+            name={@form[:password_confirmation].name}
+            id={@form[:password_confirmation].id}
+            value={
+              Phoenix.HTML.Form.normalize_value("password", @form[:password_confirmation].value)
+            }
+            autocomplete="new-password"
+            required
+            class="xamt-bot-input xamt-input--latin"
+          />
+          <p
+            :for={msg <- Enum.map(@form[:password_confirmation].errors, &translate_error(&1))}
+            class="text-xs text-red-500 mongol-text"
+          >
+            {msg}
+          </p>
+        </label>
+
+        <button
+          type="submit"
+          class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold text-xs mongol-text"
+        >
+          <.icon name="hero-check" class="w-4 h-4 mb-1.5" />
+          <span>{gettext("Create an account")}</span>
+        </button>
+      </.form>
+    </section>
+  </main>
+</Layouts.home>

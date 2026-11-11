@@ -1,74 +1,97 @@
-<Layouts.app flash={@flash} current_scope={@current_scope}>
-  <section class="xamt-stack" id="confirm-panel">
-    <div class="xamt-auth-intro">
-      <span class="xamt-ornament" aria-hidden="true"></span>
-      <p class="xamt-kicker mongol-text">{gettext("Welcome")}</p>
-    </div>
-    <.header>
-      {gettext("Welcome")}
-      <:subtitle>
-        <span class="xamt-profile__username">{@user.email}</span>
-      </:subtitle>
-    </.header>
+<Layouts.home flash={@flash} current_scope={@current_scope}>
+  <main id="confirm-panel" class="xamt-home-canvas" phx-hook="MongolianScroll">
+    <aside class="xamt-home-section">
+      <header class="xamt-home-section__header">
+        <div class="flex flex-row items-center gap-2">
+          <.icon name="hero-sparkles" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+          <h1 class="font-bold text-base tracking-widest mongol-text">
+            {gettext("Welcome")}
+          </h1>
+        </div>
+      </header>
 
-    <.form
-      :if={!@user.confirmed_at}
-      for={@form}
-      id="confirmation_form"
-      action={~p"/users/log-in?_action=confirmed"}
-      class="xamt-form xamt-form--vertical"
-    >
-      <input type="hidden" name={@form[:token].name} value={@form[:token].value} />
-      <.button
-        name={@form[:remember_me].name}
-        value="true"
-        phx-disable-with={gettext("Confirming...")}
-        variant="primary"
-        class="xamt-btn xamt-btn--primary mongol-text"
-      >
-        {gettext("Confirm and stay logged in")}
-      </.button>
-      <.button
-        phx-disable-with={gettext("Confirming...")}
-        class="xamt-btn xamt-btn--soft mongol-text"
-      >
-        {gettext("Confirm and log in only this time")}
-      </.button>
-    </.form>
+      <div class="xamt-home-card items-center justify-between">
+        <div class="flex flex-row items-center gap-3 h-full">
+          <span class="xamt-ornament !h-12" aria-hidden="true"></span>
+          <p class="xamt-kicker mongol-text">{gettext("Welcome")}</p>
+          <span class="xamt-profile__username text-xs text-[var(--xamt-muted)] font-mono">
+            {@user.email}
+          </span>
+        </div>
+      </div>
+    </aside>
 
-    <.form
-      :if={@user.confirmed_at}
-      for={@form}
-      id="login_form"
-      action={~p"/users/log-in"}
-      class="xamt-form xamt-form--vertical"
-    >
-      <input type="hidden" name={@form[:token].name} value={@form[:token].value} />
-      <%= if @current_scope do %>
-        <.button
-          variant="primary"
-          phx-disable-with={gettext("Logging in...")}
-          class="xamt-btn xamt-btn--primary mongol-text"
-        >
-          {gettext("Log in")}
-        </.button>
-      <% else %>
-        <.button
-          name={@form[:remember_me].name}
-          value="true"
-          phx-disable-with={gettext("Logging in...")}
-          variant="primary"
-          class="xamt-btn xamt-btn--primary mongol-text"
-        >
-          {gettext("Keep me logged in on this device")}
-        </.button>
-        <.button
-          phx-disable-with={gettext("Logging in...")}
-          class="xamt-btn xamt-btn--soft mongol-text"
-        >
-          {gettext("Log me in only this time")}
-        </.button>
-      <% end %>
-    </.form>
-  </section>
-</Layouts.app>
+    <section class="xamt-home-section">
+      <.form
+        :if={!@user.confirmed_at}
+        for={@form}
+        id="confirmation_form"
+        action={~p"/users/log-in?_action=confirmed"}
+        class="xamt-home-card"
+      >
+        <input type="hidden" name={@form[:token].name} value={@form[:token].value} />
+        <div class="flex flex-row items-center gap-3 h-full">
+          <button
+            type="submit"
+            name={@form[:remember_me].name}
+            value="true"
+            phx-disable-with={gettext("Confirming...")}
+            class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold text-xs mongol-text"
+          >
+            <.icon name="hero-check-badge" class="w-4 h-4 mb-1.5" />
+            <span>{gettext("Confirm and stay logged in")}</span>
+          </button>
+
+          <button
+            type="submit"
+            phx-disable-with={gettext("Confirming...")}
+            class="xamt-btn xamt-btn--soft h-full px-3 text-xs font-bold mongol-text"
+          >
+            <span>{gettext("Confirm and log in only this time")}</span>
+          </button>
+        </div>
+      </.form>
+
+      <.form
+        :if={@user.confirmed_at}
+        for={@form}
+        id="login_form"
+        action={~p"/users/log-in"}
+        class="xamt-home-card"
+      >
+        <input type="hidden" name={@form[:token].name} value={@form[:token].value} />
+        <div class="flex flex-row items-center gap-3 h-full">
+          <%= if @current_scope do %>
+            <button
+              type="submit"
+              phx-disable-with={gettext("Logging in...")}
+              class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold text-xs mongol-text"
+            >
+              <.icon name="hero-arrow-right-end-on-rectangle" class="w-4 h-4 mb-1.5" />
+              <span>{gettext("Log in")}</span>
+            </button>
+          <% else %>
+            <button
+              type="submit"
+              name={@form[:remember_me].name}
+              value="true"
+              phx-disable-with={gettext("Logging in...")}
+              class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold text-xs mongol-text"
+            >
+              <.icon name="hero-check" class="w-4 h-4 mb-1.5" />
+              <span>{gettext("Keep me logged in on this device")}</span>
+            </button>
+
+            <button
+              type="submit"
+              phx-disable-with={gettext("Logging in...")}
+              class="xamt-btn xamt-btn--soft h-full px-3 text-xs font-bold mongol-text"
+            >
+              <span>{gettext("Log me in only this time")}</span>
+            </button>
+          <% end %>
+        </div>
+      </.form>
+    </section>
+  </main>
+</Layouts.home>

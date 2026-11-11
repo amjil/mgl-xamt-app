@@ -28,55 +28,87 @@ defmodule XamtWeb.ServerLive.Overlays do
 
   def delete_reason_overlay(assigns) do
     ~H"""
-    <.drawer
+    <div
       id="delete-reason-drawer"
-      class="xamt-sheet--menu xamt-sheet--reason"
-      show
-      on_cancel={JS.push("cancel_delete_message")}
+      class="xamt-modal"
+      phx-window-keydown="cancel_delete_message"
+      phx-key="Escape"
     >
-      <div class="xamt-sheet-form">
-        <h2 id="delete-reason-title" class="xamt-section-title mongol-text">
-          {gettext("Delete message")}
-        </h2>
-        <p id="delete-reason-preview" class="xamt-delete-reason__preview mongol-text">
-          {Messages.excerpt(@message, 80)}
-        </p>
+      <div class="xamt-modal-backdrop" phx-click="cancel_delete_message"></div>
+
+      <div
+        id="delete-reason-card"
+        class="xamt-bot-modal-card !w-auto relative z-10"
+        phx-hook="MongolianScroll"
+      >
+        <%!-- Column 1: Title & Close --%>
+        <div class="xamt-bot-pane !flex-row justify-between items-center">
+          <div class="flex flex-row items-center gap-2">
+            <.icon name="hero-trash" class="w-5 h-5 text-[var(--xamt-error)] shrink-0" />
+            <h2 id="delete-reason-title" class="text-lg font-bold tracking-wider mongol-text">
+              {gettext("Delete message")}
+            </h2>
+          </div>
+
+          <button
+            type="button"
+            phx-click="cancel_delete_message"
+            class="xamt-icon-btn"
+            title={gettext("Close")}
+          >
+            <.icon name="hero-x-mark" class="w-5 h-5" />
+          </button>
+        </div>
+
+        <%!-- Column 2: Excerpt & Delete Reason Form --%>
         <.form
           for={@form}
           id="delete-reason-form"
           phx-submit="confirm_delete_message"
           novalidate
-          class="xamt-form xamt-form--vertical"
         >
-          <.input field={@form[:id]} type="hidden" />
-          <.input
-            field={@form[:reason]}
-            id="delete-reason"
-            label={gettext("Reason (optional)")}
-            phx-hook="MongolianIME"
-            class="xamt-input mongol-input"
-            autocomplete="off"
-          />
-          <div class="xamt-form__actions">
-            <button
-              type="submit"
-              id="delete-reason-submit"
-              class="xamt-btn xamt-btn--primary mongol-text"
-            >
-              {gettext("Delete")}
-            </button>
-            <button
-              type="button"
-              id="delete-reason-cancel"
-              class="xamt-btn mongol-text"
-              phx-click="cancel_delete_message"
-            >
-              {gettext("Cancel")}
-            </button>
+          <div class="xamt-bot-pane">
+            <p id="delete-reason-preview" class="xamt-delete-reason__preview mongol-text">
+              {Messages.excerpt(@message, 80)}
+            </p>
+
+            <.input field={@form[:id]} type="hidden" />
+
+            <label class="xamt-bot-field">
+              <span class="xamt-label mongol-text">{gettext("Reason (optional)")}</span>
+              <input
+                type="text"
+                id="delete-reason"
+                name={@form[:reason].name}
+                value={@form[:reason].value}
+                phx-hook="MongolianIME"
+                class="xamt-bot-input mongol-input"
+                autocomplete="off"
+              />
+            </label>
+
+            <div class="flex flex-row items-center gap-3 h-full">
+              <button
+                type="submit"
+                id="delete-reason-submit"
+                class="xamt-btn xamt-btn--primary h-full px-3 font-bold text-xs mongol-text"
+              >
+                <.icon name="hero-trash" class="w-4 h-4 mb-1.5" />
+                <span>{gettext("Delete")}</span>
+              </button>
+              <button
+                type="button"
+                id="delete-reason-cancel"
+                class="xamt-btn h-full px-2.5 text-xs mongol-text"
+                phx-click="cancel_delete_message"
+              >
+                {gettext("Cancel")}
+              </button>
+            </div>
           </div>
         </.form>
       </div>
-    </.drawer>
+    </div>
     """
   end
 
@@ -84,23 +116,45 @@ defmodule XamtWeb.ServerLive.Overlays do
 
   def status_picker_overlay(assigns) do
     ~H"""
-    <.drawer
+    <div
       id="status-picker-drawer"
-      class="xamt-sheet--menu xamt-sheet--status"
-      show
-      on_cancel={JS.push("close_status_picker")}
+      class="xamt-modal"
+      phx-window-keydown="close_status_picker"
+      phx-key="Escape"
     >
-      <div class="xamt-sheet-form xamt-status-picker">
-        <h2 id="status-picker-title" class="xamt-section-title mongol-text">
-          {gettext("Set custom status")}
-        </h2>
+      <div class="xamt-modal-backdrop" phx-click="close_status_picker"></div>
 
-        <div class="xamt-status-picker__presets" role="list">
+      <div
+        id="status-picker-card"
+        class="xamt-bot-modal-card !w-auto relative z-10 xamt-status-picker"
+        phx-hook="MongolianScroll"
+      >
+        <%!-- Column 1: Title & Close --%>
+        <div class="xamt-bot-pane !flex-row justify-between items-center">
+          <div class="flex flex-row items-center gap-2">
+            <.icon name="hero-face-smile" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+            <h2 id="status-picker-title" class="text-lg font-bold tracking-wider mongol-text">
+              {gettext("Set custom status")}
+            </h2>
+          </div>
+
+          <button
+            type="button"
+            phx-click="close_status_picker"
+            class="xamt-icon-btn"
+            title={gettext("Close")}
+          >
+            <.icon name="hero-x-mark" class="w-5 h-5" />
+          </button>
+        </div>
+
+        <%!-- Column 2: Presets --%>
+        <div class="xamt-bot-pane" role="list">
           <button
             :for={{preset, idx} <- Enum.with_index(Xamt.Accounts.custom_status_presets())}
             type="button"
             id={"status-preset-#{idx}"}
-            class="xamt-status-btn"
+            class="xamt-bot-strip justify-start gap-2.5"
             phx-click="set_status"
             phx-value-emoji={preset["emoji"]}
             phx-value-text={preset["text"]}
@@ -108,61 +162,74 @@ defmodule XamtWeb.ServerLive.Overlays do
             <span class="xamt-status-btn__emoji xamt-upright" aria-hidden="true">
               {preset["emoji"]}
             </span>
-            <span class="xamt-status-btn__text mongol-text">{preset["text"]}</span>
+            <span class="xamt-status-btn__text mongol-text font-bold text-sm">
+              {preset["text"]}
+            </span>
           </button>
 
           <button
             type="button"
             id="status-clear"
-            class="xamt-status-btn xamt-status-btn--clear mongol-text"
+            class="xamt-bot-strip justify-center text-[var(--xamt-error)] font-bold text-xs mongol-text"
             phx-click="clear_status"
           >
             {gettext("Clear status")}
           </button>
         </div>
 
+        <%!-- Column 3: Custom Emoji + Text Form --%>
         <form
           id="status-custom-form"
           phx-submit="save_custom_status"
-          class="xamt-form xamt-form--vertical xamt-status-picker__form"
         >
-          <input
-            type="text"
-            name="emoji"
-            id="status-custom-emoji"
-            value={@current_user.status_emoji}
-            placeholder="😀"
-            maxlength="10"
-            class="xamt-input xamt-status-picker__emoji"
-            phx-hook="StatusEmoji"
-            autocomplete="off"
-            readonly
-            inputmode="none"
-            aria-haspopup="dialog"
-            aria-label={gettext("Choose emoji")}
-            title={gettext("Choose emoji")}
-          />
-          <input
-            type="text"
-            name="text"
-            id="status-custom-text"
-            value={@current_user.status_text}
-            placeholder={gettext("Say something...")}
-            maxlength="50"
-            class="xamt-input mongol-input xamt-status-picker__text"
-            phx-hook="MongolianIME"
-            autocomplete="off"
-          />
-          <button
-            type="submit"
-            id="status-custom-save"
-            class="xamt-btn xamt-btn--primary mongol-text"
-          >
-            {gettext("Save")}
-          </button>
+          <div class="xamt-bot-pane">
+            <label class="xamt-bot-field">
+              <span class="xamt-label mongol-text">{gettext("Choose emoji")}</span>
+              <input
+                type="text"
+                name="emoji"
+                id="status-custom-emoji"
+                value={@current_user.status_emoji}
+                placeholder="😀"
+                maxlength="10"
+                class="xamt-input xamt-status-picker__emoji"
+                phx-hook="StatusEmoji"
+                autocomplete="off"
+                readonly
+                inputmode="none"
+                aria-haspopup="dialog"
+                aria-label={gettext("Choose emoji")}
+                title={gettext("Choose emoji")}
+              />
+            </label>
+
+            <label class="xamt-bot-field">
+              <span class="xamt-label mongol-text">{gettext("Custom Status")}</span>
+              <input
+                type="text"
+                name="text"
+                id="status-custom-text"
+                value={@current_user.status_text}
+                placeholder={gettext("Say something...")}
+                maxlength="50"
+                class="xamt-bot-input mongol-input xamt-status-picker__text"
+                phx-hook="MongolianIME"
+                autocomplete="off"
+              />
+            </label>
+
+            <button
+              type="submit"
+              id="status-custom-save"
+              class="xamt-btn xamt-btn--primary h-full px-3 font-bold text-xs mongol-text"
+            >
+              <.icon name="hero-check" class="w-4 h-4 mb-1.5" />
+              <span>{gettext("Save")}</span>
+            </button>
+          </div>
         </form>
       </div>
-    </.drawer>
+    </div>
     """
   end
 
@@ -172,39 +239,67 @@ defmodule XamtWeb.ServerLive.Overlays do
 
   def server_menu_overlay(assigns) do
     ~H"""
-    <.drawer
+    <div
       id="server-menu-drawer"
-      class="xamt-sheet--menu"
-      show
-      on_cancel={JS.push("close_server_menu")}
+      class="xamt-modal"
+      phx-window-keydown="close_server_menu"
+      phx-key="Escape"
     >
-      <div class="xamt-sheet-form xamt-server-menu-sheet">
-        <h2 id="server-menu-title" class="xamt-section-title mongol-text">
-          {upright_text(@server.name)}
-        </h2>
-        <p id="server-menu-slug" class="xamt-server-menu-sheet__slug">/{@server.slug}</p>
-        <p
-          :if={@server.description}
-          id="server-menu-description"
-          class="xamt-server-menu-sheet__desc mongol-text"
-        >
-          {upright_text(@server.description)}
-        </p>
-        <nav
-          :if={@can_manage_channels?}
-          class="xamt-server-menu-sheet__nav"
-          aria-labelledby="server-menu-title"
-        >
-          <.link
-            id="server-menu-new-channel"
-            patch={~p"/servers/#{@server.slug}/#{@active_channel.slug}/new"}
-            class="xamt-btn xamt-btn--soft mongol-text"
+      <div class="xamt-modal-backdrop" phx-click="close_server_menu"></div>
+
+      <div
+        id="server-menu-card"
+        class="xamt-bot-modal-card !w-auto relative z-10 xamt-server-menu-sheet"
+        phx-hook="MongolianScroll"
+      >
+        <%!-- Column 1: Server Title & Close --%>
+        <div class="xamt-bot-pane !flex-row justify-between items-center">
+          <div class="flex flex-row items-center gap-2">
+            <.icon name="hero-building-library" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+            <h2 id="server-menu-title" class="text-lg font-bold tracking-wider mongol-text">
+              {upright_text(@server.name)}
+            </h2>
+          </div>
+
+          <button
+            type="button"
+            phx-click="close_server_menu"
+            class="xamt-icon-btn"
+            title={gettext("Close")}
           >
-            {gettext("Create channel")}
-          </.link>
-        </nav>
+            <.icon name="hero-x-mark" class="w-5 h-5" />
+          </button>
+        </div>
+
+        <%!-- Column 2: Slug, Description & Actions --%>
+        <div class="xamt-bot-pane">
+          <p id="server-menu-slug" class="xamt-server-menu-sheet__slug">/{@server.slug}</p>
+
+          <p
+            :if={@server.description}
+            id="server-menu-description"
+            class="xamt-server-menu-sheet__desc mongol-text"
+          >
+            {upright_text(@server.description)}
+          </p>
+
+          <nav
+            :if={@can_manage_channels?}
+            class="xamt-server-menu-sheet__nav h-full"
+            aria-labelledby="server-menu-title"
+          >
+            <.link
+              id="server-menu-new-channel"
+              patch={~p"/servers/#{@server.slug}/#{@active_channel.slug}/new"}
+              class="xamt-btn xamt-btn--primary h-full px-3 font-bold text-xs mongol-text"
+            >
+              <.icon name="hero-plus" class="w-4 h-4 mb-1.5" />
+              <span>{gettext("Create channel")}</span>
+            </.link>
+          </nav>
+        </div>
       </div>
-    </.drawer>
+    </div>
     """
   end
 
@@ -216,12 +311,18 @@ defmodule XamtWeb.ServerLive.Overlays do
 
   def server_overlay(assigns) do
     ~H"""
-    <.drawer
+    <div
       :if={@live_action in [:new_channel, :edit_channel]}
       id="server-drawer"
-      show
-      on_cancel={JS.patch(~p"/servers/#{@server.slug}/#{@active_channel.slug}")}
+      class="xamt-modal"
     >
+      <.link
+        patch={~p"/servers/#{@server.slug}/#{@active_channel.slug}"}
+        class="xamt-modal-backdrop"
+        aria-label={gettext("Close")}
+      >
+      </.link>
+
       <.channel_sheet
         :if={@live_action == :new_channel}
         id="create-channel-form"
@@ -239,7 +340,7 @@ defmodule XamtWeb.ServerLive.Overlays do
         name_id="edit-channel-name"
         return_to={~p"/servers/#{@server.slug}/#{@active_channel.slug}"}
       />
-    </.drawer>
+    </div>
     """
   end
 
@@ -252,34 +353,70 @@ defmodule XamtWeb.ServerLive.Overlays do
 
   def channel_sheet(assigns) do
     ~H"""
-    <div class="xamt-sheet-form">
-      <h2 id={"#{@id}-title"} class="xamt-section-title mongol-text">{@title}</h2>
+    <div
+      id={"#{@id}-card"}
+      class="xamt-bot-modal-card !w-auto relative z-10"
+      phx-hook="MongolianScroll"
+    >
+      <%!-- Column 1: Title & Close --%>
+      <div class="xamt-bot-pane !flex-row justify-between items-center">
+        <div class="flex flex-row items-center gap-2">
+          <.icon name="hero-hashtag" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+          <h2 id={"#{@id}-title"} class="text-lg font-bold tracking-wider mongol-text">
+            {@title}
+          </h2>
+        </div>
+
+        <.link patch={@return_to} class="xamt-icon-btn" title={gettext("Close")}>
+          <.icon name="hero-x-mark" class="w-5 h-5" />
+        </.link>
+      </div>
+
+      <%!-- Column 2: Channel Form --%>
       <.form
         for={@form}
         id={@id}
         phx-submit="save_channel"
         novalidate
-        class="xamt-form xamt-form--vertical"
       >
-        <.input
-          field={@form[:name]}
-          id={@name_id}
-          label={gettext("Channel name")}
-          phx-hook="MongolianIME"
-          class="xamt-input mongol-input"
-          autocomplete="off"
-        />
-        <div class="xamt-form__actions">
-          <button
-            type="submit"
-            id={"#{@id}-submit"}
-            class="xamt-btn xamt-btn--primary mongol-text"
-          >
-            {@submit_label}
-          </button>
-          <.link patch={@return_to} id={"#{@id}-cancel"} class="xamt-btn mongol-text">
-            {gettext("Cancel")}
-          </.link>
+        <div class="xamt-bot-pane">
+          <label class="xamt-bot-field">
+            <span class="xamt-label mongol-text">{gettext("Channel name")}</span>
+            <input
+              type="text"
+              id={@name_id}
+              name={@form[:name].name}
+              value={@form[:name].value}
+              phx-hook="MongolianIME"
+              class="xamt-bot-input mongol-input"
+              autocomplete="off"
+              required
+            />
+            <p
+              :for={msg <- Enum.map(@form[:name].errors, &translate_error(&1))}
+              class="text-xs text-red-500 mongol-text"
+            >
+              {msg}
+            </p>
+          </label>
+
+          <div class="flex flex-row items-center gap-3 h-full">
+            <button
+              type="submit"
+              id={"#{@id}-submit"}
+              class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold text-xs mongol-text"
+            >
+              <.icon name="hero-check" class="w-4 h-4 mb-1.5" />
+              <span>{@submit_label}</span>
+            </button>
+            <.link
+              patch={@return_to}
+              id={"#{@id}-cancel"}
+              class="xamt-btn h-full px-2.5 text-xs mongol-text"
+            >
+              {gettext("Cancel")}
+            </.link>
+          </div>
         </div>
       </.form>
     </div>
@@ -290,34 +427,60 @@ defmodule XamtWeb.ServerLive.Overlays do
 
   def poll_details_overlay(assigns) do
     ~H"""
-    <.drawer
+    <div
       id="poll-details-drawer"
-      class="xamt-sheet--poll-details"
-      show
-      on_cancel={JS.push("close_poll_details")}
+      class="xamt-modal"
+      phx-window-keydown="close_poll_details"
+      phx-key="Escape"
     >
-      <div class="xamt-sheet-form xamt-poll-details">
-        <h2 id="poll-details-title" class="xamt-section-title mongol-text">
-          {gettext("Poll details")}
-        </h2>
-        <p class="xamt-poll-details__question mongol-text">{@poll.question}</p>
-        <p class="xamt-poll-details__meta">
-          <span class="mongol-text">
-            {if @poll.allow_multiple,
-              do: gettext("Multiple answers"),
-              else: gettext("Single answer")}
-          </span>
-          <span class="xamt-poll-details__total">
-            <span class="mongol-text">{gettext("Total")}</span>
-            <span class="xamt-poll-details__count">{@poll.total_votes}</span>
-          </span>
-        </p>
+      <div class="xamt-modal-backdrop" phx-click="close_poll_details"></div>
 
-        <div id="poll-details-body" class="xamt-poll-details__body">
+      <div
+        id="poll-details-card"
+        class="xamt-bot-modal-card !w-auto relative z-10 xamt-poll-details"
+        phx-hook="MongolianScroll"
+      >
+        <%!-- Column 1: Title & Close --%>
+        <div class="xamt-bot-pane !flex-row justify-between items-center">
+          <div class="flex flex-row items-center gap-2">
+            <.icon name="hero-chart-bar" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+            <h2 id="poll-details-title" class="text-lg font-bold tracking-wider mongol-text">
+              {gettext("Poll details")}
+            </h2>
+          </div>
+
+          <button
+            type="button"
+            phx-click="close_poll_details"
+            class="xamt-icon-btn"
+            title={gettext("Close")}
+          >
+            <.icon name="hero-x-mark" class="w-5 h-5" />
+          </button>
+        </div>
+
+        <%!-- Column 2: Question & Meta --%>
+        <div class="xamt-bot-pane">
+          <p class="xamt-poll-details__question mongol-text font-bold">{@poll.question}</p>
+          <p class="xamt-poll-details__meta">
+            <span class="mongol-text">
+              {if @poll.allow_multiple,
+                do: gettext("Multiple answers"),
+                else: gettext("Single answer")}
+            </span>
+            <span class="xamt-poll-details__total">
+              <span class="mongol-text">{gettext("Total")}</span>
+              <span class="xamt-poll-details__count">{@poll.total_votes}</span>
+            </span>
+          </p>
+        </div>
+
+        <%!-- Column 3: Options & Voters --%>
+        <div id="poll-details-body" class="xamt-bot-pane">
           <section
             :for={option <- @poll.options}
             id={"poll-details-option-#{option.id}"}
-            class="xamt-poll-details__option"
+            class="xamt-poll-details__option h-full"
           >
             <header class="xamt-poll-details__option-head">
               <h3 class="xamt-poll-details__option-text mongol-text">{option.text}</h3>
@@ -346,7 +509,7 @@ defmodule XamtWeb.ServerLive.Overlays do
           </section>
         </div>
       </div>
-    </.drawer>
+    </div>
     """
   end
 
@@ -356,78 +519,101 @@ defmodule XamtWeb.ServerLive.Overlays do
 
   def pinned_drawer(assigns) do
     ~H"""
-    <.drawer
+    <div
       id="pinned-messages-drawer"
-      class="xamt-sheet--pinned"
-      show
-      on_cancel={JS.push("close_pinned_drawer")}
+      class="xamt-modal"
+      phx-window-keydown="close_pinned_drawer"
+      phx-key="Escape"
     >
-      <div class="xamt-sheet-form xamt-pinned-drawer">
-        <h2 id="pinned-messages-title" class="xamt-pinned-drawer__title">
-          <.icon name="hero-bookmark-square" class="size-5 text-[var(--xamt-accent)]" />
-          <span class="xamt-section-title mongol-text">{gettext("Pinned messages")}</span>
-        </h2>
+      <div class="xamt-modal-backdrop" phx-click="close_pinned_drawer"></div>
 
-        <p
-          :if={@messages == []}
-          id="pinned-messages-empty"
-          class="xamt-pinned-drawer__empty mongol-text"
-        >
-          {gettext("No pinned messages yet")}
-        </p>
+      <div
+        id="pinned-messages-card"
+        class="xamt-bot-modal-card !w-auto relative z-10 xamt-pinned-drawer"
+        phx-hook="MongolianScroll"
+      >
+        <%!-- Column 1: Title & Close --%>
+        <div class="xamt-bot-pane !flex-row justify-between items-center">
+          <h2 id="pinned-messages-title" class="xamt-pinned-drawer__title">
+            <.icon name="hero-bookmark-square" class="size-5 text-[var(--xamt-accent)]" />
+            <span class="text-lg font-bold tracking-wider mongol-text">
+              {gettext("Pinned messages")}
+            </span>
+          </h2>
 
-        <div id="pinned-messages-list" class="xamt-pinned-drawer__list">
-          <article
-            :for={msg <- @messages}
-            id={"pinned-msg-#{msg.id}"}
-            class="xamt-pinned-card"
+          <button
+            type="button"
+            phx-click="close_pinned_drawer"
+            class="xamt-icon-btn"
+            title={gettext("Close")}
           >
-            <button
-              :if={@can_manage_messages?}
-              type="button"
-              id={"unpin-message-#{msg.id}"}
-              class="xamt-pinned-card__unpin"
-              phx-click="toggle_pin"
-              phx-value-id={msg.id}
-              title={gettext("Unpin")}
-              aria-label={gettext("Unpin")}
+            <.icon name="hero-x-mark" class="w-5 h-5" />
+          </button>
+        </div>
+
+        <%!-- Column 2: Pinned Messages List --%>
+        <div class="xamt-bot-pane">
+          <p
+            :if={@messages == []}
+            id="pinned-messages-empty"
+            class="xamt-pinned-drawer__empty mongol-text"
+          >
+            {gettext("No pinned messages yet")}
+          </p>
+
+          <div :if={@messages != []} id="pinned-messages-list" class="xamt-pinned-drawer__list">
+            <article
+              :for={msg <- @messages}
+              id={"pinned-msg-#{msg.id}"}
+              class="xamt-pinned-card"
             >
-              <.icon name="hero-minus" class="size-4" />
-            </button>
+              <button
+                :if={@can_manage_messages?}
+                type="button"
+                id={"unpin-message-#{msg.id}"}
+                class="xamt-pinned-card__unpin"
+                phx-click="toggle_pin"
+                phx-value-id={msg.id}
+                title={gettext("Unpin")}
+                aria-label={gettext("Unpin")}
+              >
+                <.icon name="hero-minus" class="size-4" />
+              </button>
 
-            <div class="xamt-pinned-card__header">
-              <.status_avatar user={msg.user} class="xamt-message__avatar" />
-            </div>
-
-            <div class="xamt-pinned-card__body">
-              <% pin_role = RoleHelper.get_role_ui_config(msg.user) %>
-              <header class="xamt-pinned-card__meta">
-                <strong class={["xamt-pinned-card__name mongol-text", pin_role.color_class]}>
-                  {display_name(msg.user)}
-                </strong>
-                <div
-                  :if={pin_role.label}
-                  class={["xamt-role-badge", pin_role.bg_class]}
-                >
-                  <.icon name={pin_role.icon} class="w-3 h-3 shrink-0" />
-                  <span>{pin_role.label}</span>
-                </div>
-                <time
-                  class="xamt-pinned-card__time"
-                  datetime={DateTime.to_iso8601(msg.inserted_at)}
-                >
-                  {Calendar.strftime(msg.inserted_at, "%m/%d")}
-                </time>
-              </header>
-
-              <div class="xamt-pinned-card__content mongol-text">
-                {raw(safe_html(msg, @current_scope.user.id))}
+              <div class="xamt-pinned-card__header">
+                <.status_avatar user={msg.user} class="xamt-message__avatar" />
               </div>
-            </div>
-          </article>
+
+              <div class="xamt-pinned-card__body">
+                <% pin_role = RoleHelper.get_role_ui_config(msg.user) %>
+                <header class="xamt-pinned-card__meta">
+                  <strong class={["xamt-pinned-card__name mongol-text", pin_role.color_class]}>
+                    {display_name(msg.user)}
+                  </strong>
+                  <div
+                    :if={pin_role.label}
+                    class={["xamt-role-badge", pin_role.bg_class]}
+                  >
+                    <.icon name={pin_role.icon} class="w-3 h-3 shrink-0" />
+                    <span>{pin_role.label}</span>
+                  </div>
+                  <time
+                    class="xamt-pinned-card__time"
+                    datetime={DateTime.to_iso8601(msg.inserted_at)}
+                  >
+                    {Calendar.strftime(msg.inserted_at, "%m/%d")}
+                  </time>
+                </header>
+
+                <div class="xamt-pinned-card__content mongol-text">
+                  {raw(safe_html(msg, @current_scope.user.id))}
+                </div>
+              </div>
+            </article>
+          </div>
         </div>
       </div>
-    </.drawer>
+    </div>
     """
   end
 

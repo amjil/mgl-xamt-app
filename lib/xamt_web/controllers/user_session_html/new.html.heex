@@ -1,95 +1,167 @@
-<Layouts.app flash={@flash} current_scope={@current_scope}>
-  <section class="xamt-stack" id="login-panel">
-    <div class="xamt-auth-intro">
-      <span class="xamt-ornament" aria-hidden="true"></span>
-      <p class="xamt-kicker mongol-text">{gettext("Welcome back")}</p>
-    </div>
-    <.header>
-      {gettext("Log in")}
-      <:subtitle>
-        <%= cond do %>
-          <% @current_scope -> %>
-            {gettext("You need to reauthenticate to perform sensitive actions on your account.")}
-          <% @registration_enabled? -> %>
-            {gettext("Don't have an account?")}
-            <.link href={~p"/register"} class="xamt-link">{gettext("Sign up")}</.link>
-          <% true -> %>
-            {gettext("Registration is currently closed.")}
-        <% end %>
-      </:subtitle>
-    </.header>
+<Layouts.home flash={@flash} current_scope={@current_scope}>
+  <main id="login-panel" class="xamt-home-canvas" phx-hook="MongolianScroll">
+    <%!-- 第 1 卷：欢迎旌旗与注册引导 --%>
+    <aside class="xamt-home-section">
+      <header class="xamt-home-section__header">
+        <div class="flex flex-row items-center gap-2">
+          <.icon
+            name="hero-arrow-right-end-on-rectangle"
+            class="w-5 h-5 text-[var(--xamt-accent)] shrink-0"
+          />
+          <h1 class="font-bold text-base tracking-widest mongol-text">
+            {gettext("Log in")}
+          </h1>
+        </div>
+      </header>
 
-    <.form
-      :let={f}
-      :if={@magic_link_enabled?}
-      for={@form}
-      as={:user}
-      id="login_form_magic"
-      action={~p"/login"}
-      class="xamt-form xamt-form--vertical"
-    >
-      <.input
-        readonly={!!@current_scope}
-        field={f[:email]}
-        type="email"
-        label={gettext("Email")}
-        autocomplete="username"
-        spellcheck="false"
-        required
-      />
-      <.button variant="primary" class="xamt-btn xamt-btn--primary mongol-text">
-        {gettext("Log in with email")}
-      </.button>
-    </.form>
+      <div class="xamt-home-card justify-between">
+        <div class="flex flex-row items-center gap-3 h-full">
+          <span class="xamt-ornament !h-12" aria-hidden="true"></span>
+          <p class="xamt-kicker mongol-text">{gettext("Welcome back")}</p>
+          <p class="text-sm text-[var(--xamt-muted)] mongol-text leading-relaxed">
+            <%= cond do %>
+              <% @current_scope -> %>
+                {gettext(
+                  "You need to reauthenticate to perform sensitive actions on your account."
+                )}
+              <% @registration_enabled? -> %>
+                {gettext("Don't have an account?")}
+              <% true -> %>
+                {gettext("Registration is currently closed.")}
+            <% end %>
+          </p>
+        </div>
 
-    <div :if={@magic_link_enabled?} class="xamt-divider">{gettext("or")}</div>
+        <.link
+          :if={!@current_scope && @registration_enabled?}
+          href={~p"/register"}
+          class="xamt-btn xamt-btn--soft py-3 px-2.5 text-xs font-bold mongol-text"
+        >
+          <.icon name="hero-user-plus" class="w-4 h-4 mb-1.5" />
+          <span>{gettext("Sign up")}</span>
+        </.link>
+      </div>
 
-    <.form
-      :let={f}
-      for={@form}
-      as={:user}
-      id="login_form_password"
-      action={~p"/login"}
-      class="xamt-form xamt-form--vertical"
-    >
-      <.input
-        readonly={!!@current_scope}
-        field={f[:email]}
-        type="email"
-        label={gettext("Email")}
-        autocomplete="username"
-        spellcheck="false"
-        required
-      />
-      <.input
-        field={f[:password]}
-        type="password"
-        label={gettext("Password")}
-        autocomplete="current-password"
-        spellcheck="false"
-      />
-      <.button
-        variant="primary"
-        class="xamt-btn xamt-btn--primary mongol-text"
-        name={@form[:remember_me].name}
-        value="true"
-      >
-        {gettext("Log in and stay logged in")}
-      </.button>
-      <.button class="xamt-btn xamt-btn--soft mongol-text">
-        {gettext("Log in only this time")}
-      </.button>
-    </.form>
-
-    <div :if={local_mail_adapter?()} class="xamt-alert xamt-alert--info">
-      <.icon name="hero-information-circle" class="size-6 shrink-0" />
-      <div class="xamt-latin">
-        <p>{gettext("You are running the local mail adapter.")}</p>
-        <p>
+      <div :if={local_mail_adapter?()} class="xamt-home-card">
+        <div class="flex flex-row items-center gap-2 text-xs text-[var(--xamt-accent)] font-bold">
+          <.icon name="hero-information-circle" class="w-4 h-4 shrink-0" />
+          <span class="mongol-text">{gettext("You are running the local mail adapter.")}</span>
+        </div>
+        <p class="text-xs text-[var(--xamt-muted)] mongol-text">
           {gettext("To see sent emails, visit")}
-          <.link href="/dev/mailbox" class="underline">{gettext("the mailbox page")}</.link>.
+          <.link href="/dev/mailbox" class="underline text-[var(--xamt-accent)]">
+            {gettext("the mailbox page")}
+          </.link>.
         </p>
       </div>
-    </div>
-  </section>
-</Layouts.app>
+    </aside>
+
+    <%!-- 第 2 卷：魔法链接免密登录（开启时展示） --%>
+    <section :if={@magic_link_enabled?} class="xamt-home-section">
+      <header class="xamt-home-section__header">
+        <div class="flex flex-row items-center gap-2">
+          <.icon name="hero-envelope-open" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+          <h2 class="font-bold text-sm mongol-text">{gettext("Log in with email")}</h2>
+        </div>
+      </header>
+
+      <.form
+        :let={f}
+        for={@form}
+        as={:user}
+        id="login_form_magic"
+        action={~p"/login"}
+        class="xamt-home-card"
+      >
+        <label class="xamt-bot-field">
+          <span class="xamt-label mongol-text">{gettext("Email")}</span>
+          <input
+            type="email"
+            name={f[:email].name}
+            id="login_form_magic_email"
+            value={Phoenix.HTML.Form.normalize_value("email", f[:email].value)}
+            readonly={!!@current_scope}
+            autocomplete="username"
+            spellcheck="false"
+            required
+            class="xamt-bot-input xamt-input--latin"
+          />
+        </label>
+
+        <button
+          type="submit"
+          class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold text-xs mongol-text"
+        >
+          <.icon name="hero-paper-airplane" class="w-4 h-4 mb-1.5" />
+          <span>{gettext("Log in with email")}</span>
+        </button>
+      </.form>
+    </section>
+
+    <%!-- 第 3 卷：邮箱与密码登录 --%>
+    <section class="xamt-home-section">
+      <header class="xamt-home-section__header">
+        <div class="flex flex-row items-center gap-2">
+          <.icon name="hero-key" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+          <h2 class="font-bold text-sm mongol-text">{gettext("Password")}</h2>
+        </div>
+      </header>
+
+      <.form
+        :let={f}
+        for={@form}
+        as={:user}
+        id="login_form_password"
+        action={~p"/login"}
+        class="xamt-home-card"
+      >
+        <label class="xamt-bot-field">
+          <span class="xamt-label mongol-text">{gettext("Email")}</span>
+          <input
+            type="email"
+            name={f[:email].name}
+            id="login_form_password_email"
+            value={Phoenix.HTML.Form.normalize_value("email", f[:email].value)}
+            readonly={!!@current_scope}
+            autocomplete="username"
+            spellcheck="false"
+            required
+            class="xamt-bot-input xamt-input--latin"
+          />
+        </label>
+
+        <label class="xamt-bot-field">
+          <span class="xamt-label mongol-text">{gettext("Password")}</span>
+          <input
+            type="password"
+            name={f[:password].name}
+            id="login_form_password_password"
+            value={Phoenix.HTML.Form.normalize_value("password", f[:password].value)}
+            autocomplete="current-password"
+            spellcheck="false"
+            class="xamt-bot-input xamt-input--latin"
+          />
+        </label>
+
+        <div class="flex flex-row items-center gap-3 h-full">
+          <button
+            type="submit"
+            name={@form[:remember_me].name}
+            value="true"
+            class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold text-xs mongol-text"
+          >
+            <.icon name="hero-check" class="w-4 h-4 mb-1.5" />
+            <span>{gettext("Log in and stay logged in")}</span>
+          </button>
+
+          <button
+            type="submit"
+            class="xamt-btn xamt-btn--soft h-full px-3 text-xs font-bold mongol-text"
+          >
+            <span>{gettext("Log in only this time")}</span>
+          </button>
+        </div>
+      </.form>
+    </section>
+  </main>
+</Layouts.home>
