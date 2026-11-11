@@ -14,6 +14,7 @@ defmodule XamtWeb.SettingsLive do
      socket
      |> assign(:page_title, gettext("Settings"))
      |> assign(:form, to_form(changeset, as: :user))
+     |> assign(:profile_form, to_form(changeset, as: :user))
      |> assign(:status_form, to_form(Accounts.change_user_custom_status(user), as: :status))
      |> assign(:site_admin?, User.admin?(user))
      |> assign(:registration_enabled?, SiteSettings.registration_enabled?())
@@ -33,42 +34,32 @@ defmodule XamtWeb.SettingsLive do
       |> Accounts.change_user_profile(params)
       |> Map.put(:action, :validate)
 
-    {:noreply, assign(socket, form: to_form(changeset, as: :user))}
+    form = to_form(changeset, as: :user)
+
+    {:noreply, socket |> assign(:form, form) |> assign(:profile_form, form)}
   end
 
   def handle_event("validate", _params, socket), do: {:noreply, socket}
+
+  def handle_event("validate_profile", params, socket),
+    do: handle_event("validate", params, socket)
+
+  def handle_event("validate_avatar", _params, socket), do: {:noreply, socket}
 
   def handle_event("cancel_avatar", %{"ref" => ref}, socket) do
     {:noreply, cancel_upload(socket, :avatar, ref)}
   end
 
   def handle_event("save", %{"user" => params}, socket) do
-    params =
-      params
-      |> Map.take(["display_name", "bio"])
-      |> then(fn kept ->
-        case XamtWeb.Uploads.consume_image(socket, :avatar) do
-          url when is_binary(url) -> Map.put(kept, "avatar", url)
-          _ -> kept
-        end
-      end)
+    save_profile(socket, params)
+  end
 
-    case Accounts.update_user_profile(socket.assigns.current_scope.user, params) do
-      {:ok, user} ->
-        {:noreply,
-         socket
-         |> assign(:current_scope, %{socket.assigns.current_scope | user: user})
-         |> assign(:form, to_form(Accounts.change_user_profile(user), as: :user))
-         |> assign(:status_form, to_form(Accounts.change_user_custom_status(user), as: :status))
-         |> put_flash(:info, gettext("Profile updated"))}
+  def handle_event("save_profile", %{"user" => params}, socket) do
+    save_profile(socket, params)
+  end
 
-      {:error, changeset} ->
-        if url = params["avatar"] do
-          XamtWeb.Uploads.delete_stored(url)
-        end
-
-        {:noreply, assign(socket, form: to_form(changeset, as: :user))}
-    end
+  def handle_event("save_avatar", _params, socket) do
+    save_profile(socket, %{})
   end
 
   def handle_event("set_status", %{"emoji" => emoji, "text" => text}, socket) do
@@ -77,6 +68,13 @@ defmodule XamtWeb.SettingsLive do
 
   def handle_event("clear_status", _params, socket) do
     apply_settings_status(socket, %{status_emoji: nil, status_text: nil})
+  end
+
+  def handle_event("save_status", %{"status" => params}, socket) do
+    apply_settings_status(socket, %{
+      status_emoji: Map.get(params, "status_emoji") || Map.get(params, "emoji"),
+      status_text: Map.get(params, "status_text") || Map.get(params, "text")
+    })
   end
 
   def handle_event("save_custom_status", %{"status" => params}, socket) do
@@ -139,6 +137,39 @@ defmodule XamtWeb.SettingsLive do
     end
   end
 
+  defp save_profile(socket, params) do
+    params =
+      params
+      |> Map.take(["display_name", "bio"])
+      |> then(fn kept ->
+        case XamtWeb.Uploads.consume_image(socket, :avatar) do
+          url when is_binary(url) -> Map.put(kept, "avatar", url)
+          _ -> kept
+        end
+      end)
+
+    case Accounts.update_user_profile(socket.assigns.current_scope.user, params) do
+      {:ok, user} ->
+        form = to_form(Accounts.change_user_profile(user), as: :user)
+
+        {:noreply,
+         socket
+         |> assign(:current_scope, %{socket.assigns.current_scope | user: user})
+         |> assign(:form, form)
+         |> assign(:profile_form, form)
+         |> assign(:status_form, to_form(Accounts.change_user_custom_status(user), as: :status))
+         |> put_flash(:info, gettext("Profile updated"))}
+
+      {:error, changeset} ->
+        if url = params["avatar"] do
+          XamtWeb.Uploads.delete_stored(url)
+        end
+
+        form = to_form(changeset, as: :user)
+        {:noreply, socket |> assign(:form, form) |> assign(:profile_form, form)}
+    end
+  end
+
   defp assign_site_toggles(socket, setting) do
     socket
     |> assign(:registration_enabled?, setting.registration_enabled)
@@ -162,6 +193,14 @@ defmodule XamtWeb.SettingsLive do
     end
   end
 
+  defp display_initial(%{display_name: name}) when is_binary(name) and name != "",
+    do: String.first(name)
+
+  defp display_initial(%{username: name}) when is_binary(name) and name != "",
+    do: String.first(name)
+
+  defp display_initial(_), do: "?"
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -172,229 +211,321 @@ defmodule XamtWeb.SettingsLive do
       global_search_query={@global_search_query}
       global_search_results={@global_search_results}
     >
-      <section class="xamt-stack" id="settings-panel">
-        <div class="xamt-auth-intro">
-          <span class="xamt-ornament" aria-hidden="true"></span>
-          <p class="xamt-kicker mongol-text">{gettext("Profile")}</p>
-        </div>
-        <.header>
-          <span class="mongol-text">{gettext("Settings")}</span>
-          <:subtitle>
-            {gettext("Update how you appear in the community.")}
-          </:subtitle>
-        </.header>
+      <main id="profile-edit-canvas" class="xamt-home-canvas" phx-hook="MongolianScroll">
+        <%!-- Zone 1: back + live card preview + avatar --%>
+        <aside class="xamt-home-section" id="settings-panel">
+          <div class="flex flex-row items-center justify-between h-full py-1">
+            <div class="flex flex-row items-center gap-3">
+              <.link navigate={~p"/"} class="xamt-icon-btn" title={gettext("Back")}>
+                <.icon name="hero-arrow-left" class="w-5 h-5" />
+              </.link>
 
-        <section id="settings-theme" class="xamt-surface xamt-settings-theme">
-          <h2 class="xamt-section-title mongol-text">{gettext("Theme")}</h2>
-          <p class="xamt-settings-theme__copy mongol-text">
-            {gettext("Choose a Mongolian aesthetic palette.")}
-          </p>
-          <Layouts.theme_palette id="xamt-theme-palette-settings" />
-        </section>
-
-        <.form
-          for={@form}
-          id="settings-form"
-          phx-change="validate"
-          phx-submit="save"
-          class="xamt-form xamt-form--vertical"
-        >
-          <div class="xamt-field">
-            <span class="xamt-field__label mongol-text">{gettext("Avatar")}</span>
-            <.status_avatar user={@current_scope.user} class="xamt-avatar xamt-avatar--lg" />
-            <label for={@uploads.avatar.ref} class="xamt-btn xamt-btn--soft mongol-text">
-              {gettext("Upload photo")}
-            </label>
-            <.live_file_input upload={@uploads.avatar} class="hidden" />
-            <div :for={entry <- @uploads.avatar.entries} class="xamt-upload-preview__item">
-              <.live_img_preview entry={entry} class="xamt-upload-preview__img" />
-              <button
-                type="button"
-                id={"cancel-avatar-#{entry.ref}"}
-                phx-click="cancel_avatar"
-                phx-value-ref={entry.ref}
-                class="xamt-upload-preview__cancel"
-                aria-label={gettext("Cancel upload")}
-              >
-                <.icon name="hero-x-mark" class="size-3" />
-              </button>
+              <h1 class="text-xl font-bold tracking-widest mongol-text">
+                {gettext("Settings")}
+              </h1>
             </div>
           </div>
 
-          <label class="xamt-field">
-            <span class="xamt-field__label mongol-text">{gettext("Display name")}</span>
-            <input
-              type="text"
-              name={@form[:display_name].name}
-              id={@form[:display_name].id}
-              value={@form[:display_name].value}
-              class="xamt-input mongol-input"
-              phx-hook="MongolianIME"
-              autocomplete="nickname"
-            />
-          </label>
+          <div class="xamt-home-card items-center">
+            <div class="flex flex-row items-center gap-3 h-full">
+              <div class="w-14 h-14 rounded-2xl bg-[var(--xamt-accent)]/15 text-[var(--xamt-accent)] flex items-center justify-center font-bold text-xl overflow-hidden border border-[var(--xamt-line)] shrink-0">
+                <%= if is_binary(@current_scope.user.avatar) and @current_scope.user.avatar != "" do %>
+                  <img src={@current_scope.user.avatar} class="w-full h-full object-cover" />
+                <% else %>
+                  {display_initial(@current_scope.user)}
+                <% end %>
+              </div>
 
-          <label class="xamt-field">
-            <span class="xamt-field__label mongol-text">{gettext("Bio")}</span>
-            <textarea
-              name={@form[:bio].name}
-              id={@form[:bio].id}
-              rows="4"
-              class="xamt-textarea mongol-input"
-              phx-hook="MongolianIME"
-            >{Phoenix.HTML.Form.normalize_value("textarea", @form[:bio].value)}</textarea>
-          </label>
-
-          <button type="submit" id="settings-save" class="xamt-btn xamt-btn--primary mongol-text">
-            {gettext("Save")}
-          </button>
-        </.form>
-
-        <section id="settings-status" class="xamt-status-picker xamt-surface">
-          <h2 class="xamt-section-title mongol-text">{gettext("Custom status")}</h2>
-
-          <div class="xamt-status-picker__presets" role="list">
-            <button
-              :for={{preset, idx} <- Enum.with_index(Accounts.custom_status_presets())}
-              type="button"
-              id={"settings-status-preset-#{idx}"}
-              class="xamt-status-btn"
-              phx-click="set_status"
-              phx-value-emoji={preset["emoji"]}
-              phx-value-text={preset["text"]}
-            >
-              <span class="xamt-status-btn__emoji xamt-upright" aria-hidden="true">
-                {preset["emoji"]}
+              <span class="font-bold text-lg mongol-text">
+                {@current_scope.user.display_name || @current_scope.user.username}
               </span>
-              <span class="xamt-status-btn__text mongol-text">{preset["text"]}</span>
-            </button>
 
-            <button
-              type="button"
-              id="settings-status-clear"
-              class="xamt-status-btn xamt-status-btn--clear mongol-text"
-              phx-click="clear_status"
+              <span class="text-xs text-[var(--xamt-muted)]">
+                @{@current_scope.user.username}
+              </span>
+            </div>
+
+            <form
+              id="avatar-upload-form"
+              phx-submit="save_avatar"
+              phx-change="validate_avatar"
+              class="flex flex-col gap-2 h-full"
             >
-              {gettext("Clear status")}
-            </button>
+              <label class="xamt-btn py-3 px-2 text-xs font-bold cursor-pointer h-full justify-center mongol-text">
+                <.icon name="hero-camera" class="w-4 h-4 mb-1.5" />
+                <span>{gettext("Upload photo")}</span>
+                <.live_file_input upload={@uploads.avatar} class="sr-only" />
+              </label>
+
+              <div :for={entry <- @uploads.avatar.entries} class="xamt-upload-preview__item">
+                <.live_img_preview entry={entry} class="xamt-upload-preview__img" />
+                <button
+                  type="button"
+                  id={"cancel-avatar-#{entry.ref}"}
+                  phx-click="cancel_avatar"
+                  phx-value-ref={entry.ref}
+                  class="xamt-upload-preview__cancel"
+                  aria-label={gettext("Cancel upload")}
+                >
+                  <.icon name="hero-x-mark" class="size-3" />
+                </button>
+              </div>
+
+              <button
+                :if={@uploads.avatar.entries != []}
+                type="submit"
+                class="xamt-btn xamt-btn--primary py-3 px-2 text-xs font-bold h-full mongol-text"
+              >
+                {gettext("Save")}
+              </button>
+            </form>
           </div>
 
-          <form
-            id="settings-status-form"
-            phx-submit="save_custom_status"
-            class="xamt-form xamt-form--vertical xamt-status-picker__form"
+          <section id="settings-theme" class="xamt-home-card">
+            <h2 class="font-bold text-xs text-[var(--xamt-accent)] mongol-text">
+              {gettext("Theme")}
+            </h2>
+            <p class="text-xs text-[var(--xamt-muted)] mongol-text">
+              {gettext("Choose a Mongolian aesthetic palette.")}
+            </p>
+            <Layouts.theme_palette id="xamt-theme-palette-settings" />
+          </section>
+        </aside>
+
+        <%!-- Zone 2: nickname + bio --%>
+        <section class="xamt-home-section">
+          <header class="xamt-home-section__header">
+            <div class="flex flex-row items-center gap-2">
+              <.icon name="hero-identification" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+              <h2 class="font-bold text-sm mongol-text">{gettext("Profile")}</h2>
+            </div>
+          </header>
+
+          <.form
+            for={@profile_form}
+            id="settings-form"
+            phx-change="validate_profile"
+            phx-submit="save_profile"
+            class="xamt-home-card"
           >
-            <input
-              type="text"
-              name="emoji"
-              id="settings-status-emoji"
-              value={@current_scope.user.status_emoji}
-              placeholder="😀"
-              maxlength="10"
-              class="xamt-input xamt-status-picker__emoji"
-              phx-hook="StatusEmoji"
-              autocomplete="off"
-              readonly
-              inputmode="none"
-              aria-haspopup="dialog"
-              aria-label={gettext("Choose emoji")}
-              title={gettext("Choose emoji")}
-            />
-            <input
-              type="text"
-              name="text"
-              id="settings-status-text"
-              value={@current_scope.user.status_text}
-              placeholder={gettext("Say something...")}
-              maxlength="50"
-              class="xamt-input mongol-input xamt-status-picker__text"
-              phx-hook="MongolianIME"
-              autocomplete="off"
-            />
+            <label class="xamt-bot-field">
+              <span class="xamt-label">{gettext("Display name")}</span>
+              <input
+                id="profile-display-name"
+                type="text"
+                name={@profile_form[:display_name].name}
+                value={@profile_form[:display_name].value}
+                placeholder={gettext("Display name")}
+                class="xamt-bot-input mongol-input"
+                phx-hook="MongolianIME"
+                autocomplete="nickname"
+                onfocus="setTimeout(() => this.scrollIntoView({behavior: 'smooth', inline: 'center'}), 150)"
+              />
+            </label>
+
+            <label class="xamt-bot-field">
+              <span class="xamt-label">{gettext("Bio")}</span>
+              <textarea
+                id="profile-bio"
+                name={@profile_form[:bio].name}
+                placeholder={gettext("Bio")}
+                class="xamt-bot-input mongol-input !w-20"
+                phx-hook="MongolianIME"
+                onfocus="setTimeout(() => this.scrollIntoView({behavior: 'smooth', inline: 'center'}), 150)"
+              >{Phoenix.HTML.Form.normalize_value("textarea", @profile_form[:bio].value)}</textarea>
+            </label>
+
             <button
               type="submit"
-              id="settings-status-save"
-              class="xamt-btn xamt-btn--primary mongol-text"
+              id="settings-save"
+              phx-disable-with={gettext("Save")}
+              class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold text-xs mongol-text"
             >
-              {gettext("Save")}
+              <.icon name="hero-check" class="w-4 h-4 mb-1.5" />
+              <span>{gettext("Save")}</span>
             </button>
-          </form>
+          </.form>
         </section>
 
-        <section :if={@site_admin?} id="site-settings" class="xamt-site-settings xamt-surface">
-          <h2 class="xamt-section-title mongol-text">{gettext("Site")}</h2>
-          <p class="xamt-site-settings__copy mongol-text">
-            {gettext("Control how people join and sign in.")}
-          </p>
-
-          <div class="xamt-site-settings__row">
-            <button
-              type="button"
-              id="registration-toggle"
-              class="xamt-switch"
-              role="switch"
-              aria-checked={to_string(@registration_enabled?)}
-              phx-click="toggle_registration"
-            >
-              <span class="xamt-switch__track" aria-hidden="true">
-                <span class="xamt-switch__thumb"></span>
-              </span>
-            </button>
-            <div class="xamt-site-settings__meta">
-              <span class="xamt-site-settings__label mongol-text">
-                {gettext("Allow registration")}
-              </span>
-              <span class="xamt-site-settings__state mongol-text">
-                {if @registration_enabled?,
-                  do: gettext("Open"),
-                  else: gettext("Closed")}
-              </span>
+        <%!-- Zone 3: custom status --%>
+        <section id="settings-status" class="xamt-home-section">
+          <header class="xamt-home-section__header">
+            <div class="flex flex-row items-center gap-2">
+              <.icon name="hero-face-smile" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+              <h2 class="font-bold text-sm mongol-text">{gettext("Custom status")}</h2>
             </div>
-          </div>
+          </header>
 
-          <div class="xamt-site-settings__row">
-            <button
-              type="button"
-              id="magic-link-toggle"
-              class="xamt-switch"
-              role="switch"
-              aria-checked={to_string(@magic_link_enabled?)}
-              phx-click="toggle_magic_link"
-            >
-              <span class="xamt-switch__track" aria-hidden="true">
-                <span class="xamt-switch__thumb"></span>
-              </span>
-            </button>
-            <div class="xamt-site-settings__meta">
-              <span class="xamt-site-settings__label mongol-text">
-                {gettext("Allow magic link login")}
-              </span>
-              <span class="xamt-site-settings__state mongol-text">
-                {if @magic_link_enabled?,
-                  do: gettext("Open"),
-                  else: gettext("Closed")}
-              </span>
+          <div class="flex flex-col gap-3 h-full">
+            <div class="xamt-home-card">
+              <div class="flex flex-col gap-2 h-full">
+                <button
+                  :for={{preset, idx} <- Enum.with_index(Accounts.custom_status_presets())}
+                  type="button"
+                  id={"settings-status-preset-#{idx}"}
+                  class="xamt-btn py-3 px-2 text-xs font-bold h-full mongol-text"
+                  phx-click="set_status"
+                  phx-value-emoji={preset["emoji"]}
+                  phx-value-text={preset["text"]}
+                >
+                  <span class="xamt-upright mb-1" aria-hidden="true">{preset["emoji"]}</span>
+                  <span>{preset["text"]}</span>
+                </button>
+              </div>
             </div>
-          </div>
 
-          <.link
-            navigate={~p"/admin/users"}
-            id="manage-users-link"
-            class="xamt-btn xamt-btn--soft mongol-text"
-          >
-            {gettext("Users")}
-          </.link>
+            <.form
+              for={@status_form}
+              id="settings-status-form"
+              phx-submit="save_custom_status"
+              class="xamt-home-card"
+            >
+              <label class="xamt-bot-field">
+                <span class="xamt-label">{gettext("Custom status")}</span>
+                <input
+                  id="settings-status-emoji"
+                  type="text"
+                  name="emoji"
+                  value={@current_scope.user.status_emoji}
+                  placeholder="😀"
+                  maxlength="10"
+                  class="xamt-bot-input text-center"
+                  phx-hook="StatusEmoji"
+                  autocomplete="off"
+                  readonly
+                  inputmode="none"
+                  aria-haspopup="dialog"
+                  aria-label={gettext("Choose emoji")}
+                  title={gettext("Choose emoji")}
+                />
+              </label>
+
+              <label class="xamt-bot-field">
+                <span class="xamt-label">{gettext("Custom status")}</span>
+                <input
+                  id="settings-status-text"
+                  type="text"
+                  name="text"
+                  value={@current_scope.user.status_text}
+                  placeholder={gettext("Say something...")}
+                  maxlength="50"
+                  class="xamt-bot-input mongol-input"
+                  phx-hook="MongolianIME"
+                  autocomplete="off"
+                  onfocus="setTimeout(() => this.scrollIntoView({behavior: 'smooth', inline: 'center'}), 150)"
+                />
+              </label>
+
+              <button
+                type="submit"
+                id="settings-status-save"
+                class="xamt-btn xamt-btn--primary h-full px-3 text-xs font-bold mongol-text"
+              >
+                <.icon name="hero-check" class="w-4 h-4 mb-1.5" />
+                <span>{gettext("Save")}</span>
+              </button>
+
+              <button
+                type="button"
+                id="settings-status-clear"
+                phx-click="clear_status"
+                class="xamt-btn h-full px-2.5 text-xs text-[var(--xamt-muted)] mongol-text"
+              >
+                {gettext("Clear status")}
+              </button>
+            </.form>
+          </div>
         </section>
 
-        <nav class="xamt-settings__links">
-          <.link href={~p"/users/settings"} class="xamt-btn mongol-text">
-            {gettext("Account / password")}
-          </.link>
-          <.link href={~p"/users/log-out"} method="delete" class="xamt-btn mongol-text">
-            {gettext("Log out")}
-          </.link>
-        </nav>
-      </section>
+        <%!-- Zone 4: site admin + account links --%>
+        <section class="xamt-home-section">
+          <header class="xamt-home-section__header">
+            <div class="flex flex-row items-center gap-2">
+              <.icon name="hero-cog-6-tooth" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+              <h2 class="font-bold text-sm mongol-text">{gettext("Account")}</h2>
+            </div>
+          </header>
+
+          <div class="flex flex-col gap-3 h-full">
+            <section :if={@site_admin?} id="site-settings" class="xamt-home-card">
+              <h2 class="font-bold text-xs text-[var(--xamt-accent)] mongol-text">
+                {gettext("Site")}
+              </h2>
+              <p class="text-xs text-[var(--xamt-muted)] mongol-text">
+                {gettext("Control how people join and sign in.")}
+              </p>
+
+              <div class="flex flex-row items-center justify-between gap-3">
+                <button
+                  type="button"
+                  id="registration-toggle"
+                  class="xamt-switch"
+                  role="switch"
+                  aria-checked={to_string(@registration_enabled?)}
+                  phx-click="toggle_registration"
+                >
+                  <span class="xamt-switch__track" aria-hidden="true">
+                    <span class="xamt-switch__thumb"></span>
+                  </span>
+                </button>
+                <div class="flex flex-row items-center gap-1">
+                  <span class="text-xs font-bold mongol-text">{gettext("Allow registration")}</span>
+                  <span class="text-xs text-[var(--xamt-muted)] mongol-text">
+                    {if @registration_enabled?, do: gettext("Open"), else: gettext("Closed")}
+                  </span>
+                </div>
+              </div>
+
+              <div class="flex flex-row items-center justify-between gap-3">
+                <button
+                  type="button"
+                  id="magic-link-toggle"
+                  class="xamt-switch"
+                  role="switch"
+                  aria-checked={to_string(@magic_link_enabled?)}
+                  phx-click="toggle_magic_link"
+                >
+                  <span class="xamt-switch__track" aria-hidden="true">
+                    <span class="xamt-switch__thumb"></span>
+                  </span>
+                </button>
+                <div class="flex flex-row items-center gap-1">
+                  <span class="text-xs font-bold mongol-text">
+                    {gettext("Allow magic link login")}
+                  </span>
+                  <span class="text-xs text-[var(--xamt-muted)] mongol-text">
+                    {if @magic_link_enabled?, do: gettext("Open"), else: gettext("Closed")}
+                  </span>
+                </div>
+              </div>
+
+              <.link
+                navigate={~p"/admin/users"}
+                id="manage-users-link"
+                class="xamt-btn xamt-btn--soft py-3 px-2 text-xs font-bold mongol-text"
+              >
+                {gettext("Users")}
+              </.link>
+            </section>
+
+            <nav class="xamt-home-card">
+              <.link
+                href={~p"/users/settings"}
+                class="xamt-btn py-3 px-2 text-xs font-bold mongol-text"
+              >
+                {gettext("Account / password")}
+              </.link>
+              <.link
+                href={~p"/users/log-out"}
+                method="delete"
+                class="xamt-btn py-3 px-2 text-xs font-bold mongol-text"
+              >
+                {gettext("Log out")}
+              </.link>
+            </nav>
+          </div>
+        </section>
+      </main>
     </Layouts.home>
     """
   end

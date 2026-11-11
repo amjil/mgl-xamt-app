@@ -112,17 +112,29 @@ defmodule XamtWeb.AdminUserLiveTest do
 
     assert html =~ "Edit user"
     assert has_element?(view, "#admin-edit-user-form")
+    assert has_element?(view, "#admin-edit-profile-form")
     assert has_element?(view, "#edit-user-submit")
+    assert has_element?(view, "#admin-user-detail-canvas")
+
+    view
+    |> form("#admin-edit-profile-form",
+      user: %{
+        display_name: "Updated Neighbor",
+        bio: "Lives nearby."
+      }
+    )
+    |> render_submit()
+
+    view
+    |> element("#admin-detail-role-form")
+    |> render_change(%{role: "creator"})
 
     {:ok, _list_view, redirected} =
       view
       |> form("#admin-edit-user-form",
         user: %{
-          display_name: "Updated Neighbor",
           username: username,
-          email: email,
-          bio: "Lives nearby.",
-          global_role: "creator"
+          email: email
         }
       )
       |> render_submit()

@@ -252,14 +252,12 @@ defmodule XamtWeb.AdminUsersLive do
                       class="xamt-role-select-form shrink-0"
                     >
                       <input type="hidden" name="user_id" value={u.id} />
-                      <div
-                        class={[
-                          "xamt-role-pill xamt-role-select",
-                          u.global_role == "admin" && "xamt-role-pill--admin",
-                          u.global_role == "creator" && "xamt-role-pill--creator",
-                          u.global_role not in ["admin", "creator"] && "xamt-role-pill--member"
-                        ]}
-                      >
+                      <div class={[
+                        "xamt-role-pill xamt-role-select",
+                        u.global_role == "admin" && "xamt-role-pill--admin",
+                        u.global_role == "creator" && "xamt-role-pill--creator",
+                        u.global_role not in ["admin", "creator"] && "xamt-role-pill--member"
+                      ]}>
                         <div
                           id={"role-select-host-#{u.id}-#{u.global_role}"}
                           class="mn-select-host"
