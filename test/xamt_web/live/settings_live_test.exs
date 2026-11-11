@@ -11,32 +11,33 @@ defmodule XamtWeb.SettingsLiveTest do
     %{conn: log_in_user(conn, user), user: user}
   end
 
-  test "renders custom status section and applies a preset", %{conn: conn, user: user} do
+  test "renders five-zone settings canvas", %{conn: conn} do
     {:ok, view, html} = live(conn, ~p"/settings")
 
-    assert html =~ "Settings"
-    assert has_element?(view, "#settings-status")
-    assert has_element?(view, "#settings-status-preset-0")
+    assert html =~ "Account"
+    assert has_element?(view, "#settings-canvas")
+    assert has_element?(view, "#avatar-form")
+    assert has_element?(view, "#profile-form")
+    assert has_element?(view, "#email_form")
+    assert has_element?(view, "#password_form")
+    assert has_element?(view, "#web-push-settings")
     assert has_element?(view, "#settings-status-emoji[phx-hook='StatusEmoji']")
-
-    view
-    |> element("#settings-status-preset-2")
-    |> render_click()
-
-    updated = Accounts.get_user!(user.id)
-    assert updated.status_emoji == "🏖️"
-    assert updated.status_text == "On vacation"
-    assert render(view) =~ "🏖️"
   end
 
-  test "saves a custom status from the form", %{conn: conn, user: user} do
+  test "saves profile info and custom status", %{conn: conn, user: user} do
     {:ok, view, _html} = live(conn, ~p"/settings")
 
     view
-    |> form("#settings-status-form", %{emoji: "😀", text: "hello"})
+    |> form("#profile-form", %{
+      user: %{display_name: "Сайн", bio: "hello bio"},
+      status_emoji: "😀",
+      status_text: "hello"
+    })
     |> render_submit()
 
     updated = Accounts.get_user!(user.id)
+    assert updated.display_name == "Сайн"
+    assert updated.bio == "hello bio"
     assert updated.status_emoji == "😀"
     assert updated.status_text == "hello"
   end
@@ -102,21 +103,18 @@ defmodule XamtWeb.SettingsLiveTest do
     assert Xamt.SiteSettings.magic_link_enabled?()
   end
 
-  test "clears custom status", %{conn: conn, user: user} do
-    {:ok, _} =
-      Accounts.update_user_custom_status(user, %{
-        status_emoji: "🚗",
-        status_text: "On a road trip"
-      })
-
+  test "revokes all sessions and redirects to log in", %{conn: conn, user: user} do
     {:ok, view, _html} = live(conn, ~p"/settings")
 
-    view
-    |> element("#settings-status-clear")
-    |> render_click()
+    {:ok, conn} =
+      view
+      |> element("button[phx-click='revoke_all_sessions']")
+      |> render_click()
+      |> follow_redirect(conn, ~p"/users/log-in")
 
-    updated = Accounts.get_user!(user.id)
-    assert updated.status_emoji == nil
-    assert updated.status_text == nil
+    assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "logged out"
+    assert Accounts.get_user_by_session_token(get_session(conn, :user_token)) == nil
+    # user still exists; only sessions were revoked
+    assert Accounts.get_user!(user.id)
   end
 end

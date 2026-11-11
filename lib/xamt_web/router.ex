@@ -84,6 +84,7 @@ defmodule XamtWeb.Router do
       live "/servers/:server_slug/:channel_slug/edit/:edit_slug", ServerLive, :edit_channel
       live "/servers/:server_slug/:channel_slug", ServerLive, :show
       live "/settings", SettingsLive, :edit
+      live "/settings/confirm-email/:token", SettingsLive, :confirm_email
       live "/saved", SavedLive, :index
     end
   end
@@ -123,6 +124,8 @@ defmodule XamtWeb.Router do
     get "/users/settings", UserSettingsController, :edit
     put "/users/settings", UserSettingsController, :update
     get "/users/settings/confirm-email/:token", UserSettingsController, :confirm_email
+    # LiveView password form uses phx-trigger-action → POST here to refresh the session cookie.
+    post "/users/update-password", UserSettingsController, :update_password
   end
 
   scope "/", XamtWeb do

@@ -1,80 +1,134 @@
 <Layouts.app flash={@flash} current_scope={@current_scope}>
-  <section class="xamt-stack" id="account-settings-panel">
-    <div class="xamt-auth-intro">
-      <span class="xamt-ornament" aria-hidden="true"></span>
-      <p class="xamt-kicker mongol-text">{gettext("Account")}</p>
-    </div>
-    <.header>
-      {gettext("Account Settings")}
-      <:subtitle>
-        {gettext("Manage your account email address and password settings")}
-      </:subtitle>
-    </.header>
+  <main class="xamt-home-canvas">
+    <!-- 第 1 列：返回导航与标题 -->
+    <aside class="xamt-home-section">
+      <div class="flex flex-row items-center justify-between h-full py-1">
+        <div class="flex flex-row items-center gap-3">
+          <.link navigate={~p"/"} class="xamt-icon-btn" title={gettext("Back")}>
+            <.icon name="hero-arrow-left" class="w-5 h-5" />
+          </.link>
+          <h1 class="text-xl font-bold tracking-widest">
+            {gettext("Account Settings")}
+          </h1>
+        </div>
+        <span class="text-xs text-[var(--xamt-muted)]">
+          {gettext("Manage your email and password")}
+        </span>
+      </div>
+    </aside>
+    
+<!-- 第 2 列：修改邮箱表单 -->
+    <section class="xamt-home-section">
+      <header class="xamt-home-section__header">
+        <div class="flex flex-row items-center gap-2">
+          <.icon name="hero-envelope" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+          <h2 class="font-bold text-sm">{gettext("Change Email")}</h2>
+        </div>
+      </header>
 
-    <.form
-      for={@email_form}
-      action={~p"/users/settings"}
-      id="update_email"
-      class="xamt-form xamt-form--vertical"
-    >
-      <input type="hidden" name="action" value="update_email" />
-
-      <.input
-        field={@email_form[:email]}
-        type="email"
-        label={gettext("Email")}
-        autocomplete="username"
-        spellcheck="false"
-        required
-      />
-
-      <.button
-        variant="primary"
-        class="xamt-btn xamt-btn--primary mongol-text"
-        phx-disable-with={gettext("Changing...")}
+      <.form
+        for={@email_form}
+        action={~p"/users/settings"}
+        method="put"
+        id="update_email"
+        class="xamt-home-card"
       >
-        {gettext("Change Email")}
-      </.button>
-    </.form>
+        <input type="hidden" name="action" value="update_email" />
 
-    <div class="xamt-divider">{gettext("or")}</div>
+        <label class="xamt-bot-field">
+          <span class="xamt-label">{gettext("Email")}</span>
+          <input
+            type="email"
+            name={@email_form[:email].name}
+            value={@email_form[:email].value}
+            autocomplete="username"
+            required
+            class="xamt-bot-input font-mono text-xs"
+          />
+        </label>
 
-    <.form
-      for={@password_form}
-      action={~p"/users/settings"}
-      id="update_password"
-      class="xamt-form xamt-form--vertical"
-    >
-      <input type="hidden" name="action" value="update_password" />
+        <p :for={{msg, opts} <- @email_form[:email].errors} class="text-xs text-red-500 px-1">
+          {translate_error({msg, opts})}
+        </p>
 
-      <.input
-        field={@password_form[:password]}
-        type="password"
-        label={gettext("New password")}
-        autocomplete="new-password"
-        spellcheck="false"
-        minlength="8"
-        maxlength="72"
-        required
-      />
-      <p class="xamt-muted mongol-text">
-        {gettext("At least 8 characters, with English letters, a number, and a symbol.")}
-      </p>
-      <.input
-        field={@password_form[:password_confirmation]}
-        type="password"
-        label={gettext("Confirm new password")}
-        autocomplete="new-password"
-        spellcheck="false"
-        required
-      />
-      <.button
-        variant="primary"
-        class="xamt-btn xamt-btn--primary mongol-text"
-        phx-disable-with={gettext("Changing...")}
+        <button
+          type="submit"
+          phx-disable-with={gettext("Changing...")}
+          class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold text-xs"
+        >
+          <.icon name="hero-check" class="w-4 h-4 mb-1.5" />
+          <span>{gettext("Change Email")}</span>
+        </button>
+      </.form>
+    </section>
+    
+<!-- 第 3 列：修改密码表单 -->
+    <section class="xamt-home-section">
+      <header class="xamt-home-section__header">
+        <div class="flex flex-row items-center gap-2">
+          <.icon name="hero-key" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+          <h2 class="font-bold text-sm">{gettext("Change Password")}</h2>
+        </div>
+      </header>
+
+      <.form
+        for={@password_form}
+        action={~p"/users/settings"}
+        method="put"
+        id="update_password"
+        class="xamt-home-card"
       >
-        {gettext("Save Password")}
-      </.button>
-    </.form>
-  </section>
+        <input type="hidden" name="action" value="update_password" />
+
+        <label class="xamt-bot-field">
+          <span class="xamt-label">{gettext("New password")}</span>
+          <input
+            type="password"
+            name={@password_form[:password].name}
+            value={@password_form[:password].value}
+            autocomplete="new-password"
+            required
+            placeholder="••••••••••••"
+            class="xamt-bot-input"
+          />
+        </label>
+
+        <p
+          :for={{msg, opts} <- @password_form[:password].errors}
+          class="text-xs text-red-500 px-1"
+        >
+          {translate_error({msg, opts})}
+        </p>
+
+        <label class="xamt-bot-field">
+          <span class="xamt-label">{gettext("Confirm new password")}</span>
+          <input
+            type="password"
+            name={@password_form[:password_confirmation].name}
+            value={@password_form[:password_confirmation].value}
+            autocomplete="new-password"
+            required
+            placeholder="••••••••••••"
+            class="xamt-bot-input"
+          />
+        </label>
+
+        <p
+          :for={{msg, opts} <- @password_form[:password_confirmation].errors}
+          class="text-xs text-red-500 px-1"
+        >
+          {translate_error({msg, opts})}
+        </p>
+
+        <button
+          type="submit"
+          phx-disable-with={gettext("Saving...")}
+          class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold text-xs"
+        >
+          <.icon name="hero-lock-closed" class="w-4 h-4 mb-1.5" />
+          <span>{gettext("Save Password")}</span>
+        </button>
+      </.form>
+    </section>
+  </main>
 </Layouts.app>

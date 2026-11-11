@@ -480,6 +480,18 @@ defmodule Xamt.Accounts do
     :ok
   end
 
+  @doc """
+  Revokes every session token for the user (log out all devices).
+  """
+  def revoke_all_user_sessions(%User{} = user) do
+    {count, _} =
+      Repo.delete_all(
+        from(t in UserToken, where: t.user_id == ^user.id and t.context == "session")
+      )
+
+    {:ok, count}
+  end
+
   ## Token helper
 
   defp update_user_and_delete_all_tokens(changeset) do

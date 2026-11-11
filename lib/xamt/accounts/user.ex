@@ -108,12 +108,21 @@ defmodule Xamt.Accounts.User do
   end
 
   defp put_safe_avatar(changeset, attrs) do
-    avatar = Map.get(attrs, "avatar") || Map.get(attrs, :avatar)
+    has_avatar_key? = Map.has_key?(attrs, "avatar") or Map.has_key?(attrs, :avatar)
+    avatar = Map.get(attrs, "avatar", Map.get(attrs, :avatar))
 
-    if is_binary(avatar) and Regex.match?(~r|^/uploads/[A-Za-z0-9._-]+$|, avatar) do
-      put_change(changeset, :avatar, avatar)
-    else
-      changeset
+    cond do
+      not has_avatar_key? ->
+        changeset
+
+      is_nil(avatar) or avatar == "" ->
+        put_change(changeset, :avatar, nil)
+
+      is_binary(avatar) and Regex.match?(~r|^/uploads/[A-Za-z0-9._-]+$|, avatar) ->
+        put_change(changeset, :avatar, avatar)
+
+      true ->
+        changeset
     end
   end
 
