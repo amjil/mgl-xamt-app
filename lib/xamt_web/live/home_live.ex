@@ -624,41 +624,70 @@ defmodule XamtWeb.HomeLive do
           </section>
         </main>
       <% else %>
-        <div class="xamt-home">
-          <header class="xamt-home__hero">
-            <span class="xamt-ornament" aria-hidden="true"></span>
-            <img
-              class="xamt-brand-logo"
-              src={~p"/images/pwa-icon-512.png"}
-              alt="Xamt"
-              width="112"
-              height="112"
-              decoding="async"
-            />
-            <p class="xamt-kicker mongol-text">{gettext("Community")}</p>
-            <p class="xamt-brand">Xamt</p>
-            <h1 class="xamt-home__title mongol-text">{gettext("Mongolian community")}</h1>
-            <p class="xamt-home__lead mongol-text">
-              {gettext("Traditional Mongolian community & realtime chat")}
-            </p>
+        <main id="guest-home-canvas" class="xamt-home-canvas xamt-home" phx-hook="MongolianScroll">
+          <%!-- 第 1 幕：品牌主视觉旌旗 --%>
+          <header class="xamt-home-section xamt-home__hero !border-b-0">
+            <div class="xamt-home-card items-center justify-between">
+              <div class="flex flex-row items-center gap-4 h-full">
+                <span class="xamt-ornament" aria-hidden="true"></span>
+                <img
+                  class="xamt-brand-logo !w-16 !h-16"
+                  src={~p"/images/pwa-icon-512.png"}
+                  alt="Xamt"
+                  width="64"
+                  height="64"
+                  decoding="async"
+                />
+                <p class="xamt-kicker mongol-text">{gettext("Community")}</p>
+                <p class="xamt-brand">Xamt</p>
+              </div>
+
+              <div class="flex flex-row items-center gap-3 h-full">
+                <h1 class="xamt-home__title font-bold text-xl mongol-text">
+                  {gettext("Mongolian community")}
+                </h1>
+                <p class="xamt-home__lead text-sm text-[var(--xamt-muted)] mongol-text">
+                  {gettext("Traditional Mongolian community & realtime chat")}
+                </p>
+              </div>
+            </div>
           </header>
 
-          <section class="xamt-home__cta xamt-surface">
-            <p class="xamt-home__cta-copy mongol-text">
-              {gettext("Join a community and start writing in traditional Mongolian.")}
-            </p>
-            <.link navigate={~p"/login"} class="xamt-btn xamt-btn--primary mongol-text">
-              {gettext("Log in")}
-            </.link>
-            <.link
-              :if={@registration_enabled?}
-              navigate={~p"/register"}
-              class="xamt-btn mongol-text"
-            >
-              {gettext("Register")}
-            </.link>
+          <%!-- 第 2 幕：登录与注册行动号召 --%>
+          <section class="xamt-home-section">
+            <header class="xamt-home-section__header">
+              <div class="flex flex-row items-center gap-2">
+                <.icon name="hero-sparkles" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+                <h2 class="font-bold text-sm mongol-text">{gettext("Get Started")}</h2>
+              </div>
+            </header>
+
+            <div class="xamt-home-card xamt-home__cta">
+              <p class="xamt-home__cta-copy text-sm text-[var(--xamt-muted)] mongol-text h-full">
+                {gettext("Join a community and start writing in traditional Mongolian.")}
+              </p>
+
+              <div class="flex flex-row items-center gap-3 h-full">
+                <.link
+                  navigate={~p"/login"}
+                  class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold mongol-text"
+                >
+                  <.icon name="hero-arrow-right-end-on-rectangle" class="w-4 h-4 mb-1.5" />
+                  <span>{gettext("Log in")}</span>
+                </.link>
+
+                <.link
+                  :if={@registration_enabled?}
+                  navigate={~p"/register"}
+                  class="xamt-btn xamt-btn--soft h-full px-3 font-bold mongol-text"
+                >
+                  <.icon name="hero-user-plus" class="w-4 h-4 mb-1.5" />
+                  <span>{gettext("Register")}</span>
+                </.link>
+              </div>
+            </div>
           </section>
-        </div>
+        </main>
       <% end %>
 
       <.drawer

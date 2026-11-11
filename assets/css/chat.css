@@ -794,7 +794,12 @@
   border: 0;
   border-radius: 9999px;
   color: #f4fff9;
-  background: linear-gradient(160deg, #63c197, var(--xamt-accent) 55%, #2f7a5c);
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--xamt-accent) 82%, #ffffff),
+    var(--xamt-accent) 55%,
+    color-mix(in srgb, var(--xamt-accent) 78%, #000000)
+  );
   box-shadow:
     0 8px 18px color-mix(in srgb, var(--xamt-accent) 32%, transparent),
     0 1px 0 rgba(255, 255, 255, 0.18) inset;
@@ -2546,7 +2551,12 @@ html.xamt-desktop-ime .xamt-composer__emoji {
     border: 0;
     border-radius: 9999px;
     color: #f4fff9;
-    background: linear-gradient(160deg, #63c197, var(--xamt-accent) 55%, #2f7a5c);
+    background: linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--xamt-accent) 82%, #ffffff),
+      var(--xamt-accent) 55%,
+      color-mix(in srgb, var(--xamt-accent) 78%, #000000)
+    );
     box-shadow:
       0 10px 24px color-mix(in srgb, var(--xamt-accent) 36%, transparent),
       0 1px 0 rgba(255, 255, 255, 0.18) inset;

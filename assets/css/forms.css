@@ -38,14 +38,24 @@
 }
 
 .xamt-btn--primary {
-  background: linear-gradient(160deg, #57b48c, var(--xamt-accent) 55%, #2f7a5c);
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--xamt-accent) 82%, #ffffff),
+    var(--xamt-accent) 55%,
+    color-mix(in srgb, var(--xamt-accent) 78%, #000000)
+  );
   border-color: transparent;
-  color: #f4fff9;
+  color: #ffffff;
   box-shadow: 0 10px 22px color-mix(in srgb, var(--xamt-accent) 28%, transparent);
 }
 
 .xamt-btn--primary:hover {
-  background: linear-gradient(160deg, #63c197, #4aa584 55%, #348566);
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--xamt-accent) 74%, #ffffff),
+    color-mix(in srgb, var(--xamt-accent) 92%, #ffffff) 55%,
+    color-mix(in srgb, var(--xamt-accent) 85%, #000000)
+  );
   filter: brightness(1.04);
 }
 
@@ -916,7 +926,12 @@ label:has(> input, > textarea, > select) > * {
 }
 
 .xamt-switch[aria-checked="true"] {
-  background: linear-gradient(160deg, #57b48c, var(--xamt-accent) 55%, #2f7a5c);
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--xamt-accent) 82%, #ffffff),
+    var(--xamt-accent) 55%,
+    color-mix(in srgb, var(--xamt-accent) 78%, #000000)
+  );
   border-color: transparent;
   box-shadow: 0 8px 16px color-mix(in srgb, var(--xamt-accent) 28%, transparent);
 }

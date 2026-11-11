@@ -267,8 +267,8 @@ defmodule XamtWeb.Layouts do
         data-xamt-theme="crimson-felt"
         onclick="window.dispatchEvent(new CustomEvent('xamt:set_theme', {detail: {theme: 'crimson-felt'}}))"
         class="xamt-theme-swatch xamt-theme-swatch--crimson"
-        title={gettext("Crimson felt (warm dark)")}
-        aria-label={gettext("Crimson felt (warm dark)")}
+        title={gettext("Royal amethyst (purple dark)")}
+        aria-label={gettext("Royal amethyst (purple dark)")}
       />
       <button
         type="button"

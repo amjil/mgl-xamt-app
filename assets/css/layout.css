@@ -473,8 +473,8 @@ body:has(.xamt-app) {
 }
 
 .xamt-theme-swatch--crimson {
-  background: #161110;
-  border-color: #e14d2a;
+  background: #1a1429;
+  border-color: #a855f7;
 }
 
 .xamt-theme-swatch--jade {
@@ -1336,4 +1336,29 @@ body.mgl-ime-mobile-open .xamt-home-canvas {
     min-width: 2rem;
     padding: 0.25rem 0.1rem;
   }
+}
+
+/* Enhanced Vertical Scroll Card & Sub-column Refinements */
+.xamt-home-card {
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--xamt-bg-3) 45%, transparent), transparent 48%),
+    var(--xamt-bg-2);
+}
+
+.xamt-bot-input:focus {
+  outline: none;
+  border-color: var(--xamt-accent);
+  box-shadow: 0 0 0 3px var(--xamt-accent-soft);
+  background: var(--xamt-bg);
+}
+
+/* Auth shell: stretch to fill canvas for mobile keyboard avoidance */
+.xamt-auth-shell {
+  height: 100%;
+  align-items: stretch;
+}
+
+.xamt-auth-shell__inner > .xamt-stack {
+  height: 100%;
+  align-items: stretch;
 }

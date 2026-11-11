@@ -44,51 +44,69 @@ defmodule XamtWeb.InviteLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app
+    <Layouts.home
       flash={@flash}
       current_scope={@current_scope}
       show_search={@show_search}
       global_search_query={@global_search_query}
       global_search_results={@global_search_results}
     >
-      <section class="xamt-stack" id="invite-panel">
-        <div class="xamt-auth-intro">
-          <span class="xamt-ornament" aria-hidden="true"></span>
-          <p class="xamt-kicker mongol-text">{gettext("Invitation")}</p>
-        </div>
-
-        <%= if @usable? do %>
-          <.header>
-            <span class="mongol-text">{upright_text(@invite.server.name)}</span>
-            <:subtitle>
-              <span>/{@invite.server.slug}</span>
-            </:subtitle>
-          </.header>
-
-          <p :if={@invite.server.description} class="xamt-profile__bio mongol-text">
-            {upright_text(@invite.server.description)}
-          </p>
-
-          <button
-            type="button"
-            id="accept-invite"
-            class="xamt-btn xamt-btn--primary mongol-text"
-            phx-click="accept"
-          >
-            {gettext("Join server")}
-          </button>
-        <% else %>
-          <div class="xamt-empty xamt-empty--card" id="invite-invalid">
-            <span class="xamt-ornament" aria-hidden="true"></span>
-            <p class="mongol-text">{gettext("This invitation is no longer valid.")}</p>
+      <main id="invite-panel" class="xamt-home-canvas" phx-hook="MongolianScroll">
+        <aside class="xamt-home-section">
+          <div class="flex flex-row items-center justify-between h-full py-1">
+            <div class="flex flex-row items-center gap-3">
+              <.link navigate={~p"/"} id="invite-back" class="xamt-icon-btn" title={gettext("Back")}>
+                <.icon name="hero-arrow-left" class="w-5 h-5" />
+              </.link>
+              <span class="xamt-ornament !h-10" aria-hidden="true"></span>
+              <p class="xamt-kicker mongol-text">{gettext("Invitation")}</p>
+            </div>
           </div>
-        <% end %>
+        </aside>
 
-        <.link navigate={~p"/"} id="invite-back" class="xamt-btn mongol-text">
-          {gettext("Back")}
-        </.link>
-      </section>
-    </Layouts.app>
+        <section class="xamt-home-section">
+          <%= if @usable? do %>
+            <div class="xamt-home-card items-center">
+              <div class="flex flex-row items-center gap-3 h-full">
+                <div class="w-12 h-12 rounded-2xl bg-[var(--xamt-accent)]/15 text-[var(--xamt-accent)] flex items-center justify-center font-bold text-lg shrink-0">
+                  {String.first(@invite.server.name) || "?"}
+                </div>
+                <h1 class="text-xl font-bold mongol-text">
+                  {upright_text(@invite.server.name)}
+                </h1>
+                <span class="text-xs text-[var(--xamt-muted)] font-mono">
+                  /{@invite.server.slug}
+                </span>
+              </div>
+
+              <p
+                :if={@invite.server.description}
+                class="text-sm text-[var(--xamt-muted)] mongol-text h-full px-1"
+              >
+                {upright_text(@invite.server.description)}
+              </p>
+
+              <button
+                type="button"
+                id="accept-invite"
+                class="xamt-btn xamt-btn--primary h-full px-4 font-bold mongol-text"
+                phx-click="accept"
+              >
+                <.icon name="hero-check-badge" class="w-5 h-5 mb-2" />
+                <span>{gettext("Join server")}</span>
+              </button>
+            </div>
+          <% else %>
+            <div class="xamt-home-card justify-center items-center" id="invite-invalid">
+              <span class="xamt-ornament" aria-hidden="true"></span>
+              <p class="text-sm text-[var(--xamt-muted)] mongol-text">
+                {gettext("This invitation is no longer valid.")}
+              </p>
+            </div>
+          <% end %>
+        </section>
+      </main>
+    </Layouts.home>
     """
   end
 end

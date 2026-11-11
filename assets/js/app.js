@@ -79,7 +79,7 @@ const liveSocket = new LiveSocket("/live", Socket, {
 })
 
 topbar.config({
-  barColors: {0: "#3d8f6e"},
+  barColors: {0: "#8b5cf6"},
   shadowColor: "rgba(0, 0, 0, .3)",
   className: "xamt-topbar",
 })
@@ -207,7 +207,7 @@ const XAMT_DARK_THEMES = new Set(["night-sky", "crimson-felt"])
 const THEME_COLORS = {
   "steppe-light": "#f7f4eb",
   "night-sky": "#0b101b",
-  "crimson-felt": "#161110",
+  "crimson-felt": "#110d1b",
   "jade-meadow": "#f2f6f3"
 }
 

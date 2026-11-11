@@ -68,32 +68,32 @@
 }
 
 [data-theme="crimson-felt"] {
-  --xamt-bg: #161110; /* Warm dark sandalwood */
-  --xamt-bg-2: #211a18;
-  --xamt-bg-3: #2e2421;
-  --xamt-surface-glass: rgba(33, 26, 24, 0.80);
-  --xamt-text: #f5ebe6;
-  --xamt-muted: #a8948b;
-  --xamt-line: rgba(245, 235, 230, 0.09);
-  --xamt-line-strong: rgba(245, 235, 230, 0.18);
-  --xamt-accent: #e14d2a; /* Traditional vermilion */
-  --xamt-accent-2: #eab308; /* Royal gold trim */
-  --xamt-accent-soft: rgba(225, 77, 42, 0.15);
-  --xamt-gold-soft: rgba(234, 179, 8, 0.14);
-  --xamt-shade: #090605;
-  --xamt-error: #ef4444;
-  --xamt-shadow-card: -4px 4px 20px rgba(0, 0, 0, 0.45);
-  --xamt-shadow-float: -16px 0 40px rgba(0, 0, 0, 0.65);
+  --xamt-bg: #110d1b; /* Deep amethyst velvet base */
+  --xamt-bg-2: #1a1429; /* Secondary purple-slate surface */
+  --xamt-bg-3: #261d3a; /* Active / hover surface */
+  --xamt-surface-glass: rgba(26, 20, 41, 0.82);
+  --xamt-text: #f3effb; /* Crisp lavender-white ink */
+  --xamt-muted: #9e91b8; /* Muted amethyst metadata */
+  --xamt-line: rgba(243, 239, 251, 0.09);
+  --xamt-line-strong: rgba(243, 239, 251, 0.18);
+  --xamt-accent: #a855f7; /* Royal violet accent */
+  --xamt-accent-2: #f59e0b; /* Gilded amber trim */
+  --xamt-accent-soft: rgba(168, 85, 247, 0.16);
+  --xamt-gold-soft: rgba(245, 158, 11, 0.14);
+  --xamt-shade: #07050c;
+  --xamt-error: #f43f5e;
+  --xamt-shadow-card: -4px 4px 20px rgba(5, 2, 12, 0.48);
+  --xamt-shadow-float: -16px 0 40px rgba(5, 2, 12, 0.68);
   --xamt-shadow: var(--xamt-shadow-card);
-  --xamt-glow-1: #4a2218;
-  --xamt-glow-2: #3d3220;
-  --xamt-glow-3: #2a1814;
-  --xamt-role-admin: #ef4444;
-  --xamt-role-admin-soft: rgba(239, 68, 68, 0.16);
-  --xamt-role-admin-line: rgba(239, 68, 68, 0.36);
-  --xamt-role-creator: #eab308;
-  --xamt-role-creator-soft: rgba(234, 179, 8, 0.16);
-  --xamt-role-creator-line: rgba(234, 179, 8, 0.36);
+  --xamt-glow-1: #3b1c66;
+  --xamt-glow-2: #311d42;
+  --xamt-glow-3: #1f1333;
+  --xamt-role-admin: #c084fc;
+  --xamt-role-admin-soft: rgba(192, 132, 252, 0.16);
+  --xamt-role-admin-line: rgba(192, 132, 252, 0.36);
+  --xamt-role-creator: #fbbf24;
+  --xamt-role-creator-soft: rgba(251, 191, 36, 0.16);
+  --xamt-role-creator-line: rgba(251, 191, 36, 0.36);
   color-scheme: dark;
 }
 
