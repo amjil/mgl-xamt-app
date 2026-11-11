@@ -194,17 +194,16 @@ defmodule XamtWeb.HomeLiveTest do
   test "guests do not get the global search palette", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/")
     refute has_element?(view, "#search-palette-root")
-    refute has_element?(view, "#home-open-search")
   end
 
   test "signed-in home opens the global search palette", %{conn: conn} do
     {:ok, view, _html} = live(log_in_user(conn, user_fixture()), ~p"/")
 
     assert has_element?(view, "#search-palette-root")
-    assert has_element?(view, "#home-open-search")
     refute has_element?(view, "#search-palette")
 
-    view |> element("#home-open-search") |> render_click()
+    # Search trigger lives in root layout (#home-open-search); open via LV event.
+    render_click(view, "open_search")
     assert has_element?(view, "#search-palette")
     assert has_element?(view, "#global-search-q")
   end

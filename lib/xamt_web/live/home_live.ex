@@ -268,67 +268,7 @@ defmodule XamtWeb.HomeLive do
     >
       <%= if @current_scope && @current_scope.user do %>
         <main id="home-canvas" class="xamt-home-canvas" phx-hook="MongolianScroll">
-          <%!-- Section 1: brand & personal controls --%>
-          <aside class="xamt-home-section" id="home-identity-rail">
-            <div class="flex flex-row items-center justify-between h-full py-1">
-              <div class="flex flex-row items-center gap-3">
-                <div class="w-10 h-10 rounded-2xl bg-[var(--xamt-accent)] text-white flex items-center justify-center font-bold text-lg shadow-md shrink-0">
-                  ᠬ
-                </div>
-                <h1 class="text-xl font-bold tracking-widest text-[var(--xamt-text)] mongol-text">
-                  {gettext("Xamt community hall")}
-                </h1>
-              </div>
-
-              <div class="flex flex-row items-center gap-3">
-                <button
-                  type="button"
-                  id="home-open-search"
-                  class="xamt-icon-btn"
-                  phx-click="open_search"
-                  title={gettext("Search")}
-                  aria-label={gettext("Search")}
-                >
-                  <.icon name="hero-magnifying-glass" class="w-5 h-5" />
-                </button>
-
-                <.link
-                  navigate={~p"/saved"}
-                  class="xamt-icon-btn"
-                  title={gettext("Saved")}
-                >
-                  <.icon name="hero-bookmark" class="w-5 h-5" />
-                </.link>
-
-                <.link
-                  navigate={~p"/profile/#{@current_scope.user.username}"}
-                  class="xamt-icon-btn"
-                  title={gettext("Profile")}
-                >
-                  <.icon name="hero-user-circle" class="w-5 h-5" />
-                </.link>
-
-                <.link
-                  navigate={~p"/settings"}
-                  class="xamt-icon-btn"
-                  title={gettext("Settings")}
-                >
-                  <.icon name="hero-cog-6-tooth" class="w-5 h-5" />
-                </.link>
-
-                <.link
-                  href={~p"/users/log-out"}
-                  method="delete"
-                  class="xamt-icon-btn"
-                  title={gettext("Log out")}
-                >
-                  <.icon name="hero-arrow-right-start-on-rectangle" class="w-5 h-5" />
-                </.link>
-              </div>
-            </div>
-          </aside>
-
-          <%!-- Section 2: joined communities --%>
+          <%!-- Section 1: joined communities --%>
           <section class="xamt-home-section" id="home-my-servers">
             <header class="xamt-home-section__header">
               <div class="flex flex-row items-center gap-2">

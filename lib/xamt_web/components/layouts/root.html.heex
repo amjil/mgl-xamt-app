@@ -118,21 +118,24 @@
               <li>
                 <.link navigate={~p"/"} class="mongol-text">{gettext("Home")}</.link>
               </li>
-              <li>
-                <.link navigate={~p"/saved"} class="mongol-text">{gettext("Saved")}</.link>
-              </li>
-              <li>
-                <.link navigate={~p"/settings"} class="mongol-text">{gettext("Settings")}</.link>
-              </li>
               <li :if={site_admin?(@current_scope)}>
                 <.link navigate={~p"/admin/users"} class="mongol-text">
                   {gettext("Users")}
                 </.link>
               </li>
               <li>
-                <.link href={~p"/users/log-out"} method="delete" class="mongol-text">
-                  {gettext("Log out")}
-                </.link>
+                <button
+                  type="button"
+                  id="home-open-search"
+                  class="xamt-leftnav__link-btn mongol-text"
+                  onclick="window.dispatchEvent(new CustomEvent('xamt:open_search'))"
+                  phx-click="open_search"
+                  title={gettext("Search")}
+                  aria-label={gettext("Search")}
+                >
+                  <.icon name="hero-magnifying-glass" class="w-4 h-4 shrink-0" />
+                  <span>{gettext("Search")}</span>
+                </button>
               </li>
             <% else %>
               <li>
@@ -145,7 +148,85 @@
           </ul>
 
           <div class="xamt-leftnav__foot">
-            <.theme_palette id="xamt-theme-palette-nav" />
+            <%= if @current_scope && @current_scope.user do %>
+              <details id="user-menu-details" class="xamt-user-menu">
+                <summary
+                  class="xamt-nav-profile"
+                  title={gettext("Profile")}
+                  aria-label={gettext("Profile")}
+                >
+                  <.avatar
+                    user={@current_scope.user}
+                    id="leftnav-profile-avatar"
+                    class="xamt-avatar xamt-avatar--sm"
+                  />
+                </summary>
+
+                <div class="xamt-user-menu__popover" role="menu">
+                  <%!-- Column 1: User identity header --%>
+                  <div class="xamt-user-menu__header">
+                    <span class="font-bold text-sm text-[var(--xamt-text)] mongol-text">
+                      {@current_scope.user.display_name || @current_scope.user.username}
+                    </span>
+                    <span class="text-xs text-[var(--xamt-muted)] mongol-text">
+                      @{@current_scope.user.username}
+                    </span>
+                  </div>
+
+                  <span class="xamt-user-menu__divider" aria-hidden="true"></span>
+
+                  <%!-- Columns 2..5: Profile / Saved / Settings / Log out --%>
+                  <.link
+                    navigate={~p"/profile/#{@current_scope.user.username}"}
+                    class="xamt-user-menu__item mongol-text"
+                    role="menuitem"
+                  >
+                    <.icon name="hero-user-circle" class="w-4 h-4 shrink-0" />
+                    <span>{gettext("Profile")}</span>
+                  </.link>
+
+                  <.link
+                    navigate={~p"/saved"}
+                    class="xamt-user-menu__item mongol-text"
+                    role="menuitem"
+                  >
+                    <.icon name="hero-bookmark" class="w-4 h-4 shrink-0" />
+                    <span>{gettext("Saved")}</span>
+                  </.link>
+
+                  <.link
+                    navigate={~p"/settings"}
+                    class="xamt-user-menu__item mongol-text"
+                    role="menuitem"
+                  >
+                    <.icon name="hero-cog-6-tooth" class="w-4 h-4 shrink-0" />
+                    <span>{gettext("Settings")}</span>
+                  </.link>
+
+                  <.link
+                    href={~p"/users/log-out"}
+                    method="delete"
+                    class="xamt-user-menu__item xamt-user-menu__item--danger mongol-text"
+                    role="menuitem"
+                  >
+                    <.icon name="hero-arrow-right-start-on-rectangle" class="w-4 h-4 shrink-0" />
+                    <span>{gettext("Log out")}</span>
+                  </.link>
+
+                  <span class="xamt-user-menu__divider" aria-hidden="true"></span>
+
+                  <%!-- Last column: Theme switcher --%>
+                  <div class="xamt-user-menu__theme">
+                    <span class="text-xs text-[var(--xamt-muted)] mongol-text">
+                      {gettext("Theme")}
+                    </span>
+                    <.theme_palette id="xamt-theme-palette-nav" />
+                  </div>
+                </div>
+              </details>
+            <% else %>
+              <.theme_palette id="xamt-theme-palette-nav" />
+            <% end %>
           </div>
         </nav>
       </aside>

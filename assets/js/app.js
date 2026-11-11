@@ -196,6 +196,19 @@ window.addEventListener(
   true
 )
 
+// Close the left-rail user popover menu when clicking outside or selecting a link
+window.addEventListener("click", (event) => {
+  const menu = document.getElementById("user-menu-details")
+  if (!menu || !menu.hasAttribute("open")) return
+
+  const target = event.target instanceof Element ? event.target : null
+  if (!target) return
+
+  if (!menu.contains(target) || target.closest("a[href]")) {
+    menu.removeAttribute("open")
+  }
+})
+
 adoptImeElements()
 window.addEventListener("DOMContentLoaded", () => adoptImeElements())
 

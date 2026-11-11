@@ -37,10 +37,7 @@ canvas.xamt-topbar {
   -webkit-backdrop-filter: blur(16px);
   z-index: var(--xamt-z-nav);
   padding: 1.25rem 0 1rem;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior-x: none;
-  overscroll-behavior-y: contain;
+  overflow: visible;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -86,6 +83,128 @@ canvas.xamt-topbar {
 .xamt-leftnav__links a:hover {
   color: var(--xamt-text);
   background: var(--xamt-gold-soft);
+}
+
+/* Search button inside leftnav links (matches <a> items) */
+.xamt-leftnav__link-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--xamt-muted);
+  cursor: pointer;
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 0.75rem 0.45rem;
+  border-radius: 0.55rem;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.35rem;
+  transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.xamt-leftnav__link-btn:hover {
+  color: var(--xamt-text);
+  background: var(--xamt-gold-soft);
+}
+
+/* Avatar Popover Menu in Left Rail Foot */
+.xamt-user-menu {
+  position: relative;
+}
+
+.xamt-user-menu > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.xamt-user-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.xamt-user-menu[open] > summary.xamt-nav-profile {
+  box-shadow:
+    0 0 0 3px var(--xamt-accent-soft),
+    0 8px 18px color-mix(in srgb, var(--xamt-accent) 36%, transparent);
+}
+
+.xamt-user-menu__popover {
+  position: absolute;
+  left: calc(100% + 0.65rem);
+  bottom: 0;
+  z-index: calc(var(--xamt-z-nav) + 15);
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  display: flex;
+  /* In vertical-lr, column arranges items from LEFT to RIGHT */
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+  height: min(17.5rem, calc(var(--xamt-vh, 100dvh) - 2rem));
+  padding: 0.85rem 0.75rem;
+  border-radius: 1rem;
+  border: 1px solid var(--xamt-line-strong);
+  background: color-mix(in srgb, var(--xamt-bg-2) 96%, var(--xamt-shade));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--xamt-shadow-float);
+  animation: xamt-fade-in 160ms ease;
+}
+
+.xamt-user-menu__header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.3rem;
+}
+
+.xamt-user-menu__divider {
+  width: 1px;
+  height: 100%;
+  background: var(--xamt-line);
+  flex: 0 0 auto;
+}
+
+.xamt-user-menu__item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.45rem;
+  border-radius: 0.65rem;
+  color: var(--xamt-text);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.xamt-user-menu__item:hover {
+  background: var(--xamt-accent-soft);
+  color: var(--xamt-accent);
+}
+
+.xamt-user-menu__item--danger {
+  color: var(--xamt-error);
+}
+
+.xamt-user-menu__item--danger:hover {
+  background: color-mix(in srgb, var(--xamt-error) 14%, transparent);
+  color: var(--xamt-error);
+}
+
+.xamt-user-menu__theme {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.25rem 0.2rem;
 }
 
 .xamt-leftnav__foot {
