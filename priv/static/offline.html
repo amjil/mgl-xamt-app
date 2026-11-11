@@ -1,16 +1,36 @@
 <!DOCTYPE html>
-<html lang="mn-Mong" class="dark">
+<html lang="mn-Mong" data-theme="steppe-light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#101412" />
+    <meta name="theme-color" content="#f7f4eb" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png" />
     <link rel="apple-touch-icon" href="/images/apple-touch-icon.png" />
-    <title>Xamt · Offline</title>
+    <title>Xamt · ᠰүлᠵᠢᠶ᠎ᠡ ᠲᠠᠰᠤᠷᠠᠪᠠ</title>
     <link rel="manifest" href="/pwa/manifest.json" />
     <link rel="preload" href="/fonts/OyunQaganTig.ttf" as="font" type="font/ttf" crossorigin />
+    <script>
+      (function () {
+        var valid = ["steppe-light", "night-sky", "crimson-felt", "jade-meadow"];
+        var colors = {
+          "steppe-light": "#f7f4eb",
+          "night-sky": "#0b101b",
+          "crimson-felt": "#110d1b",
+          "jade-meadow": "#f2f6f3"
+        };
+        var theme = localStorage.getItem("xamt_theme");
+        if (valid.indexOf(theme) === -1) {
+          theme = window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "night-sky"
+            : "steppe-light";
+        }
+        document.documentElement.setAttribute("data-theme", theme);
+        var meta = document.querySelector("meta[name='theme-color']");
+        if (meta && colors[theme]) meta.setAttribute("content", colors[theme]);
+      })();
+    </script>
     <style>
       @font-face {
         font-family: "Oyun Qagan Tig";
@@ -20,25 +40,53 @@
         font-display: block;
       }
 
-      :root {
-        --bg: #101412;
-        --bg-2: #181e1c;
-        --text: #f1eee6;
-        --muted: #9aa396;
-        --accent: #4aa584;
-        --line: rgba(201, 165, 106, 0.16);
-        --font: "Oyun Qagan Tig", "Noto Sans Mongolian", "Mongolian Baiti", serif;
+      :root,
+      [data-theme="steppe-light"] {
+        --xamt-bg: #f7f4eb;
+        --xamt-bg-2: #efeadd;
+        --xamt-bg-3: #e5dec9;
+        --xamt-text: #1e242b;
+        --xamt-muted: #68707a;
+        --xamt-line: rgba(30, 36, 43, 0.12);
+        --xamt-accent: #1d63b8;
+        --xamt-accent-2: #d97706;
+        --xamt-accent-soft: rgba(29, 99, 184, 0.12);
       }
 
-      @media (prefers-color-scheme: light) {
-        :root {
-          --bg: #f4efe4;
-          --bg-2: #fbf7ee;
-          --text: #1c221e;
-          --muted: #5f6a5c;
-          --accent: #2f7d5f;
-          --line: rgba(120, 95, 50, 0.2);
-        }
+      [data-theme="night-sky"] {
+        --xamt-bg: #0b101b;
+        --xamt-bg-2: #111827;
+        --xamt-bg-3: #1e293b;
+        --xamt-text: #f1f5f9;
+        --xamt-muted: #94a3b8;
+        --xamt-line: rgba(255, 255, 255, 0.10);
+        --xamt-accent: #38bdf8;
+        --xamt-accent-2: #fbbf24;
+        --xamt-accent-soft: rgba(56, 189, 248, 0.14);
+      }
+
+      [data-theme="crimson-felt"] {
+        --xamt-bg: #110d1b;
+        --xamt-bg-2: #1a1429;
+        --xamt-bg-3: #261d3a;
+        --xamt-text: #f3effb;
+        --xamt-muted: #9e91b8;
+        --xamt-line: rgba(243, 239, 251, 0.10);
+        --xamt-accent: #a855f7;
+        --xamt-accent-2: #f59e0b;
+        --xamt-accent-soft: rgba(168, 85, 247, 0.16);
+      }
+
+      [data-theme="jade-meadow"] {
+        --xamt-bg: #f2f6f3;
+        --xamt-bg-2: #e4ede7;
+        --xamt-bg-3: #d3e2d8;
+        --xamt-text: #132a1e;
+        --xamt-muted: #526b5c;
+        --xamt-line: rgba(19, 42, 30, 0.10);
+        --xamt-accent: #0d9488;
+        --xamt-accent-2: #0284c7;
+        --xamt-accent-soft: rgba(13, 148, 136, 0.12);
       }
 
       * {
@@ -50,40 +98,70 @@
         margin: 0;
         height: 100%;
         overflow: hidden;
-        background: var(--bg);
-        color: var(--text);
+        background-color: var(--xamt-bg);
+        color: var(--xamt-text);
+        font-family: "Oyun Qagan Tig", "Noto Sans Mongolian", "Mongolian Baiti", serif;
+        -webkit-font-smoothing: antialiased;
       }
 
-      body {
+      .offline-canvas {
+        writing-mode: vertical-lr;
+        -webkit-writing-mode: vertical-lr;
+        text-orientation: sideways;
+        height: 100%;
+        width: 100%;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 1.5rem;
-        font-family: var(--font);
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 1.75rem;
+        gap: 1.5rem;
+        background-image:
+          radial-gradient(circle at 18% 25%, var(--xamt-accent-soft), transparent 45%),
+          repeating-linear-gradient(
+            to right,
+            transparent,
+            transparent 55px,
+            var(--xamt-line) 56px
+          );
       }
 
-      .card {
-        writing-mode: vertical-lr;
-        text-orientation: mixed;
+      .offline-card {
         display: flex;
         flex-direction: column;
         align-items: flex-start;
-        gap: 1.1rem;
-        max-height: min(36rem, calc(100vh - 3rem));
-        padding: 1.4rem 1.2rem;
-        border: 1px solid var(--line);
-        border-radius: 1rem;
-        background: var(--bg-2);
-        box-shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
+        justify-content: space-between;
+        height: min(32rem, calc(100dvh - 3.5rem));
+        padding: 1.35rem 1.15rem;
+        gap: 1.25rem;
+        border-radius: 1.15rem;
+        border: 1px solid var(--xamt-line);
+        background:
+          linear-gradient(160deg, var(--xamt-bg-3), transparent 48%),
+          var(--xamt-bg-2);
+        box-shadow: -6px 8px 28px rgba(0, 0, 0, 0.14);
+      }
+
+      .offline-head {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 0.75rem;
+        height: 100%;
+        padding-right: 0.9rem;
+        border-right: 1px solid var(--xamt-line);
       }
 
       .mark {
-        width: 2.4rem;
-        height: 2.4rem;
-        border-radius: 0.75rem;
+        width: 2.75rem;
+        height: 2.75rem;
+        border-radius: 0.85rem;
         overflow: hidden;
         background: #fffbf5;
-        box-shadow: 0 0 0 1px var(--line);
+        flex-shrink: 0;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
       }
 
       .mark img {
@@ -93,44 +171,86 @@
         object-fit: cover;
       }
 
+      .kicker {
+        margin: 0;
+        font-size: 0.8rem;
+        letter-spacing: 0.16em;
+        color: var(--xamt-accent-2);
+      }
+
       h1 {
         margin: 0;
-        font-size: 1.35rem;
-        font-weight: 600;
+        font-size: 1.45rem;
+        font-weight: 700;
         letter-spacing: 0.08em;
-        line-height: 1.7;
+        line-height: 1.75;
+      }
+
+      .offline-body {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.85rem;
+        height: 100%;
       }
 
       p {
         margin: 0;
-        color: var(--muted);
+        color: var(--xamt-muted);
+        font-size: 0.95rem;
         line-height: 1.75;
         letter-spacing: 0.06em;
-        max-inline-size: 18rem;
       }
 
-      a {
+      .retry-btn {
         display: inline-flex;
+        flex-direction: row;
         align-items: center;
-        gap: 0.4rem;
-        padding: 0.85rem 0.55rem;
-        border-radius: 999px;
-        background: var(--accent);
-        color: #fff;
+        justify-content: center;
+        gap: 0.45rem;
+        height: 100%;
+        padding: 1rem 0.65rem;
+        border-radius: 0.75rem;
+        background: var(--xamt-accent);
+        color: #ffffff;
         text-decoration: none;
-        font-weight: 600;
-        letter-spacing: 0.04em;
+        font-weight: 700;
+        font-size: 0.9rem;
+        letter-spacing: 0.06em;
+        box-shadow: 0 8px 18px var(--xamt-accent-soft);
+        transition: filter 160ms ease, transform 160ms ease;
+      }
+
+      .retry-btn:hover {
+        filter: brightness(1.06);
+        transform: translateY(-2px);
       }
     </style>
   </head>
   <body>
-    <main class="card" id="xamt-offline-page">
-      <div class="mark" aria-hidden="true">
-        <img src="/images/pwa-icon-192.png" alt="" width="38" height="38" />
+    <main class="offline-canvas" id="xamt-offline-page">
+      <div class="offline-card">
+        <div class="offline-head">
+          <div class="mark" aria-hidden="true">
+            <img src="/images/pwa-icon-192.png" alt="Xamt" width="44" height="44" />
+          </div>
+          <p class="kicker">OFFLINE</p>
+          <h1>ᠰүлᠵᠢᠶ᠎ᠡ ᠲᠠᠰᠤᠷᠠᠭᠰᠠᠨ ᠪᠠᠢᠨ᠎ᠠ</h1>
+        </div>
+
+        <div class="offline-body">
+          <p>
+            интернэт ᠰүлᠵᠢᠶ᠎ᠡ ᠦᠭᠡᠢ ᠲᠤᠯᠠ энэ хуудас ᠨᠡᠭᠡᠭᠡᠭᠳᠡᠬᠦ ᠦᠭᠡᠢ ᠪᠠᠢᠨ᠎ᠠ᠃ ᠮᠣᠩᠭᠣᠯ ᠦᠰᠦᠭ᠎ᠦᠨ фонт хадгалагдсан ᠪᠠᠢᠭ᠎ᠠ᠃
+          </p>
+          <p>
+            You are offline. The Mongolian font stays cached so text will still render when you return.
+          </p>
+        </div>
+
+        <a href="/" class="retry-btn">
+          <span>ᠳᠠᠬᠢᠨ  оролдоᠬᠤ · Try again</span>
+        </a>
       </div>
-      <h1>You are offline</h1>
-      <p>This page is not available without a network. The Mongolian font stays cached so text will still render when you return.</p>
-      <a href="/">Try again</a>
     </main>
   </body>
 </html>

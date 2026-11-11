@@ -5,10 +5,14 @@ defmodule XamtWeb.ErrorHTMLTest do
   import Phoenix.Template, only: [render_to_string: 4]
 
   test "renders 404.html" do
-    assert render_to_string(XamtWeb.ErrorHTML, "404", "html", []) == "Not Found"
+    html = render_to_string(XamtWeb.ErrorHTML, "404", "html", [])
+    assert html =~ "Not Found"
+    assert html =~ "error-404-canvas"
   end
 
   test "renders 500.html" do
-    assert render_to_string(XamtWeb.ErrorHTML, "500", "html", []) == "Internal Server Error"
+    html = render_to_string(XamtWeb.ErrorHTML, "500", "html", [])
+    assert html =~ "Internal Server Error"
+    assert html =~ "error-500-canvas"
   end
 end
