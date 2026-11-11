@@ -38,7 +38,7 @@ defmodule XamtWeb.ServerLive.Overlays do
 
       <div
         id="delete-reason-card"
-        class="xamt-bot-modal-card !w-auto relative z-10"
+        class="xamt-bot-modal-card xamt-bot-modal-card--compact relative z-10"
         phx-hook="MongolianScroll"
       >
         <%!-- Column 1: Title & Close --%>
@@ -60,7 +60,7 @@ defmodule XamtWeb.ServerLive.Overlays do
           </button>
         </div>
 
-        <%!-- Column 2: Excerpt & Delete Reason Form --%>
+        <%!-- Column 2: Message Excerpt & Delete Reason Form --%>
         <.form
           for={@form}
           id="delete-reason-form"
@@ -91,7 +91,7 @@ defmodule XamtWeb.ServerLive.Overlays do
               <button
                 type="submit"
                 id="delete-reason-submit"
-                class="xamt-btn xamt-btn--primary h-full px-3 font-bold text-xs mongol-text"
+                class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold text-xs mongol-text"
               >
                 <.icon name="hero-trash" class="w-4 h-4 mb-1.5" />
                 <span>{gettext("Delete")}</span>
@@ -126,7 +126,7 @@ defmodule XamtWeb.ServerLive.Overlays do
 
       <div
         id="status-picker-card"
-        class="xamt-bot-modal-card !w-auto relative z-10 xamt-status-picker"
+        class="xamt-bot-modal-card xamt-bot-modal-card--compact relative z-10 xamt-status-picker"
         phx-hook="MongolianScroll"
       >
         <%!-- Column 1: Title & Close --%>
@@ -177,7 +177,7 @@ defmodule XamtWeb.ServerLive.Overlays do
           </button>
         </div>
 
-        <%!-- Column 3: Custom Emoji + Text Form --%>
+        <%!-- Column 3: Custom Emoji + Status Text Form --%>
         <form
           id="status-custom-form"
           phx-submit="save_custom_status"
@@ -221,7 +221,7 @@ defmodule XamtWeb.ServerLive.Overlays do
             <button
               type="submit"
               id="status-custom-save"
-              class="xamt-btn xamt-btn--primary h-full px-3 font-bold text-xs mongol-text"
+              class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold text-xs mongol-text"
             >
               <.icon name="hero-check" class="w-4 h-4 mb-1.5" />
               <span>{gettext("Save")}</span>
@@ -249,7 +249,7 @@ defmodule XamtWeb.ServerLive.Overlays do
 
       <div
         id="server-menu-card"
-        class="xamt-bot-modal-card !w-auto relative z-10 xamt-server-menu-sheet"
+        class="xamt-bot-modal-card xamt-bot-modal-card--compact relative z-10 xamt-server-menu-sheet"
         phx-hook="MongolianScroll"
       >
         <%!-- Column 1: Server Title & Close --%>
@@ -271,7 +271,7 @@ defmodule XamtWeb.ServerLive.Overlays do
           </button>
         </div>
 
-        <%!-- Column 2: Slug, Description & Actions --%>
+        <%!-- Column 2: Slug, Description & Channel Action --%>
         <div class="xamt-bot-pane">
           <p id="server-menu-slug" class="xamt-server-menu-sheet__slug">/{@server.slug}</p>
 
@@ -291,7 +291,7 @@ defmodule XamtWeb.ServerLive.Overlays do
             <.link
               id="server-menu-new-channel"
               patch={~p"/servers/#{@server.slug}/#{@active_channel.slug}/new"}
-              class="xamt-btn xamt-btn--primary h-full px-3 font-bold text-xs mongol-text"
+              class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold text-xs mongol-text"
             >
               <.icon name="hero-plus" class="w-4 h-4 mb-1.5" />
               <span>{gettext("Create channel")}</span>
@@ -315,6 +315,8 @@ defmodule XamtWeb.ServerLive.Overlays do
       :if={@live_action in [:new_channel, :edit_channel]}
       id="server-drawer"
       class="xamt-modal"
+      phx-window-keydown={JS.patch(~p"/servers/#{@server.slug}/#{@active_channel.slug}")}
+      phx-key="Escape"
     >
       <.link
         patch={~p"/servers/#{@server.slug}/#{@active_channel.slug}"}
@@ -355,7 +357,7 @@ defmodule XamtWeb.ServerLive.Overlays do
     ~H"""
     <div
       id={"#{@id}-card"}
-      class="xamt-bot-modal-card !w-auto relative z-10"
+      class="xamt-bot-modal-card xamt-bot-modal-card--compact relative z-10"
       phx-hook="MongolianScroll"
     >
       <%!-- Column 1: Title & Close --%>
@@ -437,7 +439,7 @@ defmodule XamtWeb.ServerLive.Overlays do
 
       <div
         id="poll-details-card"
-        class="xamt-bot-modal-card !w-auto relative z-10 xamt-poll-details"
+        class="xamt-bot-modal-card xamt-bot-modal-card--compact relative z-10 xamt-poll-details"
         phx-hook="MongolianScroll"
       >
         <%!-- Column 1: Title & Close --%>
@@ -529,7 +531,7 @@ defmodule XamtWeb.ServerLive.Overlays do
 
       <div
         id="pinned-messages-card"
-        class="xamt-bot-modal-card !w-auto relative z-10 xamt-pinned-drawer"
+        class="xamt-bot-modal-card xamt-bot-modal-card--compact relative z-10 xamt-pinned-drawer"
         phx-hook="MongolianScroll"
       >
         <%!-- Column 1: Title & Close --%>
@@ -565,7 +567,7 @@ defmodule XamtWeb.ServerLive.Overlays do
             <article
               :for={msg <- @messages}
               id={"pinned-msg-#{msg.id}"}
-              class="xamt-pinned-card"
+              class="xamt-pinned-card h-full"
             >
               <button
                 :if={@can_manage_messages?}

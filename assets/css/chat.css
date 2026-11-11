@@ -2790,6 +2790,20 @@ body:has(mgl-keyboard[visible]) .xamt-modal:has(.xamt-bot-modal-card) {
   display: contents;
 }
 
+/* Compact variant for single-form or menu modals on desktop (> 960px) */
+@media (min-width: 961px) {
+  .xamt-bot-modal-card--compact {
+    width: auto;
+    min-width: 16rem;
+    max-width: min(88vw, 48rem);
+  }
+}
+
+.xamt-bot-pane + .xamt-bot-pane,
+.xamt-bot-pane + form > .xamt-bot-pane {
+  padding-left: 1.25rem;
+}
+
 /* Installation strips stay siblings of the create button via display:contents */
 .xamt-bot-installs {
   display: contents;
