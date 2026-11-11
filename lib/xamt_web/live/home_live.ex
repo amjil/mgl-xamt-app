@@ -498,7 +498,7 @@ defmodule XamtWeb.HomeLive do
         </main>
       <% else %>
         <main id="guest-home-canvas" class="xamt-home-canvas xamt-home" phx-hook="MongolianScroll">
-          <%!-- 第 1 幕：品牌主视觉旌旗 --%>
+          <%!-- Act 1: Brand hero banner --%>
           <header class="xamt-home-section xamt-home__hero !border-b-0">
             <div class="xamt-home-card items-center justify-between">
               <div class="flex flex-row items-center gap-4 h-full">
@@ -526,7 +526,7 @@ defmodule XamtWeb.HomeLive do
             </div>
           </header>
 
-          <%!-- 第 2 幕：登录与注册行动号召 --%>
+          <%!-- Act 2: Login and registration CTA --%>
           <section class="xamt-home-section">
             <header class="xamt-home-section__header">
               <div class="flex flex-row items-center gap-2">

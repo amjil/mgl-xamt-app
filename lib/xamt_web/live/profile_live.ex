@@ -49,7 +49,7 @@ defmodule XamtWeb.ProfileLive do
       global_search_results={@global_search_results}
     >
       <main id="user-profile-canvas" class="xamt-home-canvas" phx-hook="MongolianScroll">
-        <%!-- ==================== 第 1 区：核心身份旌旗 ==================== --%>
+        <%!-- ==================== Section 1: Core identity banner ==================== --%>
         <aside class="xamt-home-section" id="profile-panel">
           <header class="xamt-home-section__header">
             <div class="flex flex-row items-center gap-2">
@@ -71,9 +71,9 @@ defmodule XamtWeb.ProfileLive do
             </.link>
           </header>
 
-          <%!-- 用户主名片竖条 --%>
+          <%!-- User identity card --%>
           <div class="xamt-home-card items-center justify-between">
-            <%!-- 左列：头像 + 昵称 + 角色徽章 --%>
+            <%!-- Left: avatar + display name + role badge --%>
             <div class="flex flex-row items-center gap-3 h-full">
               <div class="w-14 h-14 rounded-2xl bg-[var(--xamt-accent)]/15 text-[var(--xamt-accent)] flex items-center justify-center font-bold text-xl overflow-hidden border border-[var(--xamt-line)] shadow-sm shrink-0">
                 <img
@@ -115,7 +115,7 @@ defmodule XamtWeb.ProfileLive do
               </span>
             </div>
 
-            <%!-- 右列：自定义状态与加入日期 --%>
+            <%!-- Right: custom status and join date --%>
             <div class="flex flex-row items-center justify-between h-full gap-3">
               <div
                 :if={@profile_user.status_emoji || @profile_user.status_text}
@@ -141,7 +141,7 @@ defmodule XamtWeb.ProfileLive do
           </div>
         </aside>
 
-        <%!-- ==================== 第 2 区：个人简介 (Bio) 竖卷 ==================== --%>
+        <%!-- ==================== Section 2: Bio ==================== --%>
         <section :if={@profile_user.bio && @profile_user.bio != ""} class="xamt-home-section">
           <header class="xamt-home-section__header">
             <div class="flex flex-row items-center gap-2">
@@ -157,7 +157,7 @@ defmodule XamtWeb.ProfileLive do
           </div>
         </section>
 
-        <%!-- ==================== 第 3 区：共同所在的社区 (Mutual Servers) ==================== --%>
+        <%!-- ==================== Section 3: Mutual servers ==================== --%>
         <section class="xamt-home-section">
           <header class="xamt-home-section__header">
             <div class="flex flex-row items-center gap-2">
@@ -200,7 +200,7 @@ defmodule XamtWeb.ProfileLive do
           </div>
         </section>
 
-        <%!-- ==================== 第 4 区：近期消息记录 (Recent Messages) ==================== --%>
+        <%!-- ==================== Section 4: Recent messages ==================== --%>
         <section class="xamt-home-section">
           <header class="xamt-home-section__header">
             <div class="flex flex-row items-center gap-2">
@@ -228,7 +228,7 @@ defmodule XamtWeb.ProfileLive do
               navigate={~p"/servers/#{msg.channel.server.slug}/#{msg.channel.slug}"}
               class="xamt-home-card group"
             >
-              <%!-- 左列：社区与频道归属 + 发送时间 --%>
+              <%!-- Left: server/channel context + sent time --%>
               <div class="flex flex-row items-center justify-between h-full text-xs text-[var(--xamt-muted)] border-r border-[var(--xamt-line)] pr-2">
                 <span class="font-bold text-[var(--xamt-accent)]">
                   {msg.channel.server.name} · #{msg.channel.name}
@@ -238,7 +238,7 @@ defmodule XamtWeb.ProfileLive do
                 </span>
               </div>
 
-              <%!-- 右列：消息正文预览 --%>
+              <%!-- Right: message body preview --%>
               <div class="flex flex-row items-center justify-between h-full pl-1">
                 <p class="text-sm text-[var(--xamt-text)] line-clamp-2">
                   {Messages.plain_text(msg)}

@@ -2813,7 +2813,7 @@ body:has(mgl-keyboard[visible]) .xamt-modal:has(.xamt-bot-modal-card) {
    Fixed: Pure Vertical-LR Column Progression (Left-to-Right Columns)
    ========================================================================== */
 
-/* 1. 每个分区容器：内部的子列必须从左向右（column）排列，而不是从上到下挤压！ */
+/* 1. Section containers: child columns must flow left-to-right (column), not stack top-to-bottom. */
 .xamt-bot-pane {
   display: flex;
   /* CRITICAL: In vertical-lr, flex-direction: column places children side-by-side from LEFT to RIGHT! */
@@ -2831,7 +2831,7 @@ body:has(mgl-keyboard[visible]) .xamt-modal:has(.xamt-bot-modal-card) {
   padding-right: 0.25rem;
 }
 
-/* 2. 单个表单字段：支持标签在左列、输入框在右列，或者同一列内顶部标签+下方输入框 */
+/* 2. Form fields: label left / input right, or stacked label above input in one column. */
 .xamt-bot-field {
   display: flex;
   /* Label on the left strip, Input box right next to it on the right strip */

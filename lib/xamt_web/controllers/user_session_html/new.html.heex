@@ -1,6 +1,6 @@
 <Layouts.home flash={@flash} current_scope={@current_scope}>
   <main id="login-panel" class="xamt-home-canvas" phx-hook="MongolianScroll">
-    <%!-- 第 1 卷：欢迎旌旗与注册引导 --%>
+    <%!-- Section 1: Welcome banner and registration prompt --%>
     <aside class="xamt-home-section">
       <header class="xamt-home-section__header">
         <div class="flex flex-row items-center gap-2">
@@ -56,7 +56,7 @@
       </div>
     </aside>
 
-    <%!-- 第 2 卷：魔法链接免密登录（开启时展示） --%>
+    <%!-- Section 2: Magic-link passwordless login (shown when enabled) --%>
     <section :if={@magic_link_enabled?} class="xamt-home-section">
       <header class="xamt-home-section__header">
         <div class="flex flex-row items-center gap-2">
@@ -98,7 +98,7 @@
       </.form>
     </section>
 
-    <%!-- 第 3 卷：邮箱与密码登录 --%>
+    <%!-- Section 3: Email and password login --%>
     <section class="xamt-home-section">
       <header class="xamt-home-section__header">
         <div class="flex flex-row items-center gap-2">

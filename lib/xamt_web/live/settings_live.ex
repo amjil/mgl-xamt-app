@@ -271,7 +271,7 @@ defmodule XamtWeb.SettingsLive do
       global_search_results={@global_search_results}
     >
       <main id="settings-canvas" class="xamt-home-canvas" phx-hook="MongolianScroll">
-        <!-- ==================== 第 1 区：账号概览与头像管理 ==================== -->
+        <!-- ==================== Section 1: Account overview and avatar ==================== -->
         <aside class="xamt-home-section">
           <header class="xamt-home-section__header">
             <div class="flex flex-row items-center gap-2">
@@ -291,7 +291,7 @@ defmodule XamtWeb.SettingsLive do
             </.link>
           </header>
           
-    <!-- 头像上传与预览竖条卡片 -->
+    <!-- Avatar upload and preview card -->
           <div class="xamt-home-card items-center">
             <div class="flex flex-row items-center gap-3 h-full">
               <div class="w-14 h-14 rounded-2xl bg-[var(--xamt-accent)]/15 text-[var(--xamt-accent)] flex items-center justify-center font-bold text-xl overflow-hidden border border-[var(--xamt-line)] shrink-0">
@@ -315,7 +315,7 @@ defmodule XamtWeb.SettingsLive do
               </span>
             </div>
             
-    <!-- 头像操作列 -->
+    <!-- Avatar actions column -->
             <form
               id="avatar-form"
               phx-change="validate_avatar"
@@ -366,7 +366,7 @@ defmodule XamtWeb.SettingsLive do
           </div>
         </aside>
         
-    <!-- ==================== 第 2 区：基本资料与自定义状态 ==================== -->
+    <!-- ==================== Section 2: Profile details and custom status ==================== -->
         <section class="xamt-home-section">
           <header class="xamt-home-section__header">
             <div class="flex flex-row items-center gap-2">
@@ -464,7 +464,7 @@ defmodule XamtWeb.SettingsLive do
           </.form>
         </section>
         
-    <!-- ==================== 第 3 区：修改账号邮箱 (Account Email) ==================== -->
+    <!-- ==================== Section 3: Change account email ==================== -->
         <section class="xamt-home-section">
           <header class="xamt-home-section__header">
             <div class="flex flex-row items-center gap-2">
@@ -511,7 +511,7 @@ defmodule XamtWeb.SettingsLive do
           </.form>
         </section>
         
-    <!-- ==================== 第 4 区：修改登录密码 (Password) ==================== -->
+    <!-- ==================== Section 4: Change login password ==================== -->
         <section class="xamt-home-section">
           <header class="xamt-home-section__header">
             <div class="flex flex-row items-center gap-2">
@@ -591,7 +591,7 @@ defmodule XamtWeb.SettingsLive do
           </.form>
         </section>
         
-    <!-- ==================== 第 5 区：通知推送与安全退出 ==================== -->
+    <!-- ==================== Section 5: Notifications and secure logout ==================== -->
         <section class="xamt-home-section">
           <header class="xamt-home-section__header">
             <div class="flex flex-row items-center gap-2">
@@ -600,7 +600,7 @@ defmodule XamtWeb.SettingsLive do
             </div>
           </header>
           
-    <!-- 通知开关卡片 -->
+    <!-- Notification toggle card -->
           <div
             id="web-push-settings"
             phx-hook="WebPush"
@@ -639,7 +639,7 @@ defmodule XamtWeb.SettingsLive do
             </div>
           </div>
           
-    <!-- 强制下线所有设备卡片 -->
+    <!-- Sign out all devices card -->
           <div class="xamt-home-card border-red-500/30">
             <div class="flex flex-row items-center justify-between h-full gap-3">
               <span class="font-bold text-sm text-red-500">

@@ -41,7 +41,7 @@ defmodule XamtWeb.SavedLive do
       global_search_results={@global_search_results}
     >
       <main id="saved-page" class="xamt-home-canvas xamt-saved" phx-hook="MongolianScroll">
-        <%!-- 第 1 区：书签概览与全局搜索入口 --%>
+        <%!-- Section 1: Bookmarks overview and global search --%>
         <aside class="xamt-home-section">
           <header class="xamt-home-section__header">
             <div class="flex flex-row items-center gap-2">
@@ -78,7 +78,7 @@ defmodule XamtWeb.SavedLive do
           </div>
         </aside>
 
-        <%!-- 第 2 区：收藏消息画卷列表 --%>
+        <%!-- Section 2: Saved messages list --%>
         <section class="xamt-home-section">
           <header class="xamt-home-section__header">
             <div class="flex flex-row items-center gap-2">
