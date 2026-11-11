@@ -19,6 +19,7 @@ defmodule XamtWeb.ServerLive.Rails do
       >
         <.icon name="hero-x-mark" class="size-5" />
       </button>
+
       <.link
         navigate={~p"/"}
         id="drawer-home"
@@ -34,17 +35,43 @@ defmodule XamtWeb.ServerLive.Rails do
           decoding="async"
         />
       </.link>
-      <.link
-        navigate={~p"/saved"}
-        id="drawer-saved"
-        class="xamt-rail__saved"
-        title={gettext("Saved")}
-        aria-label={gettext("Saved")}
-      >
-        <.icon name="hero-star" class="size-5" />
-      </.link>
-      <div class="xamt-rail__theme">
-        <Layouts.theme_palette id="xamt-theme-palette-rail" />
+
+      <span class="xamt-leftnav__rule" aria-hidden="true"></span>
+
+      <ul class="xamt-leftnav__links">
+        <li>
+          <.link navigate={~p"/"} class="mongol-text">{gettext("Home")}</.link>
+        </li>
+        <li :if={
+          @current_scope && @current_scope.user && Xamt.Accounts.User.admin?(@current_scope.user)
+        }>
+          <.link navigate={~p"/admin/users"} class="mongol-text">
+            {gettext("Users")}
+          </.link>
+        </li>
+        <li>
+          <button
+            type="button"
+            id="rail-open-search"
+            class="xamt-leftnav__link-btn mongol-text"
+            phx-click="open_search"
+            title={gettext("Search")}
+            aria-label={gettext("Search")}
+          >
+            <.icon name="hero-magnifying-glass" class="w-4 h-4 shrink-0" />
+            <span>{gettext("Search")}</span>
+          </button>
+        </li>
+      </ul>
+
+      <div class="xamt-leftnav__foot">
+        <.chat_user_menu
+          :if={@current_scope && @current_scope.user}
+          id="chat-rail-user-menu"
+          avatar_id="rail-profile-avatar"
+          palette_id="xamt-theme-palette-rail"
+          user={@current_scope.user}
+        />
       </div>
     </aside>
     """
@@ -356,20 +383,100 @@ defmodule XamtWeb.ServerLive.Rails do
       >
         <.icon name="hero-users" class="size-5" />
       </button>
-      <.link
+
+      <.chat_user_menu
         :if={@current_scope.user}
-        navigate={~p"/profile/#{@current_scope.user.username}"}
-        id="nav-profile"
+        id="chat-toolbar-user-menu"
+        avatar_id="nav-profile-avatar"
+        profile_link_id="nav-profile"
+        palette_id="xamt-theme-palette-toolbar"
+        user={@current_scope.user}
+      />
+    </header>
+    """
+  end
+
+  attr :id, :string, required: true
+  attr :avatar_id, :string, required: true
+  attr :palette_id, :string, required: true
+  attr :profile_link_id, :string, default: nil
+  attr :user, :map, required: true
+
+  defp chat_user_menu(assigns) do
+    ~H"""
+    <details id={@id} class="xamt-user-menu">
+      <summary
         class="xamt-nav-profile"
+        title={gettext("Profile")}
         aria-label={gettext("Profile")}
       >
         <.avatar
-          user={@current_scope.user}
-          id="nav-profile-avatar"
+          user={@user}
+          id={@avatar_id}
           class="xamt-avatar xamt-avatar--sm"
         />
-      </.link>
-    </header>
+      </summary>
+
+      <div class="xamt-user-menu__popover" role="menu">
+        <div class="xamt-user-menu__header">
+          <span class="font-bold text-sm text-[var(--xamt-text)] mongol-text">
+            {@user.display_name || @user.username}
+          </span>
+          <span class="text-xs text-[var(--xamt-muted)] mongol-text">
+            @{@user.username}
+          </span>
+        </div>
+
+        <span class="xamt-user-menu__divider" aria-hidden="true"></span>
+
+        <.link
+          id={@profile_link_id}
+          navigate={~p"/profile/#{@user.username}"}
+          class="xamt-user-menu__item mongol-text"
+          role="menuitem"
+        >
+          <.icon name="hero-user-circle" class="w-4 h-4 shrink-0" />
+          <span>{gettext("Profile")}</span>
+        </.link>
+
+        <.link
+          navigate={~p"/saved"}
+          class="xamt-user-menu__item mongol-text"
+          role="menuitem"
+        >
+          <.icon name="hero-bookmark" class="w-4 h-4 shrink-0" />
+          <span>{gettext("Saved")}</span>
+        </.link>
+
+        <.link
+          navigate={~p"/settings"}
+          class="xamt-user-menu__item mongol-text"
+          role="menuitem"
+        >
+          <.icon name="hero-cog-6-tooth" class="w-4 h-4 shrink-0" />
+          <span>{gettext("Settings")}</span>
+        </.link>
+
+        <.link
+          href={~p"/users/log-out"}
+          method="delete"
+          class="xamt-user-menu__item xamt-user-menu__item--danger mongol-text"
+          role="menuitem"
+        >
+          <.icon name="hero-arrow-right-start-on-rectangle" class="w-4 h-4 shrink-0" />
+          <span>{gettext("Log out")}</span>
+        </.link>
+
+        <span class="xamt-user-menu__divider" aria-hidden="true"></span>
+
+        <div class="xamt-user-menu__theme">
+          <span class="text-xs text-[var(--xamt-muted)] mongol-text">
+            {gettext("Theme")}
+          </span>
+          <Layouts.theme_palette id={@palette_id} />
+        </div>
+      </div>
+    </details>
     """
   end
 end

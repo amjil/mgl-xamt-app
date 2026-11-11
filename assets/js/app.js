@@ -196,17 +196,16 @@ window.addEventListener(
   true
 )
 
-// Close the left-rail user popover menu when clicking outside or selecting a link
+// Close any open .xamt-user-menu popover when clicking outside or selecting a link
 window.addEventListener("click", (event) => {
-  const menu = document.getElementById("user-menu-details")
-  if (!menu || !menu.hasAttribute("open")) return
-
   const target = event.target instanceof Element ? event.target : null
   if (!target) return
 
-  if (!menu.contains(target) || target.closest("a[href]")) {
-    menu.removeAttribute("open")
-  }
+  document.querySelectorAll("details.xamt-user-menu[open]").forEach((menu) => {
+    if (!menu.contains(target) || target.closest("a[href]")) {
+      menu.removeAttribute("open")
+    }
+  })
 })
 
 adoptImeElements()
