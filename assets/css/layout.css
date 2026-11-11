@@ -1052,6 +1052,24 @@ body.mgl-ime-mobile-open .xamt-home-canvas {
   box-shadow: -6px 8px 24px color-mix(in srgb, var(--xamt-accent) 14%, transparent);
 }
 
+/* Large screens keep the inline create form; mid/small open the drawer instead. */
+.xamt-home-create-trigger {
+  display: none;
+  align-items: center;
+  text-align: start;
+  cursor: pointer;
+}
+
+@media (max-width: 960px) {
+  .xamt-home-create-inline {
+    display: none;
+  }
+
+  .xamt-home-create-trigger {
+    display: flex;
+  }
+}
+
 /* Mobile Responsive Adjustments (< 768px) */
 @media (max-width: 767px) {
   .xamt-home-canvas {

@@ -16,6 +16,7 @@ defmodule XamtWeb.HomeLiveTest do
     assert has_element?(view, "#flash-group")
     assert has_element?(view, "#home-canvas")
     refute has_element?(view, "#home-create-server-form")
+    refute has_element?(view, "#home-open-create")
     refute has_element?(view, "#create-server-form")
     assert html =~ "Join a public server or wait for an invite"
   end
@@ -25,6 +26,7 @@ defmodule XamtWeb.HomeLiveTest do
     {:ok, view, _html} = live(conn, ~p"/")
 
     assert has_element?(view, "#home-create-server-form")
+    assert has_element?(view, "#home-open-create")
     refute has_element?(view, "#create-server-drawer")
 
     assert {:error, {:live_redirect, %{to: to}}} =
@@ -34,6 +36,17 @@ defmodule XamtWeb.HomeLiveTest do
 
     assert to == "/servers/new-hall"
     assert Repo.get_by(Server, slug: "new-hall")
+  end
+
+  test "creators can open the create drawer from the hall trigger", %{conn: conn} do
+    {:ok, view, _html} = live(log_in_user(conn, creator_fixture()), ~p"/")
+
+    refute has_element?(view, "#create-server-drawer")
+
+    view |> element("#home-open-create") |> render_click()
+
+    assert has_element?(view, "#create-server-drawer")
+    assert has_element?(view, "#create-server-form")
   end
 
   test "creators can set a custom slug, including for Mongolian names", %{conn: conn} do

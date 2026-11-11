@@ -438,13 +438,30 @@ defmodule XamtWeb.HomeLive do
               </button>
             </form>
 
+            <button
+              :if={@can_create_server?}
+              type="button"
+              id="home-open-create"
+              class="xamt-home-card xamt-home-create-trigger"
+              phx-click="toggle_create"
+              aria-label={gettext("Create server")}
+            >
+              <.icon name="hero-plus" class="w-5 h-5 text-[var(--xamt-accent)] mb-1.5" />
+              <span class="font-bold text-xs text-[var(--xamt-accent)] mongol-text">
+                {gettext("Create Mongolian community")}
+              </span>
+              <span class="xamt-btn xamt-btn--primary h-full px-2.5 font-bold text-xs mongol-text">
+                {gettext("Create server")}
+              </span>
+            </button>
+
             <.form
               :if={@can_create_server?}
               for={@form}
               id="home-create-server-form"
               phx-change="validate_create"
               phx-submit="create_server"
-              class="xamt-home-card"
+              class="xamt-home-card xamt-home-create-inline"
             >
               <div class="font-bold text-xs text-[var(--xamt-accent)] mongol-text">
                 {gettext("Create Mongolian community")}
