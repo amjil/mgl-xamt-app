@@ -64,11 +64,10 @@ config :xamt, Xamt.Bots.DeliveryWorker, allow_private_hosts: true
 #   mix phx.server
 # Without them, files fall back to priv/uploads (Local adapter).
 
-# Candidate backend for mgl-web-ime. Empty (the default) is same-origin
-# `baseUrl: ""`, so `/api/next_word/` is requested on the host that served
-# the page. Set XAMT_IME_BASE_URL to a full URL for a direct backend, or
-# "local" for the bundled dictionary.
-config :xamt, :ime_base_url, System.get_env("XAMT_IME_BASE_URL", "")
+# Candidate backend for mgl-web-ime. Empty is same-origin (`baseUrl: ""`,
+# so `/api/next_word/` hits the page host). Set XAMT_IME_BASE_URL to a
+# full URL for a direct backend, or "local" for the bundled dictionary.
+config :xamt, :ime_base_url, System.get_env("XAMT_IME_BASE_URL", "100.64.0.6:3003")
 
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"
