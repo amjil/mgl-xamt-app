@@ -32,6 +32,7 @@ defmodule XamtWeb.HomeLive do
      |> assign(:unread_counts, %{})
      |> assign(:form, to_form(Servers.change_server(%Server{}), as: :server))
      |> assign(:show_create, false)
+     |> assign(:show_join_code, false)
      |> assign(:suggested_slug, "")
      |> assign(:can_create_server?, can_create_server?(scope))
      |> clear_server_settings()}
@@ -56,6 +57,18 @@ defmodule XamtWeb.HomeLive do
   end
 
   @impl true
+  def handle_event("open_join_code", _params, socket) do
+    {:noreply,
+     socket
+     |> close_create()
+     |> clear_server_settings()
+     |> assign(:show_join_code, true)}
+  end
+
+  def handle_event("close_join_code", _params, socket) do
+    {:noreply, assign(socket, :show_join_code, false)}
+  end
+
   def handle_event("toggle_create", _params, socket) do
     if socket.assigns.can_create_server? do
       {:noreply, open_create(socket)}
@@ -116,6 +129,7 @@ defmodule XamtWeb.HomeLive do
             {:ok, server} ->
               {:noreply,
                socket
+               |> assign(:show_join_code, false)
                |> put_flash(:info, gettext("Joined %{name}", name: server.name))
                |> push_navigate(to: ~p"/servers/#{server.slug}")}
 
@@ -123,12 +137,14 @@ defmodule XamtWeb.HomeLive do
               {:noreply,
                socket
                |> assign(:invite_code, code)
+               |> assign(:show_join_code, true)
                |> put_flash(:error, gettext("Invite not found"))}
 
             {:error, _} ->
               {:noreply,
                socket
                |> assign(:invite_code, code)
+               |> assign(:show_join_code, true)
                |> put_flash(:error, gettext("Invite is invalid or expired"))}
           end
       end
@@ -186,6 +202,7 @@ defmodule XamtWeb.HomeLive do
         {:noreply,
          socket
          |> close_create()
+         |> assign(:show_join_code, false)
          |> assign(:editing_server, server)
          |> assign(:server_form, to_form(Servers.change_server(server), as: :server))
          |> assign(:invites, Servers.list_invites(server.id))}
@@ -345,7 +362,7 @@ defmodule XamtWeb.HomeLive do
             </div>
           </section>
 
-          <%!-- Section 3: join & create --%>
+          <%!-- Section 2: join & create triggers (opens Bot-style modals) --%>
           <section class="xamt-home-section" id="home-create-join">
             <header class="xamt-home-section__header">
               <div class="flex flex-row items-center gap-2">
@@ -354,145 +371,61 @@ defmodule XamtWeb.HomeLive do
               </div>
             </header>
 
-            <form phx-submit="join_by_code" id="home-join-by-code-form" class="xamt-home-card">
-              <div class="font-bold text-xs text-[var(--xamt-accent)] mongol-text">
-                {gettext("Join with invite code")}
-              </div>
-
-              <label class="xamt-bot-field">
-                <span class="xamt-label">{gettext("Invite code")}</span>
-                <input
-                  type="text"
-                  name="code"
-                  value={@invite_code}
-                  required
-                  placeholder={gettext("Enter invite code...")}
-                  class="xamt-bot-input"
-                  onfocus="setTimeout(() => this.scrollIntoView({behavior: 'smooth', inline: 'center'}), 150)"
-                />
-              </label>
-
-              <button type="submit" class="xamt-btn xamt-btn--primary h-full px-2.5 font-bold text-xs">
-                <.icon name="hero-arrow-right-end-on-rectangle" class="w-4 h-4 mb-1.5" />
-                <span class="mongol-text">{gettext("Join now")}</span>
-              </button>
-            </form>
-
-            <button
-              :if={@can_create_server?}
-              type="button"
-              id="home-open-create"
-              class="xamt-home-card xamt-home-create-trigger"
-              phx-click="toggle_create"
-              aria-label={gettext("Create server")}
-            >
-              <.icon name="hero-plus" class="w-5 h-5 text-[var(--xamt-accent)] mb-1.5" />
-              <span class="font-bold text-xs text-[var(--xamt-accent)] mongol-text">
-                {gettext("Create Mongolian community")}
-              </span>
-              <span class="xamt-btn xamt-btn--primary h-full px-2.5 font-bold text-xs mongol-text">
-                {gettext("Create server")}
-              </span>
-            </button>
-
-            <.form
-              :if={@can_create_server?}
-              for={@form}
-              id="home-create-server-form"
-              phx-change="validate_create"
-              phx-submit="create_server"
-              class="xamt-home-card xamt-home-create-inline"
-            >
-              <div class="font-bold text-xs text-[var(--xamt-accent)] mongol-text">
-                {gettext("Create Mongolian community")}
-              </div>
-
-              <label class="xamt-bot-field">
-                <span class="xamt-label">{gettext("Name")}</span>
-                <input
-                  id="create-server-name"
-                  type="text"
-                  name="server[name]"
-                  value={@form[:name].value}
-                  required
-                  placeholder={gettext("Community name...")}
-                  class="xamt-bot-input mongol-input"
-                  phx-hook="MongolianIME"
-                  autocomplete="off"
-                  onfocus="setTimeout(() => this.scrollIntoView({behavior: 'smooth', inline: 'center'}), 150)"
-                />
-              </label>
-
-              <label class="xamt-bot-field">
-                <span class="xamt-label">{gettext("Slug")}</span>
-                <input
-                  id="server_slug"
-                  type="text"
-                  name="server[slug]"
-                  value={@form[:slug].value}
-                  placeholder="my-server"
-                  class="xamt-bot-input xamt-input--latin"
-                  autocomplete="off"
-                  spellcheck="false"
-                  onfocus="setTimeout(() => this.scrollIntoView({behavior: 'smooth', inline: 'center'}), 150)"
-                />
-              </label>
-
-              <label class="xamt-bot-field">
-                <span class="xamt-label">{gettext("Description")}</span>
-                <input
-                  id="create-server-desc"
-                  type="text"
-                  name="server[description]"
-                  value={@form[:description].value}
-                  placeholder={gettext("Describe the community...")}
-                  class="xamt-bot-input mongol-input"
-                  phx-hook="MongolianIME"
-                  onfocus="setTimeout(() => this.scrollIntoView({behavior: 'smooth', inline: 'center'}), 150)"
-                />
-              </label>
-
-              <label class="xamt-bot-field">
-                <span class="xamt-label">{gettext("Visibility")}</span>
-                <div
-                  id="create-server-visibility-host"
-                  class="mn-select-host"
-                  phx-hook="MnSelect"
-                  phx-update="ignore"
-                >
-                  <select
-                    id="create-server-visibility"
-                    name="server[visibility]"
-                    class="xamt-bot-input"
-                  >
-                    <option
-                      value="public"
-                      selected={to_string(@form[:visibility].value) == "public"}
-                    >
-                      {gettext("Public")}
-                    </option>
-                    <option
-                      value="private"
-                      selected={to_string(@form[:visibility].value || "private") == "private"}
-                    >
-                      {gettext("Private")}
-                    </option>
-                  </select>
-                </div>
-              </label>
-
+            <div class="flex flex-col gap-3 h-full">
+              <%!-- Trigger 1: Join with invite code modal --%>
               <button
-                type="submit"
-                id="create-server-submit"
-                class="xamt-btn xamt-btn--primary h-full px-3 font-bold text-xs"
+                type="button"
+                id="home-open-join-code"
+                phx-click="open_join_code"
+                class="xamt-home-card items-center cursor-pointer text-start group"
+                aria-label={gettext("Join with invite code")}
               >
-                <.icon name="hero-check" class="w-4 h-4 mb-1.5" />
-                <span class="mongol-text">{gettext("Create server")}</span>
+                <div class="flex flex-row items-center gap-3 h-full">
+                  <div class="w-9 h-9 rounded-xl bg-[var(--xamt-accent)]/15 text-[var(--xamt-accent)] flex items-center justify-center shrink-0 group-hover:bg-[var(--xamt-accent)] group-hover:text-white transition-colors">
+                    <.icon name="hero-ticket" class="w-5 h-5" />
+                  </div>
+                  <span class="font-bold text-base text-[var(--xamt-text)] mongol-text">
+                    {gettext("Join with invite code")}
+                  </span>
+                </div>
+
+                <div class="flex flex-row items-center justify-between h-full text-xs text-[var(--xamt-muted)]">
+                  <span class="mongol-text">{gettext("Enter invite code...")}</span>
+                  <span class="xamt-btn xamt-btn--soft py-2.5 px-2 text-xs font-bold mongol-text">
+                    {gettext("Join now")}
+                  </span>
+                </div>
               </button>
-            </.form>
+
+              <%!-- Trigger 2: Create server modal --%>
+              <button
+                :if={@can_create_server?}
+                type="button"
+                id="home-open-create"
+                class="xamt-home-card items-center cursor-pointer text-start group"
+                phx-click="toggle_create"
+                aria-label={gettext("Create server")}
+              >
+                <div class="flex flex-row items-center gap-3 h-full">
+                  <div class="w-9 h-9 rounded-xl bg-[var(--xamt-accent)]/15 text-[var(--xamt-accent)] flex items-center justify-center shrink-0 group-hover:bg-[var(--xamt-accent)] group-hover:text-white transition-colors">
+                    <.icon name="hero-plus" class="w-5 h-5" />
+                  </div>
+                  <span class="font-bold text-base text-[var(--xamt-text)] mongol-text">
+                    {gettext("Create Mongolian community")}
+                  </span>
+                </div>
+
+                <div class="flex flex-row items-center justify-between h-full text-xs text-[var(--xamt-muted)]">
+                  <span class="mongol-text">{gettext("Describe the community...")}</span>
+                  <span class="xamt-btn xamt-btn--primary py-2.5 px-2 text-xs font-bold mongol-text">
+                    {gettext("Create server")}
+                  </span>
+                </div>
+              </button>
+            </div>
           </section>
 
-          <%!-- Section 4: discover public communities --%>
+          <%!-- Section 3: discover public communities --%>
           <section class="xamt-home-section" id="discover-panel">
             <header class="xamt-home-section__header">
               <div class="flex flex-row items-center gap-2">
@@ -630,190 +563,405 @@ defmodule XamtWeb.HomeLive do
         </main>
       <% end %>
 
-      <.drawer
+      <%!-- Modal 1: Join with Invite Code (Bot Manager style vertical-lr modal) --%>
+      <div
+        :if={@show_join_code}
+        id="join-code-modal"
+        class="xamt-modal"
+        phx-window-keydown="close_join_code"
+        phx-key="Escape"
+      >
+        <div class="xamt-modal-backdrop" phx-click="close_join_code"></div>
+
+        <div
+          id="join-code-card"
+          class="xamt-bot-modal-card !w-auto relative z-10"
+          phx-hook="MongolianScroll"
+        >
+          <%!-- Column 1: Title & Close --%>
+          <div class="xamt-bot-pane !flex-row justify-between items-center">
+            <div class="flex flex-row items-center gap-2">
+              <.icon name="hero-ticket" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+              <h2 class="text-lg font-bold tracking-wider mongol-text">
+                {gettext("Join with invite code")}
+              </h2>
+            </div>
+
+            <button
+              type="button"
+              id="join-code-cancel"
+              phx-click="close_join_code"
+              class="xamt-icon-btn"
+              title={gettext("Close")}
+            >
+              <.icon name="hero-x-mark" class="w-5 h-5" />
+            </button>
+          </div>
+
+          <%!-- Column 2: Invite Code Form --%>
+          <form phx-submit="join_by_code" id="home-join-by-code-form">
+            <div class="xamt-bot-pane">
+              <label class="xamt-bot-field">
+                <span class="xamt-label mongol-text">{gettext("Invite code")}</span>
+                <input
+                  id="home-invite-code-input"
+                  type="text"
+                  name="code"
+                  value={@invite_code}
+                  required
+                  placeholder={gettext("Enter invite code...")}
+                  class="xamt-bot-input xamt-input--latin"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </label>
+
+              <div class="flex flex-row items-center gap-3 h-full">
+                <button
+                  type="submit"
+                  id="join-code-submit"
+                  class="xamt-btn xamt-btn--primary h-full px-3 font-bold text-xs mongol-text"
+                >
+                  <.icon name="hero-arrow-right-end-on-rectangle" class="w-4 h-4 mb-1.5" />
+                  <span>{gettext("Join now")}</span>
+                </button>
+
+                <button
+                  type="button"
+                  phx-click="close_join_code"
+                  class="xamt-btn h-full px-2.5 text-xs mongol-text"
+                >
+                  {gettext("Cancel")}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <%!-- Modal 2: Create Server (Bot Manager style vertical-lr modal) --%>
+      <div
         :if={@show_create}
         id="create-server-drawer"
-        show
-        on_cancel={JS.push("cancel_create")}
+        class="xamt-modal"
+        phx-window-keydown="cancel_create"
+        phx-key="Escape"
       >
-        <div id="create-server" class="xamt-sheet-form">
-          <h2 class="xamt-section-title mongol-text">{gettext("Create server")}</h2>
+        <div class="xamt-modal-backdrop" phx-click="cancel_create"></div>
 
+        <div
+          id="create-server"
+          class="xamt-bot-modal-card !w-auto relative z-10"
+          phx-hook="MongolianScroll"
+        >
+          <%!-- Column 1: Title & Close --%>
+          <div class="xamt-bot-pane !flex-row justify-between items-center">
+            <div class="flex flex-row items-center gap-2">
+              <.icon name="hero-plus-circle" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+              <h2 class="text-lg font-bold tracking-wider mongol-text">
+                {gettext("Create Mongolian community")}
+              </h2>
+            </div>
+
+            <button
+              type="button"
+              phx-click="cancel_create"
+              class="xamt-icon-btn"
+              title={gettext("Close")}
+            >
+              <.icon name="hero-x-mark" class="w-5 h-5" />
+            </button>
+          </div>
+
+          <%!-- Column 2: Create Server Form --%>
           <.form
             for={@form}
             id="create-server-form"
             phx-change="validate_create"
             phx-submit="create_server"
-            class="xamt-form xamt-form--vertical"
           >
-            <.input
-              field={@form[:name]}
-              id="server_name"
-              label={gettext("Name")}
-              required
-              class="xamt-input mongol-input"
-              phx-hook="MongolianIME"
-              autocomplete="off"
-            />
-            <.input
-              field={@form[:slug]}
-              id="drawer_server_slug"
-              label={gettext("Slug")}
-              class="xamt-input xamt-input--latin"
-              autocomplete="off"
-              spellcheck="false"
-              placeholder="my-server"
-            />
-            <.input
-              field={@form[:description]}
-              id="server_description"
-              type="textarea"
-              label={gettext("Description")}
-              class="xamt-textarea mongol-input"
-              phx-hook="MongolianIME"
-            />
-            <.input
-              field={@form[:visibility]}
-              id="server_visibility"
-              type="select"
-              label={gettext("Visibility")}
-              options={[
-                {gettext("Private — invite only"), "private"},
-                {gettext("Public — anyone can find and join"), "public"}
-              ]}
-            />
-            <div class="xamt-form__actions">
-              <button
-                type="submit"
-                id="drawer-create-server-submit"
-                class="xamt-btn xamt-btn--primary mongol-text"
-              >
-                {gettext("Create")}
-              </button>
-              <button
-                type="button"
-                id="create-server-cancel"
-                class="xamt-btn mongol-text"
-                phx-click="cancel_create"
-              >
-                {gettext("Cancel")}
-              </button>
+            <div class="xamt-bot-pane">
+              <label class="xamt-bot-field">
+                <span class="xamt-label mongol-text">{gettext("Name")}</span>
+                <input
+                  id="server_name"
+                  type="text"
+                  name={@form[:name].name}
+                  value={@form[:name].value}
+                  required
+                  placeholder={gettext("Community name...")}
+                  class="xamt-bot-input mongol-input"
+                  phx-hook="MongolianIME"
+                  autocomplete="off"
+                />
+                <p
+                  :for={msg <- Enum.map(@form[:name].errors, &translate_error(&1))}
+                  class="text-xs text-red-500 mongol-text"
+                >
+                  {msg}
+                </p>
+              </label>
+
+              <label class="xamt-bot-field">
+                <span class="xamt-label mongol-text">{gettext("Slug")}</span>
+                <input
+                  id="server_slug"
+                  type="text"
+                  name={@form[:slug].name}
+                  value={@form[:slug].value}
+                  placeholder="my-server"
+                  class="xamt-bot-input xamt-input--latin"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <p
+                  :for={msg <- Enum.map(@form[:slug].errors, &translate_error(&1))}
+                  class="text-xs text-red-500 mongol-text"
+                >
+                  {msg}
+                </p>
+              </label>
+
+              <label class="xamt-bot-field">
+                <span class="xamt-label mongol-text">{gettext("Description")}</span>
+                <textarea
+                  id="server_description"
+                  name={@form[:description].name}
+                  placeholder={gettext("Describe the community...")}
+                  class="xamt-bot-input mongol-input !w-14"
+                  phx-hook="MongolianIME"
+                >{Phoenix.HTML.Form.normalize_value("textarea", @form[:description].value)}</textarea>
+              </label>
+
+              <label class="xamt-bot-field">
+                <span class="xamt-label mongol-text">{gettext("Visibility")}</span>
+                <div
+                  id="create-server-visibility-host"
+                  class="mn-select-host"
+                  phx-hook="MnSelect"
+                  phx-update="ignore"
+                >
+                  <select
+                    id="server_visibility"
+                    name={@form[:visibility].name}
+                    class="xamt-bot-input"
+                  >
+                    <option
+                      value="private"
+                      selected={to_string(@form[:visibility].value || "private") == "private"}
+                    >
+                      {gettext("Private — invite only")}
+                    </option>
+                    <option
+                      value="public"
+                      selected={to_string(@form[:visibility].value) == "public"}
+                    >
+                      {gettext("Public — anyone can find and join")}
+                    </option>
+                  </select>
+                </div>
+              </label>
+
+              <div class="flex flex-row items-center gap-3 h-full">
+                <button
+                  type="submit"
+                  id="drawer-create-server-submit"
+                  class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold text-xs mongol-text"
+                >
+                  <.icon name="hero-check" class="w-4 h-4 mb-1.5" />
+                  <span>{gettext("Create server")}</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="create-server-cancel"
+                  class="xamt-btn h-full px-2.5 text-xs mongol-text"
+                  phx-click="cancel_create"
+                >
+                  {gettext("Cancel")}
+                </button>
+              </div>
             </div>
           </.form>
         </div>
-      </.drawer>
+      </div>
 
-      <.drawer
+      <%!-- Modal 3: Edit Server Settings & Invites (Bot Manager style vertical-lr modal) --%>
+      <div
         :if={@editing_server}
         id="edit-server-drawer"
-        show
-        on_cancel={JS.push("cancel_edit_server")}
+        class="xamt-modal"
+        phx-window-keydown="cancel_edit_server"
+        phx-key="Escape"
       >
-        <div id="server-settings" class="xamt-sheet-form">
-          <h2 class="xamt-section-title mongol-text">{gettext("Server settings")}</h2>
+        <div class="xamt-modal-backdrop" phx-click="cancel_edit_server"></div>
 
+        <div
+          id="server-settings"
+          class="xamt-bot-modal-card !w-auto relative z-10"
+          phx-hook="MongolianScroll"
+        >
+          <%!-- Column 1: Title & Close --%>
+          <div class="xamt-bot-pane !flex-row justify-between items-center">
+            <div class="flex flex-row items-center gap-2">
+              <.icon name="hero-cog-6-tooth" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+              <h2 class="text-lg font-bold tracking-wider mongol-text">
+                {gettext("Server settings")}
+              </h2>
+            </div>
+
+            <button
+              type="button"
+              phx-click="cancel_edit_server"
+              class="xamt-icon-btn"
+              title={gettext("Close")}
+            >
+              <.icon name="hero-x-mark" class="w-5 h-5" />
+            </button>
+          </div>
+
+          <%!-- Column 2: Server Settings Form --%>
           <.form
             for={@server_form}
             id="edit-server-form"
             phx-submit="save_server"
-            class="xamt-form xamt-form--vertical"
           >
-            <.input
-              field={@server_form[:name]}
-              id="server-settings-name"
-              label={gettext("Name")}
-              phx-hook="MongolianIME"
-              class="xamt-input mongol-input"
-              autocomplete="off"
-            />
-            <.input
-              field={@server_form[:slug]}
-              id="server-settings-slug"
-              label={gettext("Slug")}
-              class="xamt-input xamt-input--latin"
-              autocomplete="off"
-              spellcheck="false"
-            />
-            <.input
-              field={@server_form[:description]}
-              id="server-settings-description"
-              type="textarea"
-              label={gettext("Description")}
-              phx-hook="MongolianIME"
-              class="xamt-textarea mongol-input"
-            />
-            <.input
-              field={@server_form[:visibility]}
-              id="server-settings-visibility"
-              type="select"
-              label={gettext("Visibility")}
-              options={[
-                {gettext("Private — invite only"), "private"},
-                {gettext("Public — anyone can find and join"), "public"}
-              ]}
-            />
-            <div class="xamt-form__actions">
-              <button
-                type="submit"
-                id="server-settings-save"
-                class="xamt-btn xamt-btn--primary mongol-text"
-              >
-                {gettext("Save")}
-              </button>
-              <button
-                type="button"
-                id="edit-server-cancel"
-                class="xamt-btn mongol-text"
-                phx-click="cancel_edit_server"
-              >
-                {gettext("Cancel")}
-              </button>
+            <div class="xamt-bot-pane">
+              <label class="xamt-bot-field">
+                <span class="xamt-label mongol-text">{gettext("Name")}</span>
+                <input
+                  id="server-settings-name"
+                  type="text"
+                  name={@server_form[:name].name}
+                  value={@server_form[:name].value}
+                  phx-hook="MongolianIME"
+                  class="xamt-bot-input mongol-input"
+                  autocomplete="off"
+                />
+              </label>
+
+              <label class="xamt-bot-field">
+                <span class="xamt-label mongol-text">{gettext("Slug")}</span>
+                <input
+                  id="server-settings-slug"
+                  type="text"
+                  name={@server_form[:slug].name}
+                  value={@server_form[:slug].value}
+                  class="xamt-bot-input xamt-input--latin"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </label>
+
+              <label class="xamt-bot-field">
+                <span class="xamt-label mongol-text">{gettext("Description")}</span>
+                <textarea
+                  id="server-settings-description"
+                  name={@server_form[:description].name}
+                  phx-hook="MongolianIME"
+                  class="xamt-bot-input mongol-input !w-14"
+                >{Phoenix.HTML.Form.normalize_value("textarea", @server_form[:description].value)}</textarea>
+              </label>
+
+              <label class="xamt-bot-field">
+                <span class="xamt-label mongol-text">{gettext("Visibility")}</span>
+                <div
+                  id="server-settings-visibility-host"
+                  class="mn-select-host"
+                  phx-hook="MnSelect"
+                  phx-update="ignore"
+                >
+                  <select
+                    id="server-settings-visibility"
+                    name={@server_form[:visibility].name}
+                    class="xamt-bot-input"
+                  >
+                    <option
+                      value="private"
+                      selected={to_string(@server_form[:visibility].value || "private") == "private"}
+                    >
+                      {gettext("Private — invite only")}
+                    </option>
+                    <option
+                      value="public"
+                      selected={to_string(@server_form[:visibility].value) == "public"}
+                    >
+                      {gettext("Public — anyone can find and join")}
+                    </option>
+                  </select>
+                </div>
+              </label>
+
+              <div class="flex flex-row items-center gap-3 h-full">
+                <button
+                  type="submit"
+                  id="server-settings-save"
+                  class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold text-xs mongol-text"
+                >
+                  <.icon name="hero-check" class="w-4 h-4 mb-1.5" />
+                  <span>{gettext("Save")}</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="edit-server-cancel"
+                  class="xamt-btn h-full px-2.5 text-xs mongol-text"
+                  phx-click="cancel_edit_server"
+                >
+                  {gettext("Cancel")}
+                </button>
+              </div>
             </div>
           </.form>
 
-          <div class="xamt-rail__section-head">
-            <span class="mongol-text">{gettext("Invites")}</span>
-            <button
-              type="button"
-              id="create-invite"
-              class="xamt-icon-btn"
-              phx-click="create_invite"
-              aria-label={gettext("Create invite")}
-            >
-              +
-            </button>
-          </div>
-
-          <ul class="xamt-invite-list">
-            <li :for={invite <- @invites} class="xamt-invite">
-              <code>/invite/{invite.code}</code>
-              <span :if={invite.max_uses} class="xamt-invite__uses">
-                {invite.uses}/{invite.max_uses}
+          <%!-- Column 3: Invites Management --%>
+          <div class="xamt-bot-pane">
+            <div class="flex flex-row items-center justify-between h-full">
+              <span class="font-bold text-sm text-[var(--xamt-accent)] mongol-text">
+                {gettext("Invites")}
               </span>
               <button
                 type="button"
-                id={"copy-invite-#{invite.id}"}
-                class="xamt-icon-btn"
-                data-copy={url(~p"/invite/#{invite.code}")}
-                data-copied={gettext("Copied")}
-                data-copy-failed={gettext("Could not copy")}
-                aria-label={gettext("Copy invite link")}
+                id="create-invite"
+                class="xamt-btn xamt-btn--soft py-2.5 px-2 text-xs font-bold"
+                phx-click="create_invite"
+                aria-label={gettext("Create invite")}
               >
-                <.icon name="hero-clipboard" class="size-3" />
+                <.icon name="hero-plus" class="w-4 h-4" />
               </button>
-              <button
-                type="button"
-                class="xamt-icon-btn"
-                phx-click="delete_invite"
-                phx-value-id={invite.id}
-                aria-label={gettext("Delete invite")}
-              >
-                <.icon name="hero-x-mark" class="size-3" />
-              </button>
-            </li>
-          </ul>
+            </div>
+
+            <ul class="xamt-invite-list h-full">
+              <li :for={invite <- @invites} class="xamt-invite h-full">
+                <code>/invite/{invite.code}</code>
+                <span :if={invite.max_uses} class="xamt-invite__uses">
+                  {invite.uses}/{invite.max_uses}
+                </span>
+                <button
+                  type="button"
+                  id={"copy-invite-#{invite.id}"}
+                  class="xamt-icon-btn"
+                  data-copy={url(~p"/invite/#{invite.code}")}
+                  data-copied={gettext("Copied")}
+                  data-copy-failed={gettext("Could not copy")}
+                  aria-label={gettext("Copy invite link")}
+                >
+                  <.icon name="hero-clipboard" class="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  class="xamt-icon-btn text-[var(--xamt-error)]"
+                  phx-click="delete_invite"
+                  phx-value-id={invite.id}
+                  aria-label={gettext("Delete invite")}
+                >
+                  <.icon name="hero-x-mark" class="size-3.5" />
+                </button>
+              </li>
+            </ul>
+          </div>
         </div>
-      </.drawer>
+      </div>
     </Layouts.home>
     """
   end
@@ -875,6 +1023,7 @@ defmodule XamtWeb.HomeLive do
   defp open_create(socket) do
     socket
     |> clear_server_settings()
+    |> assign(:show_join_code, false)
     |> assign(:show_create, true)
     |> assign(:suggested_slug, "")
     |> assign(:form, to_form(Servers.change_server(%Server{}), as: :server))

@@ -15,38 +15,44 @@ defmodule XamtWeb.HomeLiveTest do
 
     assert has_element?(view, "#flash-group")
     assert has_element?(view, "#home-canvas")
-    refute has_element?(view, "#home-create-server-form")
+    assert has_element?(view, "#home-open-join-code")
     refute has_element?(view, "#home-open-create")
     refute has_element?(view, "#create-server-form")
     assert html =~ "Join a public server or wait for an invite"
   end
 
-  test "creators can create a server from the hall form", %{conn: conn} do
+  test "creators can open the create modal and create a server", %{conn: conn} do
     conn = log_in_user(conn, creator_fixture())
     {:ok, view, _html} = live(conn, ~p"/")
 
-    assert has_element?(view, "#home-create-server-form")
     assert has_element?(view, "#home-open-create")
-    refute has_element?(view, "#create-server-drawer")
-
-    assert {:error, {:live_redirect, %{to: to}}} =
-             view
-             |> form("#home-create-server-form", server: %{name: "New Hall"})
-             |> render_submit()
-
-    assert to == "/servers/new-hall"
-    assert Repo.get_by(Server, slug: "new-hall")
-  end
-
-  test "creators can open the create drawer from the hall trigger", %{conn: conn} do
-    {:ok, view, _html} = live(log_in_user(conn, creator_fixture()), ~p"/")
-
     refute has_element?(view, "#create-server-drawer")
 
     view |> element("#home-open-create") |> render_click()
 
     assert has_element?(view, "#create-server-drawer")
     assert has_element?(view, "#create-server-form")
+
+    assert {:error, {:live_redirect, %{to: to}}} =
+             view
+             |> form("#create-server-form", server: %{name: "New Hall"})
+             |> render_submit()
+
+    assert to == "/servers/new-hall"
+    assert Repo.get_by(Server, slug: "new-hall")
+  end
+
+  test "members can open and close the join-by-code modal", %{conn: conn} do
+    {:ok, view, _html} = live(log_in_user(conn, user_fixture()), ~p"/")
+
+    refute has_element?(view, "#join-code-modal")
+
+    view |> element("#home-open-join-code") |> render_click()
+    assert has_element?(view, "#join-code-modal")
+    assert has_element?(view, "#home-join-by-code-form")
+
+    view |> element("#join-code-cancel") |> render_click()
+    refute has_element?(view, "#join-code-modal")
   end
 
   test "creators can set a custom slug, including for Mongolian names", %{conn: conn} do
@@ -54,8 +60,10 @@ defmodule XamtWeb.HomeLiveTest do
     {:ok, view, _html} = live(conn, ~p"/")
     mongolian_name = "\u1830\u1820\u1837\u1820\u1828"
 
+    view |> element("#home-open-create") |> render_click()
+
     view
-    |> form("#home-create-server-form", server: %{name: "New Hall"})
+    |> form("#create-server-form", server: %{name: "New Hall"})
     |> render_change()
 
     assert has_element?(view, "#server_slug")
@@ -63,7 +71,7 @@ defmodule XamtWeb.HomeLiveTest do
 
     assert {:error, {:live_redirect, %{to: to}}} =
              view
-             |> form("#home-create-server-form",
+             |> form("#create-server-form",
                server: %{name: mongolian_name, slug: "saran-hall"}
              )
              |> render_submit()
