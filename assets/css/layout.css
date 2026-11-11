@@ -1087,3 +1087,253 @@ body.mgl-ime-mobile-open .xamt-home-canvas {
     padding: 0.75rem 0.55rem;
   }
 }
+
+/* ==========================================================================
+   Admin Users Roster Page (Pure Vertical-LR Scroll Layout)
+   ========================================================================== */
+
+/*
+  User roster card under writing-mode: vertical-lr:
+    - grid columns run TOP → BOTTOM
+    - grid rows run LEFT → RIGHT
+  So areas must place avatar in the first column (top band), spanning both rows.
+*/
+.xamt-user-strip {
+  position: relative;
+  z-index: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  grid-template-areas:
+    "avatar main"
+    "avatar email";
+  align-items: stretch;
+  justify-items: stretch;
+  height: 100%;
+  min-width: 5.4rem;
+  padding: 0.9rem 0.6rem;
+  border-radius: 1rem;
+  background: var(--xamt-bg-2);
+  border: 1px solid var(--xamt-line);
+  column-gap: 0.75rem;
+  row-gap: 0.55rem;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+  flex-shrink: 0;
+}
+
+.xamt-user-strip:hover {
+  border-color: var(--xamt-accent);
+  background: var(--xamt-bg-3);
+  box-shadow: -4px 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.xamt-user-strip__avatar {
+  grid-area: avatar;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+}
+
+/* Unwrap so main/email become direct grid items */
+.xamt-user-strip__cols {
+  display: contents;
+}
+
+/* Left pillar under avatar: name / role / actions */
+.xamt-user-strip__main {
+  grid-area: main;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+/* Right pillar under avatar: email */
+.xamt-user-strip__email {
+  grid-area: email;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.4rem;
+  padding: 0.35rem 0.15rem;
+  border-left: 1px solid var(--xamt-line);
+}
+
+.xamt-user-strip__email .xamt-admin-user__email {
+  font-size: 0.75rem;
+  font-family: var(--xamt-font-ui, ui-monospace, monospace);
+  color: var(--xamt-muted);
+  letter-spacing: 0.02em;
+  word-break: break-all;
+}
+
+/*
+  Role menu is absolute inside the strip. Later sibling strips paint over it
+  and steal hover — raise the open strip and mute neighbors while open.
+*/
+.xamt-user-strip:has(.mn-select-host--open) {
+  z-index: 40;
+}
+
+#admin-users:has(.mn-select-host--open) .xamt-user-strip:not(:has(.mn-select-host--open)) {
+  pointer-events: none;
+}
+
+/* Role pill doubles as the MnSelect trigger */
+.xamt-role-select-form {
+  margin: 0;
+}
+
+.xamt-role-select {
+  position: relative;
+  z-index: 1;
+  padding: 0;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    filter 0.15s ease;
+}
+
+.xamt-role-select:hover {
+  filter: brightness(1.05);
+}
+
+.xamt-role-select .mn-select-host {
+  position: relative;
+  z-index: 1;
+  display: block;
+  min-block-size: 0;
+  min-inline-size: 0;
+  inline-size: auto;
+  block-size: auto;
+  width: auto;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  overflow: visible;
+}
+
+.xamt-role-select .mn-select-trigger {
+  min-inline-size: 0;
+  max-inline-size: none;
+  inline-size: auto;
+  width: auto;
+  padding: 0.45rem 0.25rem;
+  border-radius: inherit;
+  color: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.xamt-role-select .mn-select-host--open .mn-select-trigger,
+.xamt-role-select:has(.mn-select-host--open) {
+  outline: 2px solid color-mix(in srgb, currentColor 35%, transparent);
+  outline-offset: 1px;
+}
+
+.xamt-user-strip .mn-select-list {
+  z-index: 50;
+  background: var(--xamt-bg-2);
+  border: 1px solid var(--xamt-line-strong);
+  border-radius: 0.75rem;
+  box-shadow: -6px 8px 24px rgba(0, 0, 0, 0.12);
+  writing-mode: horizontal-tb !important;
+  -webkit-writing-mode: horizontal-tb !important;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  /* Keep list tall enough even when trigger is a compact pill */
+  height: min(12rem, calc(var(--xamt-vh, 100dvh) - 4rem));
+}
+
+.xamt-user-strip .mn-select-option {
+  writing-mode: vertical-lr !important;
+  -webkit-writing-mode: vertical-lr !important;
+  text-orientation: mixed;
+  flex: 0 0 auto;
+  height: 100%;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.xamt-user-strip .mn-select-option:hover,
+.xamt-user-strip .mn-select-option--active {
+  background: var(--xamt-accent-soft);
+}
+
+.xamt-user-strip.is-banned {
+  border-color: color-mix(in srgb, var(--xamt-error, #ef4444) 45%, var(--xamt-line));
+  background: color-mix(in srgb, var(--xamt-error, #ef4444) 6%, var(--xamt-bg-2));
+}
+
+/* Role & Status Vertical Pill Badge */
+.xamt-role-pill {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.45rem 0.25rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+  flex-shrink: 0;
+}
+
+.xamt-role-pill--admin {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.xamt-role-pill--creator {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.xamt-role-pill--bot {
+  background: rgba(6, 182, 212, 0.15);
+  color: #06b6d4;
+  border-color: rgba(6, 182, 212, 0.35);
+}
+
+.xamt-role-pill--member {
+  background: var(--xamt-bg);
+  color: var(--xamt-muted);
+  border-color: var(--xamt-line);
+}
+
+/* Mobile Responsive Adjustments (< 768px) */
+@media (max-width: 767px) {
+  .xamt-user-strip {
+    min-width: 4.8rem;
+    padding: 0.65rem 0.45rem;
+    gap: 0.55rem;
+  }
+
+  .xamt-user-strip__cols {
+    gap: 0.4rem;
+  }
+
+  .xamt-user-strip__email {
+    min-width: 2rem;
+    padding: 0.25rem 0.1rem;
+  }
+}
