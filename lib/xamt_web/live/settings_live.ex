@@ -271,35 +271,25 @@ defmodule XamtWeb.SettingsLive do
       global_search_results={@global_search_results}
     >
       <main id="settings-canvas" class="xamt-home-canvas" phx-hook="MongolianScroll">
-        <!-- ==================== 第 1 区：返回导航与头像管理 ==================== -->
+        <!-- ==================== 第 1 区：账号概览与头像管理 ==================== -->
         <aside class="xamt-home-section">
-          <div class="flex flex-row items-center justify-between h-full py-1">
-            <div class="flex flex-row items-center gap-3">
-              <.link
-                navigate={~p"/"}
-                class="xamt-icon-btn"
-                title={gettext("Back to home")}
-              >
-                <.icon name="hero-arrow-left" class="w-5 h-5" />
-              </.link>
-
-              <div class="flex flex-row items-center gap-2">
-                <.icon name="hero-cog-6-tooth" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
-                <h1 class="text-xl font-bold tracking-widest">
-                  {gettext("Account & Security")}
-                </h1>
-              </div>
+          <header class="xamt-home-section__header">
+            <div class="flex flex-row items-center gap-2">
+              <.icon name="hero-cog-6-tooth" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+              <h1 class="font-bold text-base tracking-widest mongol-text">
+                {gettext("Account & Security")}
+              </h1>
             </div>
 
             <.link
               navigate={~p"/profile/#{@current_scope.user.username}"}
-              class="xamt-btn py-3 px-2 text-xs font-bold"
+              class="xamt-btn py-2.5 px-2 text-xs font-bold mongol-text"
               title={gettext("View Public Profile")}
             >
               <.icon name="hero-user" class="w-4 h-4 mb-1" />
               <span>{gettext("Profile")}</span>
             </.link>
-          </div>
+          </header>
           
     <!-- 头像上传与预览竖条卡片 -->
           <div class="xamt-home-card items-center">

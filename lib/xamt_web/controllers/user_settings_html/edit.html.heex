@@ -1,20 +1,18 @@
 <Layouts.app flash={@flash} current_scope={@current_scope}>
   <main class="xamt-home-canvas">
-    <!-- 第 1 列：返回导航与标题 -->
+    <!-- 第 1 列：标题 -->
     <aside class="xamt-home-section">
-      <div class="flex flex-row items-center justify-between h-full py-1">
-        <div class="flex flex-row items-center gap-3">
-          <.link navigate={~p"/"} class="xamt-icon-btn" title={gettext("Back")}>
-            <.icon name="hero-arrow-left" class="w-5 h-5" />
-          </.link>
-          <h1 class="text-xl font-bold tracking-widest">
+      <header class="xamt-home-section__header">
+        <div class="flex flex-row items-center gap-2">
+          <.icon name="hero-cog-6-tooth" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+          <h1 class="font-bold text-base tracking-widest mongol-text">
             {gettext("Account Settings")}
           </h1>
         </div>
-        <span class="text-xs text-[var(--xamt-muted)]">
+        <span class="text-xs text-[var(--xamt-muted)] mongol-text">
           {gettext("Manage your email and password")}
         </span>
-      </div>
+      </header>
     </aside>
     
 <!-- 第 2 列：修改邮箱表单 -->

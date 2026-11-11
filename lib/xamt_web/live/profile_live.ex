@@ -49,20 +49,12 @@ defmodule XamtWeb.ProfileLive do
       global_search_results={@global_search_results}
     >
       <main id="user-profile-canvas" class="xamt-home-canvas" phx-hook="MongolianScroll">
-        <%!-- ==================== 第 1 区：返回导航与核心身份旌旗 ==================== --%>
+        <%!-- ==================== 第 1 区：核心身份旌旗 ==================== --%>
         <aside class="xamt-home-section" id="profile-panel">
-          <div class="flex flex-row items-center justify-between h-full py-1">
-            <div class="flex flex-row items-center gap-3">
-              <.link
-                navigate={~p"/"}
-                id="profile-back"
-                class="xamt-icon-btn"
-                title={gettext("Back to home")}
-              >
-                <.icon name="hero-arrow-left" class="w-5 h-5" />
-              </.link>
-
-              <h1 class="text-xl font-bold tracking-widest">
+          <header class="xamt-home-section__header">
+            <div class="flex flex-row items-center gap-2">
+              <.icon name="hero-user-circle" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+              <h1 class="font-bold text-base tracking-widest mongol-text">
                 {gettext("User Profile")}
               </h1>
             </div>
@@ -71,13 +63,13 @@ defmodule XamtWeb.ProfileLive do
               :if={@current_scope.user && @current_scope.user.id == @profile_user.id}
               navigate={~p"/settings"}
               id="profile-edit"
-              class="xamt-btn py-3 px-2 text-xs font-bold"
+              class="xamt-btn py-2.5 px-2 text-xs font-bold mongol-text"
               title={gettext("Edit Profile")}
             >
               <.icon name="hero-pencil-square" class="w-4 h-4 mb-1" />
               <span>{gettext("Edit")}</span>
             </.link>
-          </div>
+          </header>
 
           <%!-- 用户主名片竖条 --%>
           <div class="xamt-home-card items-center justify-between">

@@ -21,6 +21,6 @@ defmodule XamtWeb.ProfileLiveTest do
     assert has_element?(view, "#profile-panel .xamt-profile__display-name")
     assert has_element?(view, "#profile-panel .xamt-profile__username")
     assert has_element?(view, "#profile-edit")
-    assert has_element?(view, "#profile-back")
+    refute has_element?(view, "#profile-back")
   end
 end

@@ -80,20 +80,14 @@ defmodule XamtWeb.AdminUsersLive do
       global_search_results={@global_search_results}
     >
       <main id="admin-users-canvas" class="xamt-home-canvas" phx-hook="MongolianScroll">
-        <%!-- Zone 1: nav + site auth toggle --%>
+        <%!-- Zone 1: overview + site auth toggle --%>
         <aside class="xamt-home-section" id="admin-users-identity-rail">
-          <div class="flex flex-row items-center justify-between h-full py-1">
-            <div class="flex flex-row items-center gap-3">
-              <.link navigate={~p"/"} class="xamt-icon-btn" title={gettext("Back to community hall")}>
-                <.icon name="hero-arrow-left" class="w-5 h-5" />
-              </.link>
-
-              <div class="flex flex-row items-center gap-2">
-                <.icon name="hero-users" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
-                <h1 class="text-xl font-bold tracking-widest mongol-text">
-                  {gettext("Users")}
-                </h1>
-              </div>
+          <header class="xamt-home-section__header">
+            <div class="flex flex-row items-center gap-2">
+              <.icon name="hero-users" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+              <h1 class="font-bold text-base tracking-widest mongol-text">
+                {gettext("Users")}
+              </h1>
             </div>
 
             <div class="flex flex-row items-center gap-2 text-xs text-[var(--xamt-muted)]">
@@ -104,12 +98,12 @@ defmodule XamtWeb.AdminUsersLive do
               <.link
                 navigate={~p"/admin/users/new"}
                 id="admin-users-create"
-                class="xamt-btn xamt-btn--primary py-3 px-2 text-xs font-bold mongol-text"
+                class="xamt-btn xamt-btn--primary py-2.5 px-2 text-xs font-bold mongol-text"
               >
                 {gettext("Create user")}
               </.link>
             </div>
-          </div>
+          </header>
 
           <div class="xamt-user-strip justify-between">
             <div class="flex flex-row items-center gap-2">

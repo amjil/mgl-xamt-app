@@ -41,35 +41,27 @@ defmodule XamtWeb.SavedLive do
       global_search_results={@global_search_results}
     >
       <main id="saved-page" class="xamt-home-canvas xamt-saved" phx-hook="MongolianScroll">
-        <%!-- 第 1 区：返回导航、书签总数与全局搜索入口 --%>
+        <%!-- 第 1 区：书签概览与全局搜索入口 --%>
         <aside class="xamt-home-section">
-          <div class="flex flex-row items-center justify-between h-full py-1">
-            <div class="flex flex-row items-center gap-3">
-              <.link navigate={~p"/"} class="xamt-icon-btn" title={gettext("Back to home")}>
-                <.icon name="hero-arrow-left" class="w-5 h-5" />
-              </.link>
-
-              <div class="flex flex-row items-center gap-2">
-                <.icon name="hero-bookmark-square" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
-                <h1 class="text-xl font-bold tracking-widest mongol-text">
-                  {gettext("Saved")}
-                </h1>
-              </div>
+          <header class="xamt-home-section__header">
+            <div class="flex flex-row items-center gap-2">
+              <.icon name="hero-bookmark-square" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+              <h1 class="font-bold text-base tracking-widest mongol-text">
+                {gettext("Saved")}
+              </h1>
             </div>
 
-            <div class="flex flex-row items-center gap-3">
-              <button
-                type="button"
-                id="saved-open-search"
-                class="xamt-btn xamt-btn--soft py-3 px-2 text-xs font-bold"
-                phx-click="open_search"
-              >
-                <.icon name="hero-magnifying-glass" class="size-4 mb-1" />
-                <span class="mongol-text">{gettext("Search")}</span>
-                <kbd class="xamt-search-palette__kbd xamt-search-palette__kbd--inline">⌘K</kbd>
-              </button>
-            </div>
-          </div>
+            <button
+              type="button"
+              id="saved-open-search"
+              class="xamt-btn xamt-btn--soft py-2.5 px-2 text-xs font-bold"
+              phx-click="open_search"
+            >
+              <.icon name="hero-magnifying-glass" class="size-4 mb-1" />
+              <span class="mongol-text">{gettext("Search")}</span>
+              <kbd class="xamt-search-palette__kbd xamt-search-palette__kbd--inline">⌘K</kbd>
+            </button>
+          </header>
 
           <div class="xamt-home-card justify-between">
             <div class="flex flex-row items-center gap-2">
