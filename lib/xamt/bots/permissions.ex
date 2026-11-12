@@ -10,6 +10,7 @@ defmodule Xamt.Bots.Permissions do
     "reaction.added" => "channel.messages.read",
     "bot.mentioned" => "channel.messages.read",
     "interaction.created" => "channel.messages.read",
+    "interaction.responded" => "channel.messages.read",
     "channel.created" => "channel.messages.read"
   }
 

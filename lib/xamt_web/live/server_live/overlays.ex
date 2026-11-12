@@ -622,6 +622,7 @@ defmodule XamtWeb.ServerLive.Overlays do
   attr :show, :boolean, default: false
   attr :installations, :list, default: []
   attr :selected_installation, :any, default: nil
+  attr :delivery_events, :list, default: []
   attr :channels, :list, default: []
   attr :newly_issued_token, :string, default: nil
   attr :show_create_form, :boolean, default: false
@@ -642,11 +643,11 @@ defmodule XamtWeb.ServerLive.Overlays do
         class="xamt-bot-modal-card relative z-10"
         phx-hook="MongolianScroll"
       >
-        <%!-- Column 1: title and close (flex-row = top→bottom in vertical-lr) --%>
+        <%!-- Column 1: title and close --%>
         <div class="xamt-bot-pane !flex-row justify-between items-center">
           <div class="flex flex-row items-center gap-2">
             <.icon name="hero-cpu-chip" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
-            <h2 class="text-lg font-bold tracking-wider">
+            <h2 class="text-lg font-bold tracking-wider mongol-text">
               {gettext("Bot Manager")}
             </h2>
           </div>
@@ -663,7 +664,6 @@ defmodule XamtWeb.ServerLive.Overlays do
 
         <%!-- Column 2: installed bots and create entry --%>
         <div class="xamt-bot-pane">
-          <%!-- Create strip (stays visible so mobile create mode can return to list) --%>
           <button
             type="button"
             phx-click="toggle_bot_create_form"
@@ -673,14 +673,13 @@ defmodule XamtWeb.ServerLive.Overlays do
             ]}
           >
             <.icon name="hero-plus-circle" class="w-5 h-5 shrink-0" />
-            <span>
+            <span class="mongol-text">
               {if @show_create_form,
                 do: gettext("Back to list"),
                 else: gettext("Register & Install Bot")}
             </span>
           </button>
 
-          <%!-- Installation list: collapse on mobile while creating to free horizontal space --%>
           <div class={["xamt-bot-installs", @show_create_form && "xamt-bot-pane--hide-mobile"]}>
             <div
               :for={inst <- @installations}
@@ -698,17 +697,17 @@ defmodule XamtWeb.ServerLive.Overlays do
                   inst.status == "enabled" && "bg-emerald-500",
                   inst.status != "enabled" && "bg-zinc-400"
                 ]} />
-                <span class="font-bold text-base">{inst.bot.name}</span>
+                <span class="font-bold text-base mongol-text">{inst.bot.name}</span>
               </div>
 
-              <span class="text-xs text-[var(--xamt-muted)]">
+              <span class="text-xs text-[var(--xamt-muted)] mongol-text">
                 {if inst.status == "enabled", do: gettext("Enabled"), else: gettext("Disabled")}
               </span>
             </div>
 
             <div
               :if={@installations == []}
-              class="flex flex-row items-center justify-center h-full text-xs text-[var(--xamt-muted)] px-2"
+              class="flex flex-row items-center justify-center h-full text-xs text-[var(--xamt-muted)] px-2 mongol-text"
             >
               {gettext("No bots installed yet")}
             </div>
@@ -722,7 +721,7 @@ defmodule XamtWeb.ServerLive.Overlays do
         >
           <div class="flex flex-row items-center gap-2 text-amber-500 font-bold">
             <.icon name="hero-key" class="w-5 h-5 shrink-0" />
-            <span>{gettext("Copy this token now (shown once)")}</span>
+            <span class="mongol-text">{gettext("Copy this token now (shown once)")}</span>
           </div>
 
           <div class="xamt-bot-code-strip text-amber-500 border-amber-500/30">
@@ -732,7 +731,7 @@ defmodule XamtWeb.ServerLive.Overlays do
           <button
             type="button"
             phx-click="dismiss_bot_token"
-            class="xamt-btn py-3 px-2 text-xs font-bold self-end"
+            class="xamt-btn py-3 px-2 text-xs font-bold self-end mongol-text"
           >
             {gettext("Saved — dismiss")}
           </button>
@@ -745,37 +744,37 @@ defmodule XamtWeb.ServerLive.Overlays do
           phx-submit="create_and_install_bot"
         >
           <div class="xamt-bot-pane">
-            <div class="font-bold text-sm text-[var(--xamt-accent)]">
+            <div class="font-bold text-sm text-[var(--xamt-accent)] mongol-text">
               {gettext("New Bot Details")}
             </div>
 
             <label class="xamt-bot-field">
-              <span class="xamt-label">{gettext("Bot Name")}</span>
+              <span class="xamt-label mongol-text">{gettext("Bot Name")}</span>
               <input
                 id="new-bot-name-input"
                 type="text"
                 name="bot[name]"
                 required
                 placeholder={gettext("Mongolian or general name...")}
-                class="xamt-bot-input"
+                class="xamt-bot-input mongol-input"
                 phx-hook="MongolianIME"
               />
             </label>
 
             <label class="xamt-bot-field">
-              <span class="xamt-label">{gettext("Description")}</span>
+              <span class="xamt-label mongol-text">{gettext("Description")}</span>
               <input
                 id="new-bot-desc-input"
                 type="text"
                 name="bot[description]"
                 placeholder={gettext("What this bot does...")}
-                class="xamt-bot-input"
+                class="xamt-bot-input mongol-input"
                 phx-hook="MongolianIME"
               />
             </label>
 
             <label class="xamt-bot-field">
-              <span class="xamt-label">{gettext("Webhook URL")}</span>
+              <span class="xamt-label mongol-text">{gettext("Webhook URL")}</span>
               <input
                 type="url"
                 name="bot[webhook_url]"
@@ -785,7 +784,17 @@ defmodule XamtWeb.ServerLive.Overlays do
               />
             </label>
 
-            <button type="submit" class="xamt-btn xamt-btn--primary h-full px-3 font-bold">
+            <label class="xamt-bot-field">
+              <span class="xamt-label mongol-text">{gettext("Avatar URL (optional)")}</span>
+              <input
+                type="url"
+                name="bot[avatar_url]"
+                placeholder="https://example.com/bot-avatar.png"
+                class="xamt-bot-input font-mono text-xs"
+              />
+            </label>
+
+            <button type="submit" class="xamt-btn xamt-btn--primary h-full px-3 font-bold mongol-text">
               <.icon name="hero-check" class="w-5 h-5 mb-2" />
               <span>{gettext("Create & Install")}</span>
             </button>
@@ -803,16 +812,16 @@ defmodule XamtWeb.ServerLive.Overlays do
           <%!-- Sub-column 1: status and credentials --%>
           <div class="xamt-bot-pane">
             <div class="flex flex-row items-center justify-between h-full">
-              <span class="font-bold text-base text-[var(--xamt-accent)]">
+              <span class="font-bold text-base text-[var(--xamt-accent)] mongol-text">
                 {@selected_installation.bot.name}
               </span>
-              <span class="text-xs text-[var(--xamt-muted)]">
+              <span class="text-xs text-[var(--xamt-muted)] mongol-text">
                 {@selected_installation.bot.description}
               </span>
             </div>
 
             <label class="xamt-bot-field">
-              <span class="xamt-label">{gettext("Status")}</span>
+              <span class="xamt-label mongol-text">{gettext("Status")}</span>
               <select
                 id={"bot-status-select-#{@selected_installation.id}"}
                 name="status"
@@ -836,7 +845,7 @@ defmodule XamtWeb.ServerLive.Overlays do
             </div>
 
             <div class="xamt-bot-field">
-              <span class="xamt-label">{gettext("Signing Secret")}</span>
+              <span class="xamt-label mongol-text">{gettext("Signing Secret")}</span>
               <div class="xamt-bot-code-strip">
                 {@selected_installation.bot.signing_secret}
               </div>
@@ -848,23 +857,37 @@ defmodule XamtWeb.ServerLive.Overlays do
                   do: t.token_prefix <> "...",
                   else: "-"}
               </span>
-              <button
-                type="button"
-                phx-click="rotate_bot_token"
-                phx-value-id={@selected_installation.id}
-                data-confirm={gettext("The old token will stop working immediately. Continue?")}
-                class="xamt-btn text-amber-500 border-amber-500/40 py-3 px-2 text-xs font-bold"
-              >
-                <.icon name="hero-arrow-path" class="w-4 h-4 mb-1" />
-                <span>{gettext("Rotate Token")}</span>
-              </button>
+              <div class="flex flex-row items-center gap-2">
+                <button
+                  type="button"
+                  phx-click="rotate_bot_token"
+                  phx-value-id={@selected_installation.id}
+                  data-confirm={gettext("The old token will stop working immediately. Continue?")}
+                  class="xamt-btn text-amber-500 border-amber-500/40 py-2.5 px-2 text-xs font-bold mongol-text"
+                >
+                  <.icon name="hero-arrow-path" class="w-4 h-4 mb-1" />
+                  <span>{gettext("Rotate Token")}</span>
+                </button>
+
+                <button
+                  type="button"
+                  id={"uninstall-bot-#{@selected_installation.id}"}
+                  phx-click="uninstall_bot"
+                  phx-value-id={@selected_installation.id}
+                  data-confirm={gettext("Uninstall this bot and revoke its tokens?")}
+                  class="xamt-btn text-[var(--xamt-error)] border-[var(--xamt-error)]/40 py-2.5 px-2 text-xs font-bold mongol-text"
+                >
+                  <.icon name="hero-trash" class="w-4 h-4 mb-1" />
+                  <span>{gettext("Uninstall")}</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          <%!-- Sub-column 2: event subscriptions --%>
+          <%!-- Sub-column 2: event subscriptions (all 8 supported events) --%>
           <% current_events = Enum.map(@selected_installation.subscriptions, & &1.event_type) %>
           <div class="xamt-bot-pane">
-            <div class="font-bold text-sm text-[var(--xamt-accent)]">
+            <div class="font-bold text-sm text-[var(--xamt-accent)] mongol-text">
               {gettext("Event Subscriptions")}
             </div>
 
@@ -873,13 +896,21 @@ defmodule XamtWeb.ServerLive.Overlays do
                 {ev_code, ev_label, req_scope} <- [
                   {"message.created", gettext("New channel message (message.created)"),
                    "channel.messages.read"},
+                  {"bot.mentioned", gettext("Bot mentioned (@bot -> bot.mentioned)"),
+                   "channel.messages.read"},
+                  {"interaction.responded", gettext("Action button clicked (interaction.responded)"),
+                   "channel.messages.read"},
                   {"reaction.added", gettext("Reaction / like added (reaction.added)"),
+                   "channel.messages.read"},
+                  {"message.updated", gettext("Message edited (message.updated)"),
+                   "channel.messages.read"},
+                  {"message.deleted", gettext("Message deleted (message.deleted)"),
                    "channel.messages.read"},
                   {"member.joined", gettext("Member joined (member.joined)"),
                    "server.members.events"},
                   {"member.left", gettext("Member left (member.left)"), "server.members.events"},
                   {"channel.created", gettext("Channel created (channel.created)"),
-                   "server.channels.manage"}
+                   "channel.messages.read"}
                 ]
               }
               class="xamt-bot-vcheck"
@@ -890,7 +921,7 @@ defmodule XamtWeb.ServerLive.Overlays do
                 value={ev_code}
                 checked={ev_code in current_events}
               />
-              <span class="font-bold text-sm">{ev_label}</span>
+              <span class="font-bold text-sm mongol-text">{ev_label}</span>
               <span class="text-xs text-[var(--xamt-muted)] mt-auto">
                 ({gettext("requires")} {req_scope})
               </span>
@@ -900,7 +931,7 @@ defmodule XamtWeb.ServerLive.Overlays do
           <%!-- Sub-column 3: granted scopes --%>
           <% granted = @selected_installation.granted_scopes %>
           <div class="xamt-bot-pane">
-            <div class="font-bold text-sm text-[var(--xamt-accent)]">
+            <div class="font-bold text-sm text-[var(--xamt-accent)] mongol-text">
               {gettext("Granted Scopes")}
             </div>
 
@@ -926,14 +957,14 @@ defmodule XamtWeb.ServerLive.Overlays do
                 value={scope_code}
                 checked={scope_code in granted}
               />
-              <span class="font-bold text-sm">{scope_label}</span>
+              <span class="font-bold text-sm mongol-text">{scope_label}</span>
             </label>
           </div>
 
           <%!-- Sub-column 4: allowed channels and save --%>
           <% allowed_cids = @selected_installation.allowed_channel_ids || [] %>
           <div class="xamt-bot-pane">
-            <div class="font-bold text-sm text-[var(--xamt-accent)]">
+            <div class="font-bold text-sm text-[var(--xamt-accent)] mongol-text">
               {gettext("Allowed Channels (none = all)")}
             </div>
 
@@ -944,13 +975,80 @@ defmodule XamtWeb.ServerLive.Overlays do
                 value={ch.id}
                 checked={ch.id in allowed_cids}
               />
-              <span class="font-bold text-sm">#{ch.name}</span>
+              <span class="font-bold text-sm mongol-text">#{ch.name}</span>
             </label>
 
-            <button type="submit" class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold ml-2">
+            <button
+              type="submit"
+              class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold ml-2 mongol-text"
+            >
               <.icon name="hero-check" class="w-5 h-5 mb-2" />
               <span>{gettext("Save Config")}</span>
             </button>
+          </div>
+
+          <%!-- Sub-column 5: Recent Webhook Deliveries & Manual Retry --%>
+          <div class="xamt-bot-pane">
+            <div class="flex flex-row items-center justify-between h-full">
+              <span class="font-bold text-sm text-[var(--xamt-accent)] mongol-text">
+                {gettext("Recent Deliveries")}
+              </span>
+              <button
+                type="button"
+                id="refresh-bot-deliveries"
+                phx-click="refresh_bot_deliveries"
+                class="xamt-icon-btn"
+                title={gettext("Refresh")}
+              >
+                <.icon name="hero-arrow-path" class="w-4 h-4" />
+              </button>
+            </div>
+
+            <div
+              :if={@delivery_events == []}
+              class="flex flex-row items-center justify-center h-full text-xs text-[var(--xamt-muted)] px-2 mongol-text"
+            >
+              {gettext("No webhook deliveries yet")}
+            </div>
+
+            <div
+              :for={ev <- Enum.take(@delivery_events, 15)}
+              id={"bot-delivery-#{ev.id}"}
+              class="xamt-bot-strip justify-between gap-2"
+            >
+              <div class="flex flex-row items-center gap-2">
+                <span class={[
+                  "w-2 h-2 rounded-full shrink-0",
+                  ev.status == "delivered" && "bg-emerald-500",
+                  ev.status in ["pending", "processing"] && "bg-amber-500",
+                  ev.status in ["failed", "dead"] && "bg-red-500"
+                ]} />
+                <span class="font-mono text-xs font-bold">{ev.event_type}</span>
+                <span
+                  :if={ev.execution_result["http_status"]}
+                  class="font-mono text-[11px] text-[var(--xamt-muted)]"
+                >
+                  HTTP {ev.execution_result["http_status"]}
+                </span>
+              </div>
+
+              <div class="flex flex-row items-center gap-2">
+                <span class="font-mono text-[11px] text-[var(--xamt-muted)]">
+                  {Calendar.strftime(ev.inserted_at, "%H:%M:%S")}
+                </span>
+                <button
+                  :if={ev.status in ["failed", "dead"]}
+                  type="button"
+                  id={"retry-delivery-#{ev.id}"}
+                  phx-click="retry_bot_delivery"
+                  phx-value-id={ev.id}
+                  class="xamt-btn py-2 px-1.5 text-xs font-bold text-amber-500 border-amber-500/40 mongol-text"
+                >
+                  <.icon name="hero-arrow-path" class="w-3.5 h-3.5 mb-1" />
+                  <span>{gettext("Retry")}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </form>
       </div>

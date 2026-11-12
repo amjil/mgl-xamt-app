@@ -1000,6 +1000,10 @@ defmodule Xamt.Messages do
   defp broadcast_content(%{"type" => "poll"} = content),
     do: Map.take(content, ["type", "question"])
 
+  defp broadcast_content(content) when is_map(content) do
+    Map.take(content, ["type", "metadata", "actions", "action_resolution"])
+  end
+
   defp broadcast_content(_), do: %{}
 
   defp attach_mention_ids(%Message{} = message) do
@@ -1147,8 +1151,9 @@ defmodule Xamt.Messages do
     Xamt.Bots.Dispatcher.enqueue_event_multi(multi, :bot_events, fn changes ->
       message = Map.get(changes, :message) || seed_message
       server_id = channel_server_id(channel_id)
-
       author_type = if user.is_bot, do: "bot", else: "user"
+      reply_context = build_reply_webhook_context(message)
+      msg_metadata = get_in((message && message.content) || %{}, ["metadata"])
 
       %{
         server_id: server_id,
@@ -1160,20 +1165,26 @@ defmodule Xamt.Messages do
             "message_id" => message && message.id,
             "channel_id" => channel_id,
             "server_id" => server_id,
+            "reply_to" => reply_context,
+            "metadata" => msg_metadata,
             "author" => %{
               "type" => author_type,
               "id" => user.id,
-              "username" => user.username
+              "username" => user.username,
+              "global_role" => user.global_role
             },
             "content" => message && plain_text(message)
           },
           "message" => %{
             "id" => message && message.id,
             "body" => message && plain_text(message),
+            "metadata" => msg_metadata,
+            "reply_to" => reply_context,
             "author" => %{
               "type" => author_type,
               "id" => user.id,
-              "username" => user.username
+              "username" => user.username,
+              "global_role" => user.global_role
             }
           }
         }
@@ -1190,6 +1201,8 @@ defmodule Xamt.Messages do
       server_id = channel_server_id(channel_id)
       mentioned_bot_ids = bot_ids_for_user_ids(mention_ids)
       author_type = if user.is_bot, do: "bot", else: "user"
+      reply_context = build_reply_webhook_context(message)
+      msg_metadata = get_in(message.content || %{}, ["metadata"])
 
       %{
         server_id: server_id,
@@ -1203,26 +1216,49 @@ defmodule Xamt.Messages do
             "channel_id" => channel_id,
             "server_id" => server_id,
             "mentioned_bot_ids" => mentioned_bot_ids,
+            "reply_to" => reply_context,
+            "metadata" => msg_metadata,
             "author" => %{
               "type" => author_type,
               "id" => user.id,
-              "username" => user.username
+              "username" => user.username,
+              "global_role" => user.global_role
             },
             "content" => plain_text(message)
           },
           "message" => %{
             "id" => message.id,
             "body" => plain_text(message),
+            "metadata" => msg_metadata,
+            "reply_to" => reply_context,
             "author" => %{
               "type" => author_type,
               "id" => user.id,
-              "username" => user.username
+              "username" => user.username,
+              "global_role" => user.global_role
             }
           }
         }
       }
     end)
   end
+
+  defp build_reply_webhook_context(%{reply_to_id: reply_id}) when is_binary(reply_id) do
+    case Repo.get(Message, reply_id) do
+      %Message{} = parent ->
+        %{
+          "id" => parent.id,
+          "author_id" => parent.user_id,
+          "body" => plain_text(parent),
+          "metadata" => get_in(parent.content || %{}, ["metadata"])
+        }
+
+      _ ->
+        nil
+    end
+  end
+
+  defp build_reply_webhook_context(_), do: nil
 
   defp bot_ids_for_user_ids(user_ids) when is_list(user_ids) do
     from(b in Xamt.Bots.Bot, where: b.bot_user_id in ^user_ids, select: b.id)
@@ -1240,6 +1276,9 @@ defmodule Xamt.Messages do
         :ok
 
       server_id ->
+        member = Xamt.Servers.get_member(server_id, user.id)
+        msg_metadata = get_in(message.content || %{}, ["metadata"])
+
         Xamt.Bots.Dispatcher.enqueue_event(%{
           server_id: server_id,
           channel_id: message.channel_id,
@@ -1249,10 +1288,18 @@ defmodule Xamt.Messages do
             "emoji" => emoji,
             "reaction_count" => current_count,
             "reactor_id" => user.id,
+            "reactor" => %{
+              "id" => user.id,
+              "username" => user.username,
+              "display_name" => user.display_name || user.username,
+              "global_role" => user.global_role,
+              "member_role" => member && member.role
+            },
             "message" => %{
               "id" => message.id,
               "body" => plain_text(message),
-              "author_id" => message.user_id
+              "author_id" => message.user_id,
+              "metadata" => msg_metadata
             }
           }
         })

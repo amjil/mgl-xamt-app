@@ -367,6 +367,42 @@ defmodule XamtWeb.ServerLive.MessageItem do
                 <% end %>
               <% end %>
             <% end %>
+            <% bot_actions = get_in(@message.content || %{}, ["actions"]) %>
+            <% action_res = get_in(@message.content || %{}, ["action_resolution"]) %>
+            <%= if is_list(bot_actions) and bot_actions != [] do %>
+              <div
+                id={"msg-bot-actions-#{@message.id}"}
+                class="flex flex-row items-center gap-2 mt-1 pt-1 border-l border-[var(--xamt-line)] pl-2"
+              >
+                <%= if is_map(action_res) do %>
+                  <div class="inline-flex flex-row items-center gap-1.5 px-1.5 py-2.5 rounded-xl bg-[var(--xamt-accent-soft)] border border-[var(--xamt-accent)]/30 text-xs font-bold text-[var(--xamt-accent)] mongol-text">
+                    <.icon name="hero-check-badge" class="w-4 h-4 shrink-0" />
+                    <span>{action_res["label"]}</span>
+                    <span class="text-[var(--xamt-muted)] font-normal">
+                      · @{action_res["actor_username"]}
+                    </span>
+                  </div>
+                <% else %>
+                  <button
+                    :for={act <- bot_actions}
+                    type="button"
+                    id={"bot-action-#{@message.id}-#{act["action_key"]}"}
+                    phx-click="trigger_bot_action"
+                    phx-value-msg-id={@message.id}
+                    phx-value-action-key={act["action_key"]}
+                    class={[
+                      "xamt-btn py-2.5 px-2 text-xs font-bold mongol-text",
+                      act["style"] == "primary" && "xamt-btn--primary",
+                      act["style"] == "danger" &&
+                        "text-[var(--xamt-error)] border-[var(--xamt-error)]/40 hover:bg-[var(--xamt-error)]/10",
+                      act["style"] not in ["primary", "danger"] && "xamt-btn--soft"
+                    ]}
+                  >
+                    <span>{act["label"]}</span>
+                  </button>
+                <% end %>
+              </div>
+            <% end %>
             <%= if @preview do %>
               <div id={"msg-embed-#{@message.id}"} class="xamt-embed-island">
                 <%= if @embed_src do %>

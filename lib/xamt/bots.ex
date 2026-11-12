@@ -7,6 +7,7 @@ defmodule Xamt.Bots do
   alias Xamt.Repo
   alias Xamt.Accounts.User
   alias Xamt.Channels
+  alias Xamt.Channels.Channel
   alias Xamt.Servers.ServerMember
 
   alias Xamt.Bots.{
@@ -28,11 +29,13 @@ defmodule Xamt.Bots do
     |> Ecto.Multi.run(:bot_user, fn repo, _ ->
       bot_uid = System.unique_integer([:positive])
       name = Map.get(attrs, "name") || Map.get(attrs, :name) || "Bot"
+      avatar_url = Map.get(attrs, "avatar_url") || Map.get(attrs, :avatar_url)
 
       %User{
         email: "bot_#{bot_uid}@bots.xamt.local",
         username: "bot_#{bot_uid}",
         display_name: "#{name} [BOT]",
+        avatar: avatar_url,
         is_bot: true,
         confirmed_at: DateTime.utc_now(:second)
       }
@@ -63,8 +66,21 @@ defmodule Xamt.Bots do
   end
 
   def update_bot(%Bot{} = bot, attrs, actor_user \\ nil) do
+    s_attrs = stringify_keys(attrs)
+
     Ecto.Multi.new()
-    |> Ecto.Multi.update(:bot, Bot.changeset(bot, stringify_keys(attrs)))
+    |> Ecto.Multi.update(:bot, Bot.changeset(bot, s_attrs))
+    |> Ecto.Multi.run(:sync_bot_user, fn repo, %{bot: updated} ->
+      from(u in User, where: u.id == ^updated.bot_user_id)
+      |> repo.update_all(
+        set: [
+          display_name: "#{updated.name} [BOT]",
+          avatar: updated.avatar_url
+        ]
+      )
+
+      {:ok, :synced}
+    end)
     |> Ecto.Multi.run(:audit, fn repo, %{bot: updated} ->
       insert_audit(repo, %{
         bot_id: updated.id,
@@ -695,6 +711,112 @@ defmodule Xamt.Bots do
         {:error, :invalid_status}
     end
   end
+
+  @doc """
+  Triggered when a user clicks an interactive action button on a bot message in chat.
+  Marks the action as resolved on the message, records a BotInteraction row, and
+  enqueues an `interaction.responded` webhook event to the authoring bot.
+  """
+  def trigger_message_action(%User{} = actor, message_id, action_key, member_role \\ "member")
+      when is_binary(message_id) and is_binary(action_key) do
+    now = DateTime.utc_now()
+
+    with %Xamt.Messages.Message{} = message <- Repo.get(Xamt.Messages.Message, message_id),
+         nil <- message.deleted_at,
+         %Channel{} = channel <- Channels.get_channel(message.channel_id),
+         %Bot{} = bot <- Repo.get_by(Bot, bot_user_id: message.user_id),
+         %BotInstallation{} = inst <-
+           Repo.get_by(BotInstallation,
+             bot_id: bot.id,
+             server_id: channel.server_id,
+             status: "enabled"
+           ),
+         actions when is_list(actions) and actions != [] <-
+           get_in(message.content || %{}, ["actions"]),
+         %{} = target_action <-
+           Enum.find(actions, fn a -> a["action_key"] == action_key end),
+         true <- is_nil(get_in(message.content || %{}, ["action_resolution"])) do
+      resolution = %{
+        "action_key" => action_key,
+        "label" => target_action["label"] || action_key,
+        "actor_id" => actor.id,
+        "actor_username" => actor.username,
+        "actor_display_name" => actor.display_name || actor.username,
+        "actor_role" => member_role,
+        "resolved_at" => DateTime.to_iso8601(now)
+      }
+
+      updated_content =
+        Map.put(message.content || %{}, "action_resolution", funeral_safe(resolution))
+
+      metadata = Map.get(message.content || %{}, "metadata", %{})
+      action_payload = Map.get(target_action, "payload", %{})
+
+      Ecto.Multi.new()
+      |> Ecto.Multi.update(
+        :message,
+        Ecto.Changeset.change(message, content: updated_content)
+      )
+      |> Ecto.Multi.insert(:interaction, fn _ ->
+        BotInteraction.changeset(%BotInteraction{}, %{
+          bot_id: bot.id,
+          bot_installation_id: inst.id,
+          server_id: channel.server_id,
+          channel_id: channel.id,
+          message_id: message.id,
+          created_by_user_id: actor.id,
+          action_key: action_key,
+          label: target_action["label"] || action_key,
+          payload: action_payload,
+          status: "responded",
+          expires_at: DateTime.add(now, 3600, :second),
+          responded_at: now,
+          response_payload: resolution
+        })
+      end)
+      |> Xamt.Bots.Dispatcher.enqueue_event_multi(:bot_events, fn %{interaction: interaction} ->
+        %{
+          server_id: channel.server_id,
+          channel_id: channel.id,
+          event_type: "interaction.responded",
+          actor_is_bot: false,
+          only_bot_ids: [bot.id],
+          payload: %{
+            "interaction_id" => interaction.id,
+            "action_key" => action_key,
+            "label" => target_action["label"],
+            "action_payload" => action_payload,
+            "metadata" => metadata,
+            "actor" => %{
+              "id" => actor.id,
+              "username" => actor.username,
+              "display_name" => actor.display_name || actor.username,
+              "global_role" => actor.global_role,
+              "member_role" => member_role
+            },
+            "message" => %{
+              "id" => message.id,
+              "channel_id" => channel.id,
+              "server_id" => channel.server_id,
+              "metadata" => metadata
+            }
+          }
+        }
+      end)
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{message: updated_msg}} ->
+          {:ok, updated_msg}
+
+        {:error, _step, reason, _} ->
+          {:error, reason}
+      end
+    else
+      _ -> {:error, :invalid_or_already_resolved}
+    end
+  end
+
+  defp funeral_safe(map), do: map
 
   def me_payload(%BotToken{} = token) do
     bot = token.bot

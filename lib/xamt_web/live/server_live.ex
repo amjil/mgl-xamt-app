@@ -735,11 +735,14 @@ defmodule XamtWeb.ServerLive do
             List.first(installations)
         end
 
+      events = if selected, do: Bots.list_installation_events(selected.id), else: []
+
       {:noreply,
        socket
        |> assign(:show_bot_manager, true)
        |> assign(:bot_installations, installations)
        |> assign(:selected_bot_installation, selected)
+       |> assign(:bot_delivery_events, events)
        |> assign(:show_bot_create_form, Enum.empty?(installations))}
     else
       {:noreply, put_flash(socket, :error, gettext("You do not have permission to manage bots"))}
@@ -917,6 +920,34 @@ defmodule XamtWeb.ServerLive do
       {:noreply, assign(socket, :bot_delivery_events, events)}
     else
       {:noreply, put_flash(socket, :error, gettext("Unauthorized"))}
+    end
+  end
+
+  def handle_event(
+        "trigger_bot_action",
+        %{"msg-id" => msg_id, "action-key" => action_key},
+        socket
+      ) do
+    user = socket.assigns.current_scope.user
+
+    member_role =
+      (socket.assigns[:current_member] && socket.assigns.current_member.role) || "member"
+
+    case Bots.trigger_message_action(user, msg_id, action_key, member_role) do
+      {:ok, updated_msg} ->
+        {:ok, preloaded} =
+          Messages.get_message_for_user(socket.assigns.current_scope, updated_msg.id)
+
+        Phoenix.PubSub.broadcast(
+          Xamt.PubSub,
+          channel_topic(socket.assigns.active_channel),
+          {:updated_message, preloaded}
+        )
+
+        {:noreply, stream_message(socket, preloaded)}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, gettext("Could not process bot action"))}
     end
   end
 

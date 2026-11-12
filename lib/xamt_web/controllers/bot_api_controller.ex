@@ -375,27 +375,103 @@ defmodule XamtWeb.BotApiController do
   end
 
   defp bot_message_attrs(params) do
+    raw_html = Map.get(params, "content_html")
     body = Map.get(params, "body") || Map.get(params, "content") || ""
     body = to_string(body)
-    escaped = body |> html_escape() |> Phoenix.HTML.safe_to_string()
-    content_html = if String.trim(body) == "", do: "", else: "<p>#{escaped}</p>"
+
+    content_html =
+      cond do
+        is_binary(raw_html) and String.trim(raw_html) != "" ->
+          raw_html
+
+        String.trim(body) == "" ->
+          ""
+
+        true ->
+          escaped =
+            body
+            |> html_escape()
+            |> Phoenix.HTML.safe_to_string()
+            |> auto_link_urls()
+            |> String.replace("\n", "<br/>")
+
+          "<p>#{escaped}</p>"
+      end
+
+    metadata =
+      case Map.get(params, "metadata") do
+        m when is_map(m) -> m
+        _ -> nil
+      end
+
+    actions =
+      case Map.get(params, "actions") do
+        list when is_list(list) ->
+          list
+          |> Enum.map(&sanitize_bot_action/1)
+          |> Enum.reject(&is_nil/1)
+          |> Enum.take(5)
+
+        _ ->
+          nil
+      end
+
+    content_map =
+      %{
+        "type" => "rich_text",
+        "html" => content_html,
+        "metadata" => metadata,
+        "actions" => actions
+      }
+      |> Enum.reject(fn {_k, v} -> is_nil(v) or v == [] end)
+      |> Map.new()
 
     %{
+      "content" => content_map,
       "content_html" => content_html,
+      "content_type" => "rich_text",
       "reply_to_id" => Map.get(params, "reply_to_id")
     }
   end
+
+  defp auto_link_urls(escaped_text) do
+    Regex.replace(~r|(https?://[^\s<>&"']+)|, escaped_text, fn _, url ->
+      ~s(<a href="#{url}">#{url}</a>)
+    end)
+  end
+
+  defp sanitize_bot_action(action) when is_map(action) do
+    key = Map.get(action, "action_key") || Map.get(action, :action_key)
+    label = Map.get(action, "label") || Map.get(action, :label)
+    style = Map.get(action, "style") || Map.get(action, :style) || "soft"
+    payload = Map.get(action, "payload") || Map.get(action, :payload) || %{}
+
+    if is_binary(key) and key != "" and is_binary(label) and label != "" do
+      %{
+        "action_key" => String.slice(String.trim(key), 0, 80),
+        "label" => String.slice(String.trim(label), 0, 80),
+        "style" => if(style in ["primary", "danger", "soft"], do: style, else: "soft"),
+        "payload" => if(is_map(payload), do: payload, else: %{})
+      }
+    end
+  end
+
+  defp sanitize_bot_action(_), do: nil
 
   defp serialize_message(message) do
     %{
       id: message.id,
       channel_id: message.channel_id,
       body: Messages.plain_text(message),
+      content_html: message.content_html,
+      metadata: get_in(message.content || %{}, ["metadata"]),
+      actions: get_in(message.content || %{}, ["actions"]),
+      action_resolution: get_in(message.content || %{}, ["action_resolution"]),
       author_id: message.user_id,
       author_type: if(match?(%{user: %{is_bot: true}}, message), do: "bot", else: "user"),
       deleted_at: message.deleted_at,
       inserted_at: message.inserted_at,
-      updated_at: message.updated_at
+      updated_at: message.inserted_at && message.updated_at
     }
   end
 
