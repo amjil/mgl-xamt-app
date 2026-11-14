@@ -2901,6 +2901,69 @@ body:has(mgl-keyboard[visible]) .xamt-modal:has(.xamt-bot-modal-card) {
   flex-shrink: 0;
 }
 
+/* MnSelect host replaces the native select box inside bot fields. */
+.xamt-bot-field > .mn-select-host {
+  writing-mode: vertical-lr;
+  -webkit-writing-mode: vertical-lr;
+  text-orientation: mixed;
+  height: 100%;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  min-block-size: 2.75rem;
+  padding: 0;
+  border-radius: 0.75rem;
+  border: 1px solid var(--xamt-line);
+  background: var(--xamt-bg-2);
+  color: var(--xamt-text);
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.xamt-bot-field > .mn-select-host:focus-within {
+  border-color: var(--xamt-accent);
+  box-shadow: 0 0 0 3px var(--xamt-accent-soft);
+  background: var(--xamt-bg);
+}
+
+.xamt-bot-field .mn-select-trigger {
+  height: 100%;
+  min-inline-size: 0;
+  padding: 0.65rem 0.5rem;
+  justify-content: flex-start !important;
+  align-items: flex-start !important;
+  text-align: start;
+}
+
+.xamt-bot-field .mn-select-list {
+  background: var(--xamt-bg-2);
+  border-color: var(--xamt-line-strong);
+  color: var(--xamt-text);
+  writing-mode: horizontal-tb !important;
+  -webkit-writing-mode: horizontal-tb !important;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+}
+
+.xamt-bot-field .mn-select-option {
+  writing-mode: vertical-lr !important;
+  -webkit-writing-mode: vertical-lr !important;
+  text-orientation: mixed;
+  flex: 0 0 auto;
+  height: 100%;
+}
+
+.xamt-bot-field .mn-select-option:hover,
+.xamt-bot-field .mn-select-option--active {
+  background: var(--xamt-accent-soft);
+}
+
+.xamt-bot-field .mn-select-option--selected {
+  color: var(--xamt-accent);
+}
+
 /* Multi-column wrap container for vertical checkboxes/cards (wraps left-to-right) */
 .xamt-bot-vlist {
   display: flex;

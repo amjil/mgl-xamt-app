@@ -822,27 +822,39 @@ defmodule XamtWeb.ServerLive.Overlays do
 
             <label class="xamt-bot-field">
               <span class="xamt-label mongol-text">{gettext("Status")}</span>
-              <select
-                id={"bot-status-select-#{@selected_installation.id}"}
-                name="status"
-                class="xamt-bot-input"
+              <div
+                id={"bot-status-select-host-#{@selected_installation.id}-#{@selected_installation.status}"}
+                class="mn-select-host"
                 phx-hook="MnSelect"
+                phx-update="ignore"
               >
-                <option value="enabled" selected={@selected_installation.status == "enabled"}>
-                  {gettext("Enabled")}
-                </option>
-                <option value="disabled" selected={@selected_installation.status == "disabled"}>
-                  {gettext("Disabled")}
-                </option>
-              </select>
+                <select
+                  id={"bot-status-select-#{@selected_installation.id}"}
+                  name="status"
+                  class="xamt-bot-input"
+                >
+                  <option value="enabled" selected={@selected_installation.status == "enabled"}>
+                    {gettext("Enabled")}
+                  </option>
+                  <option value="disabled" selected={@selected_installation.status == "disabled"}>
+                    {gettext("Disabled")}
+                  </option>
+                </select>
+              </div>
             </label>
 
-            <div class="xamt-bot-field">
-              <span class="xamt-label">Webhook URL</span>
-              <div class="xamt-bot-code-strip text-[var(--xamt-muted)]">
-                {@selected_installation.bot.webhook_url}
-              </div>
-            </div>
+            <label class="xamt-bot-field">
+              <span class="xamt-label mongol-text">{gettext("Webhook URL")}</span>
+              <input
+                id={"bot-webhook-url-#{@selected_installation.id}"}
+                type="url"
+                name="webhook_url"
+                required
+                value={@selected_installation.bot.webhook_url}
+                placeholder="https://example.com/webhook"
+                class="xamt-bot-input font-mono text-xs"
+              />
+            </label>
 
             <div class="xamt-bot-field">
               <span class="xamt-label mongol-text">{gettext("Signing Secret")}</span>

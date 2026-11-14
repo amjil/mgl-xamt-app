@@ -815,6 +815,8 @@ defmodule XamtWeb.ServerLive do
   def handle_event("save_bot_installation_config", params, socket) do
     if can_manage_server?(socket) do
       inst = socket.assigns.selected_bot_installation
+      actor = socket.assigns.current_scope.user
+      webhook_url = params |> Map.get("webhook_url", "") |> String.trim()
 
       config_attrs = %{
         "status" => Map.get(params, "status", "enabled"),
@@ -823,16 +825,19 @@ defmodule XamtWeb.ServerLive do
         "allowed_channel_ids" => Map.get(params, "allowed_channel_ids", [])
       }
 
-      case Bots.update_installation_config(inst, config_attrs) do
-        {:ok, _} ->
-          installations = Bots.list_server_installations(socket.assigns.server.id)
-          updated_selected = Enum.find(installations, &(&1.id == inst.id))
+      with {:ok, _} <- update_bot_webhook_url(inst.bot, webhook_url, actor),
+           {:ok, _} <- Bots.update_installation_config(inst, config_attrs) do
+        installations = Bots.list_server_installations(socket.assigns.server.id)
+        updated_selected = Enum.find(installations, &(&1.id == inst.id))
 
-          {:noreply,
-           socket
-           |> assign(:bot_installations, installations)
-           |> assign(:selected_bot_installation, updated_selected)
-           |> put_flash(:info, gettext("Bot permissions and subscriptions updated"))}
+        {:noreply,
+         socket
+         |> assign(:bot_installations, installations)
+         |> assign(:selected_bot_installation, updated_selected)
+         |> put_flash(:info, gettext("Bot permissions and subscriptions updated"))}
+      else
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, gettext("Could not save configuration"))}
 
         {:error, _, _, _} ->
           {:noreply, put_flash(socket, :error, gettext("Could not save configuration"))}
@@ -1431,6 +1436,19 @@ defmodule XamtWeb.ServerLive do
 
   defp can_view_channel?(member) do
     Permissions.has_permission?(member.permissions, :view_channel)
+  end
+
+  defp update_bot_webhook_url(_bot, webhook_url, _actor) when webhook_url in ["", nil] do
+    {:error, :webhook_url_required}
+  end
+
+  defp update_bot_webhook_url(%{webhook_url: current}, webhook_url, _actor)
+       when current == webhook_url do
+    {:ok, :unchanged}
+  end
+
+  defp update_bot_webhook_url(bot, webhook_url, actor) do
+    Bots.update_bot(bot, %{"webhook_url" => webhook_url}, actor)
   end
 
   defp can_manage_server?(socket) do
