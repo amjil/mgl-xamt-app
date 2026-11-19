@@ -158,7 +158,7 @@ defmodule XamtWeb.BotApiController do
            Messages.update_message(
              Scope.for_user(token.bot.bot_user),
              message_id,
-             bot_message_attrs(params)
+             bot_message_attrs(params, message.content || %{})
            ) do
       _ = Bots.log_message_action(token, "message.updated", updated)
       json(conn, %{ok: true, data: serialize_message(updated)})
@@ -374,7 +374,7 @@ defmodule XamtWeb.BotApiController do
     end
   end
 
-  defp bot_message_attrs(params) do
+  defp bot_message_attrs(params, existing_content \\ %{}) do
     raw_html = Map.get(params, "content_html")
     body = Map.get(params, "body") || Map.get(params, "content") || ""
     body = to_string(body)
@@ -399,29 +399,37 @@ defmodule XamtWeb.BotApiController do
       end
 
     metadata =
-      case Map.get(params, "metadata") do
-        m when is_map(m) -> m
-        _ -> nil
+      if Map.has_key?(params, "metadata") do
+        if is_map(params["metadata"]), do: params["metadata"], else: nil
+      else
+        Map.get(existing_content, "metadata")
       end
 
     actions =
-      case Map.get(params, "actions") do
-        list when is_list(list) ->
-          list
-          |> Enum.map(&sanitize_bot_action/1)
-          |> Enum.reject(&is_nil/1)
-          |> Enum.take(5)
+      if Map.has_key?(params, "actions") do
+        case params["actions"] do
+          list when is_list(list) ->
+            list
+            |> Enum.map(&sanitize_bot_action/1)
+            |> Enum.reject(&is_nil/1)
+            |> Enum.take(5)
 
-        _ ->
-          nil
+          _ ->
+            nil
+        end
+      else
+        Map.get(existing_content, "actions")
       end
+
+    action_resolution = Map.get(existing_content, "action_resolution")
 
     content_map =
       %{
         "type" => "rich_text",
         "html" => content_html,
         "metadata" => metadata,
-        "actions" => actions
+        "actions" => actions,
+        "action_resolution" => action_resolution
       }
       |> Enum.reject(fn {_k, v} -> is_nil(v) or v == [] end)
       |> Map.new()

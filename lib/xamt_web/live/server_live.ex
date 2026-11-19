@@ -933,25 +933,26 @@ defmodule XamtWeb.ServerLive do
         %{"msg-id" => msg_id, "action-key" => action_key},
         socket
       ) do
-    user = socket.assigns.current_scope.user
+    scope = socket.assigns.current_scope
+    active_channel = socket.assigns.active_channel
 
     member_role =
       (socket.assigns[:current_member] && socket.assigns.current_member.role) || "member"
 
-    case Bots.trigger_message_action(user, msg_id, action_key, member_role) do
-      {:ok, updated_msg} ->
-        {:ok, preloaded} =
-          Messages.get_message_for_user(socket.assigns.current_scope, updated_msg.id)
+    with {:ok, msg} <- Messages.get_message_for_user(scope, msg_id),
+         true <- active_channel != nil and msg.channel_id == active_channel.id,
+         {:ok, updated_msg} <-
+           Bots.trigger_message_action(scope.user, msg.id, action_key, member_role),
+         {:ok, preloaded} <- Messages.get_message_for_user(scope, updated_msg.id) do
+      Phoenix.PubSub.broadcast(
+        Xamt.PubSub,
+        channel_topic(active_channel),
+        {:updated_message, preloaded}
+      )
 
-        Phoenix.PubSub.broadcast(
-          Xamt.PubSub,
-          channel_topic(socket.assigns.active_channel),
-          {:updated_message, preloaded}
-        )
-
-        {:noreply, stream_message(socket, preloaded)}
-
-      {:error, _} ->
+      {:noreply, stream_message(socket, preloaded)}
+    else
+      _ ->
         {:noreply, put_flash(socket, :error, gettext("Could not process bot action"))}
     end
   end

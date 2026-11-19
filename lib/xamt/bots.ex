@@ -734,8 +734,7 @@ defmodule Xamt.Bots do
          actions when is_list(actions) and actions != [] <-
            get_in(message.content || %{}, ["actions"]),
          %{} = target_action <-
-           Enum.find(actions, fn a -> a["action_key"] == action_key end),
-         true <- is_nil(get_in(message.content || %{}, ["action_resolution"])) do
+           Enum.find(actions, fn a -> a["action_key"] == action_key end) do
       resolution = %{
         "action_key" => action_key,
         "label" => target_action["label"] || action_key,
@@ -746,17 +745,25 @@ defmodule Xamt.Bots do
         "resolved_at" => DateTime.to_iso8601(now)
       }
 
-      updated_content =
-        Map.put(message.content || %{}, "action_resolution", funeral_safe(resolution))
-
       metadata = Map.get(message.content || %{}, "metadata", %{})
       action_payload = Map.get(target_action, "payload", %{})
 
       Ecto.Multi.new()
-      |> Ecto.Multi.update(
-        :message,
-        Ecto.Changeset.change(message, content: updated_content)
-      )
+      |> Ecto.Multi.run(:locked_message, fn repo, _ ->
+        locked =
+          from(m in Xamt.Messages.Message, where: m.id == ^message.id, lock: "FOR UPDATE")
+          |> repo.one()
+
+        if locked && is_nil(get_in(locked.content || %{}, ["action_resolution"])) do
+          {:ok, locked}
+        else
+          {:error, :already_resolved}
+        end
+      end)
+      |> Ecto.Multi.update(:message, fn %{locked_message: locked} ->
+        updated_content = Map.put(locked.content || %{}, "action_resolution", resolution)
+        Ecto.Changeset.change(locked, content: updated_content)
+      end)
       |> Ecto.Multi.insert(:interaction, fn _ ->
         BotInteraction.changeset(%BotInteraction{}, %{
           bot_id: bot.id,
@@ -815,8 +822,6 @@ defmodule Xamt.Bots do
       _ -> {:error, :invalid_or_already_resolved}
     end
   end
-
-  defp funeral_safe(map), do: map
 
   def me_payload(%BotToken{} = token) do
     bot = token.bot

@@ -276,15 +276,23 @@ defmodule Mix.Tasks.Xamt.SetupBot do
   end
 
   defp reuse_bot(%BotInstallation{} = inst, admin, channel, bot_base_url) do
+    inst = Repo.preload(inst, :subscriptions)
     bot = inst.bot
     url = webhook_url(bot_base_url, bot.id)
+
+    preserved_scopes = Enum.uniq((inst.granted_scopes || []) ++ @default_scopes)
+
+    preserved_events =
+      inst.subscriptions |> Enum.filter(& &1.is_enabled) |> Enum.map(& &1.event_type)
+
+    allowed_channels = Enum.uniq((inst.allowed_channel_ids || []) ++ [channel.id])
 
     with {:ok, %{bot: bot}} <- Bots.update_bot(bot, %{"webhook_url" => url}, admin),
          {:ok, %{installation: inst}} <-
            Bots.update_installation_config(inst, %{
-             "granted_scopes" => @default_scopes,
-             "allowed_channel_ids" => [channel.id],
-             "subscribed_events" => [],
+             "granted_scopes" => preserved_scopes,
+             "allowed_channel_ids" => allowed_channels,
+             "subscribed_events" => preserved_events,
              "status" => "enabled"
            }),
          {:ok, %{raw_token: raw_token}} <- Bots.rotate_installation_token(inst, admin) do
