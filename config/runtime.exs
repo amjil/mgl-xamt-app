@@ -46,6 +46,44 @@ config :xamt,
   bot_webhook_delivery_enabled:
     System.get_env("BOT_WEBHOOK_DELIVERY_ENABLED", "true") in ~w(true 1)
 
+# Only apply Mgl ID env overrides when explicitly configured so
+# config/test.exs (and local defaults) are not wiped to enabled: false.
+if System.get_env("MGL_ID_ENABLED") || System.get_env("MGL_ID_CLIENT_ID") do
+  mgl_enabled? = System.get_env("MGL_ID_ENABLED", "false") in ~w(true 1)
+  mgl_client_id = System.get_env("MGL_ID_CLIENT_ID")
+  mgl_client_secret = System.get_env("MGL_ID_CLIENT_SECRET")
+
+  mgl_opts =
+    [
+      enabled: mgl_enabled?,
+      issuer: System.get_env("MGL_ID_ISSUER", "https://id.amjil.net"),
+      client_id: mgl_client_id,
+      client_secret: mgl_client_secret,
+      redirect_uri:
+        System.get_env(
+          "MGL_ID_REDIRECT_URI",
+          "http://127.0.0.1:4002/auth/mgl/callback"
+        ),
+      link_redirect_uri:
+        System.get_env(
+          "MGL_ID_LINK_REDIRECT_URI",
+          "http://127.0.0.1:4002/settings/account/identities/mgl/callback"
+        ),
+      scopes: System.get_env("MGL_ID_SCOPES", "openid profile email")
+    ]
+    |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+
+  config :xamt, Xamt.MglId, mgl_opts
+
+  if mgl_enabled? and (is_nil(mgl_client_id) or mgl_client_id == "") do
+    raise "MGL_ID_ENABLED is true but MGL_ID_CLIENT_ID is missing"
+  end
+
+  if mgl_enabled? and (is_nil(mgl_client_secret) or mgl_client_secret == "") do
+    raise "MGL_ID_ENABLED is true but MGL_ID_CLIENT_SECRET is missing"
+  end
+end
+
 if max_attempts = System.get_env("BOT_WEBHOOK_MAX_ATTEMPTS") do
   config :xamt, Xamt.Bots.DeliveryWorker, max_attempts: String.to_integer(max_attempts)
 end

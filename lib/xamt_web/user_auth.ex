@@ -84,6 +84,7 @@ defmodule XamtWeb.UserAuth do
     conn
     |> assign(:registration_enabled?, Xamt.SiteSettings.registration_enabled?())
     |> assign(:magic_link_enabled?, Xamt.SiteSettings.magic_link_enabled?())
+    |> assign(:mgl_id_enabled?, Xamt.MglId.enabled?())
   end
 
   defp ensure_user_token(conn) do

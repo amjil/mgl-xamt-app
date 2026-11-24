@@ -20,6 +20,7 @@ defmodule Xamt.Application do
       Xamt.Channels.ChannelListCache,
       Xamt.Servers.ServerCache,
       Xamt.Messages.RateLimiter,
+      Xamt.MglId.Cache,
       XamtWeb.Endpoint
     ]
 

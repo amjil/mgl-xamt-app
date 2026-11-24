@@ -54,6 +54,18 @@ config :xamt, Xamt.Messages.LinkPreview, enabled: false
 # Web Push hits push services; tests that need it opt in and stub the sender.
 config :xamt, Xamt.Notifications.WebPush, enabled: false, async: false
 
+# Mgl ID OIDC — tests enable and stub HTTP/JWKS as needed.
+config :xamt, Xamt.MglId,
+  enabled: true,
+  issuer: "https://id.amjil.net",
+  client_id: "xamt-test-client",
+  client_secret: "xamt-test-secret",
+  redirect_uri: "http://127.0.0.1:4002/auth/mgl/callback",
+  link_redirect_uri: "http://127.0.0.1:4002/settings/account/identities/mgl/callback",
+  scopes: "openid profile email",
+  transaction_ttl_seconds: 600,
+  req_options: [plug: {Req.Test, Xamt.MglId}]
+
 # Disable swoosh api client as it is only required for production adapters
 config :swoosh, :api_client, false
 

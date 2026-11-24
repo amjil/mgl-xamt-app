@@ -6,7 +6,8 @@ defmodule Xamt.Accounts do
   import Ecto.Query, warn: false
   alias Xamt.Repo
 
-  alias Xamt.Accounts.{Scope, User, UserToken, UserNotifier}
+  alias Xamt.Accounts.{Scope, User, UserIdentity, UserToken, UserNotifier}
+  alias Xamt.MglId
 
   ## Database getters
 
@@ -490,6 +491,167 @@ defmodule Xamt.Accounts do
       )
 
     {:ok, count}
+  end
+
+  ## Mgl ID identities
+
+  @doc """
+  Returns a `UserIdentity` with preloaded user for the given Mgl issuer + sub.
+  """
+  def get_user_by_mgl_identity(issuer, subject)
+      when is_binary(issuer) and is_binary(subject) do
+    issuer = String.trim_trailing(issuer, "/")
+
+    from(i in UserIdentity,
+      where: i.provider == ^MglId.provider() and i.issuer == ^issuer and i.subject == ^subject,
+      preload: [:user]
+    )
+    |> Repo.one()
+  end
+
+  @doc """
+  Returns the Mgl identity for a local user, or nil.
+  """
+  def get_mgl_identity(%User{id: user_id}) do
+    Repo.get_by(UserIdentity, user_id: user_id, provider: MglId.provider())
+  end
+
+  @doc """
+  Creates a local user and Mgl identity in one transaction from verified claims.
+
+  Never matches existing users by username or email.
+  """
+  def provision_user_from_mgl(claims) when is_map(claims) do
+    email = claims["email"]
+    preferred = claims["preferred_username"] || claims["name"]
+    display_name = claims["name"]
+
+    cond do
+      not is_binary(email) or String.trim(email) == "" ->
+        {:error, :missing_email}
+
+      not is_binary(claims["sub"]) or claims["sub"] == "" ->
+        {:error, :missing_sub}
+
+      true ->
+        Repo.transact(fn ->
+          with {:ok, username} <- unique_username(preferred),
+               {:ok, user} <-
+                 %User{}
+                 |> User.oidc_registration_changeset(%{
+                   email: email,
+                   username: username,
+                   display_name: display_name
+                 })
+                 |> Repo.insert(),
+               {:ok, _identity} <- insert_mgl_identity(user, claims) do
+            {:ok, user}
+          else
+            {:error, reason} -> {:error, reason}
+          end
+        end)
+    end
+  end
+
+  @doc """
+  Links a verified Mgl identity to an existing local user.
+  """
+  def link_mgl_identity(%User{} = user, claims) when is_map(claims) do
+    issuer =
+      claims
+      |> Map.get("iss", MglId.issuer())
+      |> to_string()
+      |> String.trim_trailing("/")
+
+    subject = claims["sub"]
+
+    cond do
+      not is_binary(subject) or subject == "" ->
+        {:error, :missing_sub}
+
+      identity = get_user_by_mgl_identity(issuer, subject) ->
+        if identity.user_id == user.id do
+          {:ok, identity}
+        else
+          {:error, :already_linked_other_user}
+        end
+
+      existing = get_mgl_identity(user) ->
+        if existing.subject == subject and existing.issuer == issuer do
+          {:ok, existing}
+        else
+          {:error, :user_already_linked}
+        end
+
+      true ->
+        insert_mgl_identity(user, claims)
+    end
+  end
+
+  defp insert_mgl_identity(%User{} = user, claims) do
+    %UserIdentity{}
+    |> UserIdentity.changeset(UserIdentity.mgl_attrs(user.id, claims))
+    |> Repo.insert()
+    |> case do
+      {:ok, identity} ->
+        {:ok, identity}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        if Keyword.has_key?(changeset.errors, :provider) or
+             Keyword.has_key?(changeset.errors, :user_id) or
+             unique_constraint_error?(changeset) do
+          {:error, :identity_conflict}
+        else
+          {:error, changeset}
+        end
+    end
+  end
+
+  defp unique_constraint_error?(%Ecto.Changeset{errors: errors}) do
+    Enum.any?(errors, fn
+      {_field, {_msg, opts}} -> opts[:constraint] == :unique
+      _ -> false
+    end)
+  end
+
+  defp unique_username(preferred) do
+    base =
+      preferred
+      |> to_string()
+      |> String.trim()
+      |> case do
+        "" -> "user"
+        value -> value
+      end
+      |> String.replace(~r/[^a-zA-Z0-9_]/, "_")
+      |> String.slice(0, 24)
+
+    base =
+      cond do
+        String.length(base) < 3 -> base <> String.duplicate("0", 3 - String.length(base))
+        true -> base
+      end
+
+    find_unique_username(base, 0)
+  end
+
+  defp find_unique_username(base, attempt) when attempt < 50 do
+    candidate =
+      if attempt == 0 do
+        base
+      else
+        suffix = Integer.to_string(attempt)
+        String.slice(base, 0, max(3, 32 - String.length(suffix))) <> suffix
+      end
+
+    case Repo.get_by(User, username: candidate) do
+      nil -> {:ok, candidate}
+      _ -> find_unique_username(base, attempt + 1)
+    end
+  end
+
+  defp find_unique_username(_base, _attempt) do
+    {:ok, "user" <> Integer.to_string(System.unique_integer([:positive]))}
   end
 
   ## Token helper

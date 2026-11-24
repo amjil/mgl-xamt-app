@@ -136,6 +136,19 @@ defmodule XamtWeb.Router do
     post "/users/log-in", UserSessionController, :create
     post "/login", UserSessionController, :create
     delete "/users/log-out", UserSessionController, :delete
+
+    # Mgl ID OIDC — must not use redirect_if_user_is_authenticated so
+    # the callback can create a local session for first-time users.
+    get "/auth/mgl", MglAuthController, :start
+    get "/auth/mgl/callback", MglAuthController, :callback
+  end
+
+  # Account linking requires an existing Xamt session.
+  scope "/", XamtWeb do
+    pipe_through [:browser, :require_authenticated_user]
+
+    get "/settings/account/identities/mgl/connect", MglAuthController, :link_start
+    get "/settings/account/identities/mgl/callback", MglAuthController, :link_callback
   end
 
   if Application.compile_env(:xamt, :dev_routes) do

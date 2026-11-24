@@ -55,6 +55,17 @@ config :xamt,
   bot_api_enabled: true,
   bot_webhook_delivery_enabled: true
 
+# Mgl ID OIDC (disabled until env secrets are provided).
+config :xamt, Xamt.MglId,
+  enabled: false,
+  issuer: "https://id.amjil.net",
+  client_id: nil,
+  client_secret: nil,
+  redirect_uri: "http://127.0.0.1:4002/auth/mgl/callback",
+  link_redirect_uri: "http://127.0.0.1:4002/settings/account/identities/mgl/callback",
+  scopes: "openid profile email",
+  transaction_ttl_seconds: 600
+
 config :xamt, Xamt.Bots.DeliveryWorker,
   max_attempts: 5,
   timeout_ms: 5_000,

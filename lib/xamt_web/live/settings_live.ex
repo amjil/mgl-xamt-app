@@ -22,6 +22,7 @@ defmodule XamtWeb.SettingsLive do
 
   def mount(_params, _session, socket) do
     user = socket.assigns.current_scope.user
+    mgl_identity = Accounts.get_mgl_identity(user)
 
     {:ok,
      socket
@@ -40,6 +41,8 @@ defmodule XamtWeb.SettingsLive do
      |> assign(:site_admin?, User.admin?(user))
      |> assign(:registration_enabled?, SiteSettings.registration_enabled?())
      |> assign(:magic_link_enabled?, SiteSettings.magic_link_enabled?())
+     |> assign(:mgl_id_enabled?, Xamt.MglId.enabled?())
+     |> assign(:mgl_identity, mgl_identity)
      |> allow_upload(:avatar,
        accept: ~w(.jpg .jpeg .png .gif .webp),
        max_entries: 1,
@@ -509,6 +512,41 @@ defmodule XamtWeb.SettingsLive do
               <span>{gettext("Change Email")}</span>
             </button>
           </.form>
+        </section>
+        
+    <!-- ==================== Mgl ID identity linking ==================== -->
+        <section :if={@mgl_id_enabled?} class="xamt-home-section" id="mgl-id-section">
+          <header class="xamt-home-section__header">
+            <div class="flex flex-row items-center gap-2">
+              <.icon name="hero-identification" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+              <h2 class="font-bold text-sm">{gettext("Mgl ID")}</h2>
+            </div>
+          </header>
+
+          <div class="xamt-home-card">
+            <%= if @mgl_identity do %>
+              <p class="text-sm text-[var(--xamt-muted)] mongol-text leading-relaxed">
+                {gettext("Connected as %{username}",
+                  username: @mgl_identity.provider_username || @mgl_identity.subject
+                )}
+              </p>
+              <p class="text-xs text-[var(--xamt-muted)] mongol-text">
+                {gettext("Unlinking is not available yet.")}
+              </p>
+            <% else %>
+              <p class="text-sm text-[var(--xamt-muted)] mongol-text leading-relaxed">
+                {gettext("Connect your Mgl ID to use unified sign-in across Mgl products.")}
+              </p>
+              <.link
+                href={~p"/settings/account/identities/mgl/connect"}
+                id="mgl-id-connect"
+                class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold text-xs mongol-text"
+              >
+                <.icon name="hero-link" class="w-4 h-4 mb-1.5" />
+                <span>{gettext("Connect Mgl ID")}</span>
+              </.link>
+            <% end %>
+          </div>
         </section>
         
     <!-- ==================== Section 4: Change login password ==================== -->

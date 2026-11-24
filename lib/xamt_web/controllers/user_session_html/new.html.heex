@@ -56,6 +56,30 @@
       </div>
     </aside>
 
+    <%!-- Mgl ID OIDC (shown when enabled) --%>
+    <section :if={@mgl_id_enabled?} class="xamt-home-section">
+      <header class="xamt-home-section__header">
+        <div class="flex flex-row items-center gap-2">
+          <.icon name="hero-identification" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+          <h2 class="font-bold text-sm mongol-text">{gettext("Mgl ID")}</h2>
+        </div>
+      </header>
+
+      <div class="xamt-home-card">
+        <p class="text-sm text-[var(--xamt-muted)] mongol-text leading-relaxed">
+          {gettext("Sign in with your Mgl ID account.")}
+        </p>
+        <.link
+          href={~p"/auth/mgl"}
+          id="mgl-id-login"
+          class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold text-xs mongol-text"
+        >
+          <.icon name="hero-arrow-right-end-on-rectangle" class="w-4 h-4 mb-1.5" />
+          <span>{gettext("Continue with Mgl ID")}</span>
+        </.link>
+      </div>
+    </section>
+
     <%!-- Section 2: Magic-link passwordless login (shown when enabled) --%>
     <section :if={@magic_link_enabled?} class="xamt-home-section">
       <header class="xamt-home-section__header">

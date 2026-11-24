@@ -73,6 +73,20 @@ defmodule Xamt.Accounts.User do
   end
 
   @doc """
+  Registration via verified Mgl ID claims (no local password).
+
+  Marks the account confirmed because the IdP already authenticated the user.
+  """
+  def oidc_registration_changeset(user, attrs, opts \\ []) do
+    user
+    |> cast(attrs, [:email, :username, :display_name])
+    |> validate_required([:email, :username])
+    |> validate_registration_email(opts)
+    |> validate_username(opts)
+    |> put_change(:confirmed_at, DateTime.utc_now(:second))
+  end
+
+  @doc """
   Registration changeset used by site admins.
 
   Same as `registration_changeset/3`, but allows assigning a `global_role`.
