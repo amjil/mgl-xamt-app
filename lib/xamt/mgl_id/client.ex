@@ -82,6 +82,44 @@ defmodule Xamt.MglId.Client do
     end
   end
 
+  @doc """
+  Confirms an Mgl ID → product account-link initiation with client credentials.
+
+  Body fields match `POST /api/v1/account-links/confirm` on mgl-id.
+  """
+  def confirm_account_link(initiation_token, external_user_id)
+      when is_binary(initiation_token) do
+    url = MglId.account_link_confirm_url()
+
+    body = %{
+      "initiation_token" => initiation_token,
+      "external_user_id" => to_string(external_user_id),
+      "external_account_status" => "active",
+      "client_id" => MglId.client_id(),
+      "client_secret" => MglId.client_secret()
+    }
+
+    opts =
+      Keyword.merge(
+        [
+          json: body,
+          headers: [{"accept", "application/json"}]
+        ],
+        MglId.req_options()
+      )
+
+    case Req.post(url, opts) do
+      {:ok, %{status: 200, body: response}} when is_map(response) ->
+        {:ok, response}
+
+      {:ok, %{status: status, body: body}} ->
+        {:error, {:account_link_confirm, status, body}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   defp random_token do
     :crypto.strong_rand_bytes(32)
     |> Base.url_encode64(padding: false)

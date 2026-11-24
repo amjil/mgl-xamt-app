@@ -57,6 +57,58 @@ defmodule Xamt.MglId.Auth do
     end
   end
 
+  @doc """
+  Completes an Mgl ID–initiated product account link.
+
+  Proves ownership of the signed-in Xamt user, confirms with mgl-id, then
+  stores a local `UserIdentity` keyed by the Amjil user id (`sub`).
+  """
+  def complete_account_link(user, token, provider)
+      when is_binary(token) and is_binary(provider) do
+    cond do
+      is_nil(user) ->
+        {:error, :not_authenticated}
+
+      provider != "xamt" ->
+        {:error, :invalid_provider}
+
+      Accounts.get_mgl_identity(user) ->
+        {:error, :user_already_linked}
+
+      true ->
+        with {:ok, response} <- Client.confirm_account_link(token, user.id),
+             {:ok, claims} <- claims_from_confirm(response),
+             {:ok, _identity} <- Accounts.link_mgl_identity(user, claims) do
+          emit("auth.mgl.identity.linked", user, claims)
+          {:ok, user}
+        else
+          {:error, :already_linked_other_user} = error ->
+            emit_failure("auth.mgl.identity.link_failed", :already_linked_other_user)
+            error
+
+          {:error, reason} = error ->
+            emit_failure("auth.mgl.identity.link_failed", reason)
+            error
+        end
+    end
+  end
+
+  defp claims_from_confirm(%{"data" => data}) when is_map(data) do
+    subject = data["amjil_user_id"] || data["user_id"]
+
+    if is_binary(subject) and subject != "" do
+      {:ok,
+       %{
+         "sub" => subject,
+         "iss" => MglId.issuer() |> String.trim_trailing("/")
+       }}
+    else
+      {:error, :missing_amjil_user_id}
+    end
+  end
+
+  defp claims_from_confirm(_), do: {:error, :invalid_confirm_response}
+
   defp authenticate(code, txn) do
     with {:ok, token_response} <- Client.exchange_code(code, txn),
          id_token when is_binary(id_token) <- Map.get(token_response, "id_token"),

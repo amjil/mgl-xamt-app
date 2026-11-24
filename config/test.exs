@@ -57,11 +57,11 @@ config :xamt, Xamt.Notifications.WebPush, enabled: false, async: false
 # Mgl ID OIDC — tests enable and stub HTTP/JWKS as needed.
 config :xamt, Xamt.MglId,
   enabled: true,
-  issuer: "https://id.amjil.net",
+  issuer: "http://localhost:4004",
   client_id: "xamt-test-client",
   client_secret: "xamt-test-secret",
-  redirect_uri: "http://127.0.0.1:4002/auth/mgl/callback",
-  link_redirect_uri: "http://127.0.0.1:4002/settings/account/identities/mgl/callback",
+  redirect_uri: "http://localhost:4002/auth/mgl/callback",
+  link_redirect_uri: "http://localhost:4002/settings/account/identities/mgl/callback",
   scopes: "openid profile email",
   transaction_ttl_seconds: 600,
   req_options: [plug: {Req.Test, Xamt.MglId}]

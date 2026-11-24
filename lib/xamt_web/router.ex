@@ -144,9 +144,12 @@ defmodule XamtWeb.Router do
   end
 
   # Account linking requires an existing Xamt session.
+  # `/account/link` is the Mgl ID → Xamt token receiver (ownership proof).
+  # OIDC link entry remains under `/settings/account/identities/mgl/*`.
   scope "/", XamtWeb do
     pipe_through [:browser, :require_authenticated_user]
 
+    get "/account/link", MglAuthController, :account_link
     get "/settings/account/identities/mgl/connect", MglAuthController, :link_start
     get "/settings/account/identities/mgl/callback", MglAuthController, :link_callback
   end

@@ -113,6 +113,71 @@ defmodule XamtWeb.MglAuthController do
     end
   end
 
+  @doc """
+  Receives Mgl ID → Xamt account-link redirects (`?token=&provider=xamt`).
+
+  Placed behind `require_authenticated_user` so ownership is proven by the
+  existing Xamt session; unauthenticated users are sent to login with return_to.
+  """
+  def account_link(conn, params) do
+    user = current_user(conn)
+    token = params["token"]
+    provider = params["provider"] || "xamt"
+
+    cond do
+      not MglId.enabled?() ->
+        conn
+        |> put_flash(:error, gettext("Mgl ID login is disabled."))
+        |> redirect(to: ~p"/settings")
+
+      is_nil(user) ->
+        conn
+        |> put_flash(:error, gettext("You must log in before connecting Mgl ID."))
+        |> redirect(to: ~p"/login")
+
+      not is_binary(token) or token == "" ->
+        conn
+        |> put_flash(:error, gettext("Invalid Mgl ID link request."))
+        |> redirect(to: ~p"/settings")
+
+      true ->
+        case Auth.complete_account_link(user, token, provider) do
+          {:ok, _user} ->
+            conn
+            |> put_flash(:info, gettext("Mgl ID connected successfully."))
+            |> redirect(to: ~p"/settings")
+
+          {:error, :user_already_linked} ->
+            conn
+            |> put_flash(:error, gettext("This Xamt account is already connected to Mgl ID."))
+            |> redirect(to: ~p"/settings")
+
+          {:error, :already_linked_other_user} ->
+            conn
+            |> put_flash(
+              :error,
+              gettext("This Mgl ID account is already connected to another Xamt account.")
+            )
+            |> redirect(to: ~p"/settings")
+
+          {:error, :invalid_provider} ->
+            conn
+            |> put_flash(:error, gettext("Invalid Mgl ID link request."))
+            |> redirect(to: ~p"/settings")
+
+          {:error, {:account_link_confirm, status, _body}} when status in [410, 404] ->
+            conn
+            |> put_flash(:error, gettext("Mgl ID link expired. Please try again."))
+            |> redirect(to: ~p"/settings")
+
+          {:error, _reason} ->
+            conn
+            |> put_flash(:error, gettext("Could not connect Mgl ID."))
+            |> redirect(to: ~p"/settings")
+        end
+    end
+  end
+
   defp finish_login(conn, code, state) do
     {conn, result} = Transactions.take(conn, state)
 

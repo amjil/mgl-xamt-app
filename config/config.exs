@@ -56,13 +56,14 @@ config :xamt,
   bot_webhook_delivery_enabled: true
 
 # Mgl ID OIDC (disabled until env secrets are provided).
+# Local default issuer matches mgl-id dev (`mix phx.server` on :4004).
 config :xamt, Xamt.MglId,
   enabled: false,
-  issuer: "https://id.amjil.net",
+  issuer: "http://localhost:4004",
   client_id: nil,
   client_secret: nil,
-  redirect_uri: "http://127.0.0.1:4002/auth/mgl/callback",
-  link_redirect_uri: "http://127.0.0.1:4002/settings/account/identities/mgl/callback",
+  redirect_uri: "http://localhost:4002/auth/mgl/callback",
+  link_redirect_uri: "http://localhost:4002/settings/account/identities/mgl/callback",
   scopes: "openid profile email",
   transaction_ttl_seconds: 600
 

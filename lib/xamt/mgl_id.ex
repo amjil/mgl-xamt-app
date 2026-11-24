@@ -41,6 +41,17 @@ defmodule Xamt.MglId do
       )
   end
 
+  @doc """
+  Product-side receiver for Mgl ID → Xamt account-link initiations.
+  """
+  def account_link_path, do: "/account/link"
+
+  def account_link_confirm_url do
+    issuer()
+    |> String.trim_trailing("/")
+    |> Kernel.<>("/api/v1/account-links/confirm")
+  end
+
   def scopes do
     config()
     |> Keyword.get(:scopes, @default_scopes)

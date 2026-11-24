@@ -142,6 +142,61 @@ defmodule XamtWeb.MglAuthControllerTest do
     assert has_element?(view, "#mgl-id-connect")
   end
 
+  test "account_link requires authentication", %{conn: conn} do
+    conn = get(conn, ~p"/account/link", %{"token" => "t", "provider" => "xamt"})
+    assert redirected_to(conn) in [~p"/users/log-in", ~p"/login"]
+  end
+
+  test "account_link confirms with mgl-id and stores local identity", %{conn: conn} do
+    user = user_fixture()
+    amjil_user_id = Ecto.UUID.generate()
+    stub_account_link_confirm(amjil_user_id)
+
+    token = Accounts.generate_user_session_token(user)
+
+    conn =
+      conn
+      |> init_test_session(%{:user_token => token})
+      |> get(~p"/account/link", %{"token" => "init-token", "provider" => "xamt"})
+
+    assert redirected_to(conn) == ~p"/settings"
+    assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "connected"
+
+    identity = Accounts.get_mgl_identity(user)
+    assert identity
+    assert identity.subject == amjil_user_id
+    assert identity.issuer == String.trim_trailing(MglId.issuer(), "/")
+  end
+
+  test "account_link rejects when user already linked", %{conn: conn} do
+    user = user_fixture()
+    claims = MglIdHelpers.default_claims()
+    assert {:ok, _} = Accounts.link_mgl_identity(user, claims)
+
+    token = Accounts.generate_user_session_token(user)
+
+    conn =
+      conn
+      |> init_test_session(%{:user_token => token})
+      |> get(~p"/account/link", %{"token" => "init-token", "provider" => "xamt"})
+
+    assert redirected_to(conn) == ~p"/settings"
+    assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "already connected"
+  end
+
+  test "account_link rejects missing token", %{conn: conn} do
+    user = user_fixture()
+    token = Accounts.generate_user_session_token(user)
+
+    conn =
+      conn
+      |> init_test_session(%{:user_token => token})
+      |> get(~p"/account/link", %{"provider" => "xamt"})
+
+    assert redirected_to(conn) == ~p"/settings"
+    assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Invalid"
+  end
+
   defp put_login_txn(conn, state, nonce) do
     txn = %{
       "state" => state,
@@ -164,6 +219,29 @@ defmodule XamtWeb.MglAuthControllerTest do
             "id_token" => id_token,
             "token_type" => "Bearer",
             "expires_in" => 600
+          })
+
+        _ ->
+          Plug.Conn.send_resp(conn, 404, "not found")
+      end
+    end)
+  end
+
+  defp stub_account_link_confirm(amjil_user_id) do
+    Req.Test.stub(Xamt.MglId, fn conn ->
+      case {conn.method, conn.request_path} do
+        {"POST", "/api/v1/account-links/confirm"} ->
+          Req.Test.json(conn, %{
+            "data" => %{
+              "user_id" => amjil_user_id,
+              "amjil_user_id" => amjil_user_id,
+              "link" => %{
+                "id" => Ecto.UUID.generate(),
+                "provider" => "xamt",
+                "external_user_id" => "ignored"
+              }
+            },
+            "meta" => %{}
           })
 
         _ ->
