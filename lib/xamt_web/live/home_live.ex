@@ -6,13 +6,10 @@ defmodule XamtWeb.HomeLive do
   alias Xamt.Servers
   alias Xamt.Servers.Permissions
   alias Xamt.Servers.Server
-  alias Xamt.SiteSettings
   alias Xamt.Slug
 
   @impl true
   def mount(_params, _session, socket) do
-    if connected?(socket), do: SiteSettings.subscribe()
-
     scope = socket.assigns.current_scope
 
     {servers, public_servers} =
@@ -46,14 +43,6 @@ defmodule XamtWeb.HomeLive do
        :show_create,
        params["create"] == "1" and socket.assigns.can_create_server?
      )}
-  end
-
-  @impl true
-  def handle_info({:site_settings_updated, setting}, socket) do
-    {:noreply,
-     socket
-     |> assign(:registration_enabled?, setting.registration_enabled)
-     |> assign(:magic_link_enabled?, setting.magic_link_enabled)}
   end
 
   @impl true
@@ -526,7 +515,7 @@ defmodule XamtWeb.HomeLive do
             </div>
           </header>
 
-          <%!-- Act 2: Login and registration CTA --%>
+          <%!-- Act 2: Login CTA (Mgl ID) --%>
           <section class="xamt-home-section">
             <header class="xamt-home-section__header">
               <div class="flex flex-row items-center gap-2">
@@ -547,15 +536,6 @@ defmodule XamtWeb.HomeLive do
                 >
                   <.icon name="hero-arrow-right-end-on-rectangle" class="w-4 h-4 mb-1.5" />
                   <span>{gettext("Log in")}</span>
-                </.link>
-
-                <.link
-                  :if={@registration_enabled?}
-                  navigate={~p"/register"}
-                  class="xamt-btn xamt-btn--soft h-full px-3 font-bold mongol-text"
-                >
-                  <.icon name="hero-user-plus" class="w-4 h-4 mb-1.5" />
-                  <span>{gettext("Register")}</span>
                 </.link>
               </div>
             </div>

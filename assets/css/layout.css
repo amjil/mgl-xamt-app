@@ -176,11 +176,16 @@ canvas.xamt-topbar {
   align-items: center;
   gap: 0.45rem;
   padding: 0.55rem 0.45rem;
+  border: 0;
   border-radius: 0.65rem;
+  background: transparent;
   color: var(--xamt-text);
   text-decoration: none;
+  font: inherit;
   font-size: 0.9rem;
   font-weight: 600;
+  cursor: pointer;
+  text-align: inherit;
   transition: background-color 150ms ease, color 150ms ease;
 }
 

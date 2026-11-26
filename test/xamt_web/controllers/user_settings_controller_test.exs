@@ -12,7 +12,7 @@ defmodule XamtWeb.UserSettingsControllerTest do
       response = html_response(conn, 200)
       assert response =~ "Settings"
       assert response =~ ~s(id="update_email")
-      assert response =~ ~s(id="update_password")
+      refute response =~ ~s(id="update_password")
     end
 
     test "redirects if user is not logged in" do
@@ -31,9 +31,9 @@ defmodule XamtWeb.UserSettingsControllerTest do
     end
   end
 
-  describe "PUT /users/settings (change password form)" do
-    test "updates the user password and resets tokens", %{conn: conn, user: user} do
-      new_password_conn =
+  describe "PUT /users/settings (removed password action)" do
+    test "a stale update_password submission is a no-op redirect", %{conn: conn} do
+      conn =
         put(conn, ~p"/users/settings", %{
           "action" => "update_password",
           "user" => %{
@@ -42,32 +42,7 @@ defmodule XamtWeb.UserSettingsControllerTest do
           }
         })
 
-      assert redirected_to(new_password_conn) == ~p"/users/settings"
-
-      assert get_session(new_password_conn, :user_token) != get_session(conn, :user_token)
-
-      assert Phoenix.Flash.get(new_password_conn.assigns.flash, :info) =~
-               "Password updated successfully"
-
-      assert Accounts.get_user_by_email_and_password(user.email, "new valid pass1!")
-    end
-
-    test "does not update password on invalid data", %{conn: conn} do
-      old_password_conn =
-        put(conn, ~p"/users/settings", %{
-          "action" => "update_password",
-          "user" => %{
-            "password" => "short",
-            "password_confirmation" => "does not match"
-          }
-        })
-
-      response = html_response(old_password_conn, 200)
-      assert response =~ "Settings"
-      assert response =~ "should be at least 8 character(s)"
-      assert response =~ "does not match password"
-
-      assert get_session(old_password_conn, :user_token) == get_session(conn, :user_token)
+      assert redirected_to(conn) == ~p"/users/settings"
     end
   end
 

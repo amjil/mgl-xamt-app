@@ -40,7 +40,6 @@ defmodule Xamt.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
-      {:bcrypt_elixir, "~> 3.0"},
       {:jose, "~> 1.11"},
       {:phoenix, "~> 1.8.3"},
       {:phoenix_ecto, "~> 4.5"},

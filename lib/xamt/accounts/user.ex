@@ -15,8 +15,6 @@ defmodule Xamt.Accounts.User do
     field :status_text, :string
     field :global_role, :string, default: "user"
     field :is_bot, :boolean, default: false
-    field :password, :string, virtual: true, redact: true
-    field :hashed_password, :string, redact: true
     field :confirmed_at, :utc_datetime
     field :authenticated_at, :utc_datetime, virtual: true
 
@@ -60,20 +58,7 @@ defmodule Xamt.Accounts.User do
   end
 
   @doc """
-  A user changeset for registration with email, username, display name, and password.
-  """
-  def registration_changeset(user, attrs, opts \\ []) do
-    user
-    |> cast(attrs, [:email, :username, :display_name, :password])
-    |> validate_required([:email, :username, :password])
-    |> validate_confirmation(:password, message: "does not match password")
-    |> validate_registration_email(opts)
-    |> validate_username(opts)
-    |> validate_password(opts)
-  end
-
-  @doc """
-  Registration via verified Mgl ID claims (no local password).
+  Registration via verified Mgl ID claims.
 
   Marks the account confirmed because the IdP already authenticated the user.
   """
@@ -87,17 +72,18 @@ defmodule Xamt.Accounts.User do
   end
 
   @doc """
-  Registration changeset used by site admins.
+  Creation changeset used by seeds and test fixtures.
 
-  Same as `registration_changeset/3`, but allows assigning a `global_role`.
-  Keep this out of the public register form so users cannot escalate themselves.
-  Operators confirm the account immediately so the person can sign in.
+  Allows assigning a `global_role`, so it must never be reachable from a
+  user-facing form. Accounts for real people are provisioned by Mgl ID on
+  first sign-in; a row created here has no Mgl identity and cannot sign in.
   """
   def admin_registration_changeset(user, attrs, opts \\ []) do
     user
-    |> registration_changeset(attrs, opts)
-    |> cast(attrs, [:global_role])
-    |> validate_required([:global_role])
+    |> cast(attrs, [:email, :username, :display_name, :global_role])
+    |> validate_required([:email, :username, :global_role])
+    |> validate_registration_email(opts)
+    |> validate_username(opts)
     |> validate_inclusion(:global_role, @global_roles)
     |> maybe_confirm_on_register()
   end
@@ -244,66 +230,6 @@ defmodule Xamt.Accounts.User do
   end
 
   @doc """
-  A user changeset for changing the password.
-
-  It is important to validate the length of the password, as long passwords may
-  be very expensive to hash for certain algorithms.
-
-  ## Options
-
-    * `:hash_password` - Hashes the password so it can be stored securely
-      in the database and ensures the password field is cleared to prevent
-      leaks in the logs. If password hashing is not needed and clearing the
-      password field is not desired (like when using this changeset for
-      validations on a LiveView form), this option can be set to `false`.
-      Defaults to `true`.
-  """
-  def password_changeset(user, attrs, opts \\ []) do
-    user
-    |> cast(attrs, [:password])
-    |> validate_confirmation(:password, message: "does not match password")
-    |> validate_password(opts)
-  end
-
-  @password_min_length 8
-  @password_max_length 72
-
-  defp validate_password(changeset, opts) do
-    changeset
-    |> validate_required([:password])
-    |> validate_length(:password, min: @password_min_length, max: @password_max_length)
-    |> validate_format(:password, ~r/[A-Za-z]/, message: "must include an English letter")
-    |> validate_format(:password, ~r/[0-9]/, message: "must include a number")
-    |> validate_format(:password, ~r/[[:punct:]]/, message: "must include a symbol")
-    |> maybe_hash_password(opts)
-  end
-
-  defp maybe_hash_password(changeset, opts) do
-    hash_password? = Keyword.get(opts, :hash_password, true)
-    password = get_change(changeset, :password)
-
-    if hash_password? && password && changeset.valid? do
-      changeset
-      # If using Bcrypt, then further validate it is at most 72 bytes long
-      |> validate_length(:password, max: 72, count: :bytes)
-      # Hashing could be done with `Ecto.Changeset.prepare_changes/2`, but that
-      # would keep the database transaction open longer and hurt performance.
-      |> put_change(:hashed_password, Bcrypt.hash_pwd_salt(password))
-      |> delete_change(:password)
-    else
-      changeset
-    end
-  end
-
-  @doc """
-  Confirms the account by setting `confirmed_at`.
-  """
-  def confirm_changeset(user) do
-    now = DateTime.utc_now(:second)
-    change(user, confirmed_at: now)
-  end
-
-  @doc """
   Changeset for operators to assign a global role.
 
   Keep `:global_role` out of registration and profile changesets so users
@@ -319,51 +245,17 @@ defmodule Xamt.Accounts.User do
   @doc """
   Changeset for site admins to update another account.
 
-  Accepts profile fields, email, username, role, and an optional new
-  password. A blank password is ignored so the current hash is kept.
-  Keep this out of public forms so users cannot escalate themselves.
+  Accepts profile fields, email, username, and role. Keep this out of public
+  forms so users cannot escalate themselves.
   """
   def admin_update_changeset(user, attrs, opts \\ []) do
     user
-    |> cast(attrs, [:email, :username, :display_name, :bio, :global_role, :password])
+    |> cast(attrs, [:email, :username, :display_name, :bio, :global_role])
     |> validate_required([:email, :username, :global_role])
     |> validate_inclusion(:global_role, @global_roles)
     |> validate_length(:display_name, max: 100)
     |> validate_length(:bio, max: 500)
     |> validate_username(opts)
     |> validate_registration_email(opts)
-    |> maybe_change_admin_password(opts)
-  end
-
-  defp maybe_change_admin_password(changeset, opts) do
-    case get_change(changeset, :password) do
-      password when is_binary(password) ->
-        if String.trim(password) == "" do
-          delete_change(changeset, :password)
-        else
-          changeset
-          |> validate_confirmation(:password, message: "does not match password")
-          |> validate_password(opts)
-        end
-
-      _ ->
-        changeset
-    end
-  end
-
-  @doc """
-  Verifies the password.
-
-  If there is no user or the user doesn't have a password, we call
-  `Bcrypt.no_user_verify/0` to avoid timing attacks.
-  """
-  def valid_password?(%Xamt.Accounts.User{hashed_password: hashed_password}, password)
-      when is_binary(hashed_password) and byte_size(password) > 0 do
-    Bcrypt.verify_pass(password, hashed_password)
-  end
-
-  def valid_password?(_, _) do
-    Bcrypt.no_user_verify()
-    false
   end
 end

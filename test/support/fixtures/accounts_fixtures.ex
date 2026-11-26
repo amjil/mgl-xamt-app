@@ -12,16 +12,11 @@ defmodule Xamt.AccountsFixtures do
 
   def unique_user_email, do: "user#{System.unique_integer()}@example.com"
   def unique_user_username, do: "user#{System.unique_integer() |> abs()}"
-  def valid_user_password, do: "hello world1!"
 
   def valid_user_attributes(attrs \\ %{}) do
-    password = valid_user_password()
-
     Enum.into(attrs, %{
       email: unique_user_email(),
-      username: unique_user_username(),
-      password: password,
-      password_confirmation: password
+      username: unique_user_username()
     })
   end
 
@@ -36,22 +31,18 @@ defmodule Xamt.AccountsFixtures do
     user
   end
 
-  def passwordless_user_fixture(attrs \\ %{}) do
-    unconfirmed_user_fixture(attrs)
-  end
-
   def user_fixture(attrs \\ %{}) do
     {global_role, attrs} = pop_global_role(attrs)
 
-    {:ok, user} =
-      attrs
-      |> valid_user_attributes()
-      |> Accounts.register_user()
-
-    {:ok, user} =
-      user
-      |> User.confirm_changeset()
-      |> Repo.update()
+    # Admin changeset creates a confirmed account directly (public sign-up is gone).
+    user =
+      %User{}
+      |> User.admin_registration_changeset(
+        attrs
+        |> valid_user_attributes()
+        |> Map.put_new(:global_role, "user")
+      )
+      |> Repo.insert!()
 
     maybe_set_global_role(user, global_role)
   end
@@ -92,13 +83,6 @@ defmodule Xamt.AccountsFixtures do
     Scope.for_user(user)
   end
 
-  def set_password(user) do
-    {:ok, {user, _expired_tokens}} =
-      Accounts.update_user_password(user, %{password: valid_user_password()})
-
-    user
-  end
-
   def extract_user_token(fun) do
     {:ok, captured_email} = fun.(&"[TOKEN]#{&1}[TOKEN]")
     [_, token | _] = String.split(captured_email.text_body, "[TOKEN]")
@@ -112,12 +96,6 @@ defmodule Xamt.AccountsFixtures do
       ),
       set: [authenticated_at: authenticated_at]
     )
-  end
-
-  def generate_user_magic_link_token(user) do
-    {encoded_token, user_token} = Accounts.UserToken.build_email_token(user, "login")
-    Xamt.Repo.insert!(user_token)
-    {encoded_token, user_token.token}
   end
 
   def offset_user_token(token, amount_to_add, unit) do

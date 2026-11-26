@@ -1,8 +1,5 @@
 import Config
 
-# Only in tests, remove the complexity from the password hashing algorithm
-config :bcrypt_elixir, :log_rounds, 1
-
 # Configure your database
 #
 # The MIX_TEST_PARTITION environment variable can be used
@@ -33,11 +30,7 @@ config :xamt, Xamt.Mailer, adapter: Swoosh.Adapters.Test
 # Avoid flaky failures when fixtures create many messages in one window
 config :xamt, Xamt.Messages.RateLimiter, limit: :infinity
 
-config :xamt, Xamt.AuthRateLimit,
-  login: [limit: :infinity, window_seconds: 60],
-  magic_link: [limit: :infinity, window_seconds: 60],
-  register: [limit: :infinity, window_seconds: 60],
-  invite: [limit: :infinity, window_seconds: 60]
+config :xamt, Xamt.AuthRateLimit, invite: [limit: :infinity, window_seconds: 60]
 
 # SQL sandbox owns connections per test; GenServers must not warm from Repo.
 config :xamt, :ets_cache_warmup, false

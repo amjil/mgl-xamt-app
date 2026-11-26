@@ -44,7 +44,7 @@ defmodule XamtWeb.AdminUsersLiveTest do
     assert html =~ "Users"
     assert has_element?(view, "#admin-users-search")
     assert has_element?(view, "#admin-users-q")
-    assert has_element?(view, "#admin-users-create")
+    refute has_element?(view, "#admin-users-create")
     assert has_element?(view, "#users-#{alice.id}")
     assert has_element?(view, "#users-#{bob.id}")
     assert has_element?(view, "#admin-user-edit-#{alice.id}")

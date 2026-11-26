@@ -7,14 +7,12 @@ defmodule XamtWeb.MglAuthControllerTest do
   alias Xamt.MglId
   alias Xamt.MglId.Transactions
   alias Xamt.MglIdHelpers
-  alias Xamt.SiteSettings
 
   setup do
     MglIdHelpers.clear_cache!()
     MglIdHelpers.put_discovery!()
     jwk = MglIdHelpers.rsa_keypair!()
     MglIdHelpers.put_jwks!(MglIdHelpers.jwks_for(jwk))
-    SiteSettings.put_registration_enabled!(true)
     {:ok, jwk: jwk}
   end
 
@@ -74,22 +72,6 @@ defmodule XamtWeb.MglAuthControllerTest do
     identity = Accounts.get_user_by_mgl_identity(MglId.issuer(), claims["sub"])
     assert identity
     assert identity.user.email == claims["email"]
-  end
-
-  test "callback rejects first login when registration is closed", %{conn: conn, jwk: jwk} do
-    SiteSettings.put_registration_enabled!(false)
-    claims = MglIdHelpers.default_claims(%{"nonce" => "n3"})
-    id_token = MglIdHelpers.sign_id_token(jwk, claims)
-    stub_token_endpoint(id_token)
-
-    conn =
-      conn
-      |> put_login_txn("s3", "n3")
-      |> get(~p"/auth/mgl/callback", %{"code" => "auth-code", "state" => "s3"})
-
-    assert redirected_to(conn) == ~p"/login"
-    assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Registration"
-    refute get_session(conn, :user_token)
   end
 
   test "login page shows Mgl ID button when enabled", %{conn: conn} do

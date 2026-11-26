@@ -4,12 +4,11 @@ defmodule XamtWeb.UserSettingsController do
   import Phoenix.Component, only: [to_form: 2]
 
   alias Xamt.Accounts
-  alias XamtWeb.UserAuth
 
   import XamtWeb.UserAuth, only: [require_sudo_mode: 2]
 
   plug :require_sudo_mode when action in [:edit, :update, :confirm_email]
-  plug :assign_email_and_password_changesets when action in [:edit, :update]
+  plug :assign_email_changeset when action in [:edit, :update]
 
   def edit(conn, _params) do
     render(conn, :edit)
@@ -39,41 +38,9 @@ defmodule XamtWeb.UserSettingsController do
     end
   end
 
-  def update(conn, %{"action" => "update_password"} = params) do
-    %{"user" => user_params} = params
-    user = conn.assigns.current_scope.user
-
-    case Accounts.update_user_password(user, user_params) do
-      {:ok, {user, _}} ->
-        conn
-        |> put_flash(:info, "Password updated successfully.")
-        |> put_session(:user_return_to, ~p"/users/settings")
-        |> UserAuth.log_in_user(user)
-
-      {:error, changeset} ->
-        render(conn, :edit, password_form: to_form(changeset, as: :user))
-    end
-  end
-
-  @doc """
-  Accepts the LiveView settings password form via `phx-trigger-action`.
-  Re-issues the session cookie after password (and token) rotation.
-  """
-  def update_password(conn, %{"user" => user_params}) do
-    user = conn.assigns.current_scope.user
-
-    case Accounts.update_user_password(user, user_params) do
-      {:ok, {user, _}} ->
-        conn
-        |> put_flash(:info, "Password updated successfully.")
-        |> put_session(:user_return_to, ~p"/settings")
-        |> UserAuth.log_in_user(user)
-
-      {:error, _changeset} ->
-        conn
-        |> put_flash(:error, "Could not update password.")
-        |> redirect(to: ~p"/settings")
-    end
+  # Password updates were removed; any other action (e.g. a stale form) is a no-op.
+  def update(conn, _params) do
+    redirect(conn, to: ~p"/users/settings")
   end
 
   def confirm_email(conn, %{"token" => token}) do
@@ -90,11 +57,9 @@ defmodule XamtWeb.UserSettingsController do
     end
   end
 
-  defp assign_email_and_password_changesets(conn, _opts) do
+  defp assign_email_changeset(conn, _opts) do
     user = conn.assigns.current_scope.user
 
-    conn
-    |> assign(:email_form, to_form(Accounts.change_user_email(user), as: :user))
-    |> assign(:password_form, to_form(Accounts.change_user_password(user), as: :user))
+    assign(conn, :email_form, to_form(Accounts.change_user_email(user), as: :user))
   end
 end

@@ -101,21 +101,15 @@ defmodule XamtWeb.Router do
         {XamtWeb.SearchPaletteHook, :default}
       ] do
       live "/admin/users", AdminUsersLive, :index
-      live "/admin/users/new", AdminUserLive, :new
       live "/admin/users/:id/edit", AdminUserLive, :edit
     end
   end
 
-  ## Authentication route aliases (spec: /login /register)
+  ## Authentication route alias (spec: /login)
   scope "/", XamtWeb do
     pipe_through [:browser, :redirect_if_user_is_authenticated]
 
     get "/login", UserSessionController, :new
-    get "/register", UserRegistrationController, :new
-    post "/register", UserRegistrationController, :create
-
-    get "/users/register", UserRegistrationController, :new
-    post "/users/register", UserRegistrationController, :create
   end
 
   scope "/", XamtWeb do
@@ -124,17 +118,12 @@ defmodule XamtWeb.Router do
     get "/users/settings", UserSettingsController, :edit
     put "/users/settings", UserSettingsController, :update
     get "/users/settings/confirm-email/:token", UserSettingsController, :confirm_email
-    # LiveView password form uses phx-trigger-action → POST here to refresh the session cookie.
-    post "/users/update-password", UserSettingsController, :update_password
   end
 
   scope "/", XamtWeb do
     pipe_through [:browser]
 
     get "/users/log-in", UserSessionController, :new
-    get "/users/log-in/:token", UserSessionController, :confirm
-    post "/users/log-in", UserSessionController, :create
-    post "/login", UserSessionController, :create
     delete "/users/log-out", UserSessionController, :delete
 
     # Mgl ID OIDC — must not use redirect_if_user_is_authenticated so

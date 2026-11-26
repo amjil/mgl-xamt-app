@@ -196,13 +196,17 @@ window.addEventListener(
   true
 )
 
-// Close any open .xamt-user-menu popover when clicking outside or selecting a link
+// Close any open .xamt-user-menu popover when clicking outside or selecting an item
 window.addEventListener("click", (event) => {
   const target = event.target instanceof Element ? event.target : null
   if (!target) return
 
   document.querySelectorAll("details.xamt-user-menu[open]").forEach((menu) => {
-    if (!menu.contains(target) || target.closest("a[href]")) {
+    if (
+      !menu.contains(target) ||
+      target.closest("a[href]") ||
+      target.closest("button[type='submit']")
+    ) {
       menu.removeAttribute("open")
     }
   })

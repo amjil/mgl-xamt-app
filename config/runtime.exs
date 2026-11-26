@@ -54,7 +54,7 @@ if System.get_env("MGL_ID_ENABLED") || System.get_env("MGL_ID_CLIENT_ID") do
   mgl_client_secret = System.get_env("MGL_ID_CLIENT_SECRET")
 
   default_issuer =
-    if config_env() == :prod, do: "https://id.amjil.net", else: "http://localhost:4004"
+    if config_env() == :prod, do: "https://id.amjil.net", else: "http://100.64.0.8:4004"
 
   mgl_opts =
     [
@@ -65,12 +65,12 @@ if System.get_env("MGL_ID_ENABLED") || System.get_env("MGL_ID_CLIENT_ID") do
       redirect_uri:
         System.get_env(
           "MGL_ID_REDIRECT_URI",
-          "http://localhost:4002/auth/mgl/callback"
+          "http://100.64.0.8:4002/auth/mgl/callback"
         ),
       link_redirect_uri:
         System.get_env(
           "MGL_ID_LINK_REDIRECT_URI",
-          "http://localhost:4002/settings/account/identities/mgl/callback"
+          "http://100.64.0.8:4002/settings/account/identities/mgl/callback"
         ),
       scopes: System.get_env("MGL_ID_SCOPES", "openid profile email")
     ]

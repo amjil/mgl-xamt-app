@@ -12,7 +12,6 @@ defmodule Xamt.Accounts.MglIdentityTest do
     assert {:ok, user} = Accounts.provision_user_from_mgl(claims)
     assert user.email == claims["email"]
     assert user.confirmed_at
-    assert is_nil(user.hashed_password)
 
     identity = Accounts.get_mgl_identity(user)
     assert identity.provider == MglId.provider()
@@ -78,8 +77,16 @@ defmodule Xamt.Accounts.MglIdentityTest do
     assert {:error, :user_already_linked} = Accounts.link_mgl_identity(user, claims_b)
   end
 
-  test "requires email claim for provisioning" do
-    claims = MglIdHelpers.default_claims() |> Map.delete("email")
-    assert {:error, :missing_email} = Accounts.provision_user_from_mgl(claims)
+  test "synthesizes email when claim is missing" do
+    claims =
+      MglIdHelpers.default_claims(%{
+        "sub" => "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        "preferred_username" => "NoMailUser"
+      })
+      |> Map.delete("email")
+
+    assert {:ok, user} = Accounts.provision_user_from_mgl(claims)
+    assert user.email == "nomailuser.aaaaaaaa@users.noreply.mgl-id"
+    assert Accounts.get_mgl_identity(user)
   end
 end

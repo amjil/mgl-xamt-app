@@ -4,7 +4,6 @@ alias Xamt.Repo
 alias Xamt.Servers
 alias Xamt.Servers.Server
 
-demo_password = "hello world1!"
 demo_email = "demo@xamt.local"
 server_slug = "mongol-bichig"
 
@@ -14,18 +13,16 @@ user =
       existing
 
     nil ->
-      {:ok, registered} =
-        Accounts.register_user(%{
-          "email" => demo_email,
-          "username" => "demo",
-          "display_name" => "Demo",
-          "password" => demo_password,
-          "password_confirmation" => demo_password
-        })
-
-      registered
-      |> User.confirm_changeset()
-      |> Repo.update!()
+      # Seeds bypass public sign-up (removed); the admin changeset creates a
+      # confirmed account directly. Sign-in for the demo user is via Mgl ID.
+      %User{}
+      |> User.admin_registration_changeset(%{
+        "email" => demo_email,
+        "username" => "demo",
+        "display_name" => "Demo",
+        "global_role" => "creator"
+      })
+      |> Repo.insert!()
   end
 
 user =

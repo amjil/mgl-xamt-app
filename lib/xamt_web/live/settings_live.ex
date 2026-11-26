@@ -3,7 +3,6 @@ defmodule XamtWeb.SettingsLive do
 
   alias Xamt.Accounts
   alias Xamt.Accounts.User
-  alias Xamt.SiteSettings
   alias XamtWeb.Uploads
 
   @impl true
@@ -33,14 +32,7 @@ defmodule XamtWeb.SettingsLive do
        :email_form,
        to_form(Accounts.change_user_email(user, %{}, validate_unique: false), as: "email")
      )
-     |> assign(
-       :password_form,
-       to_form(Accounts.change_user_password(user, %{}, hash_password: false), as: "user")
-     )
-     |> assign(:trigger_submit, false)
      |> assign(:site_admin?, User.admin?(user))
-     |> assign(:registration_enabled?, SiteSettings.registration_enabled?())
-     |> assign(:magic_link_enabled?, SiteSettings.magic_link_enabled?())
      |> assign(:mgl_id_enabled?, Xamt.MglId.enabled?())
      |> assign(:mgl_identity, mgl_identity)
      |> allow_upload(:avatar,
@@ -171,31 +163,6 @@ defmodule XamtWeb.SettingsLive do
     end
   end
 
-  def handle_event("validate_password", %{"user" => password_params}, socket) do
-    password_form =
-      socket.assigns.current_scope.user
-      |> Accounts.change_user_password(password_params, hash_password: false)
-      |> Map.put(:action, :validate)
-      |> to_form(as: "user")
-
-    {:noreply, assign(socket, password_form: password_form)}
-  end
-
-  def handle_event("update_password", %{"user" => password_params}, socket) do
-    user = socket.assigns.current_scope.user
-
-    case Accounts.change_user_password(user, password_params) do
-      %{valid?: true} = changeset ->
-        {:noreply,
-         socket
-         |> assign(:trigger_submit, true)
-         |> assign(:password_form, to_form(changeset, as: "user"))}
-
-      changeset ->
-        {:noreply, assign(socket, password_form: to_form(changeset, action: :insert, as: "user"))}
-    end
-  end
-
   def handle_event("revoke_all_sessions", _params, socket) do
     user = socket.assigns.current_scope.user
     Accounts.revoke_all_user_sessions(user)
@@ -204,58 +171,6 @@ defmodule XamtWeb.SettingsLive do
      socket
      |> put_flash(:info, gettext("All sessions have been logged out. Please log in again."))
      |> redirect(to: ~p"/users/log-in")}
-  end
-
-  def handle_event("toggle_registration", _params, socket) do
-    enabled = !socket.assigns.registration_enabled?
-
-    case SiteSettings.update_registration_enabled(socket.assigns.current_scope.user, enabled) do
-      {:ok, setting} ->
-        flash =
-          if setting.registration_enabled do
-            gettext("Registration is now open.")
-          else
-            gettext("Registration is now closed.")
-          end
-
-        {:noreply,
-         socket
-         |> assign_site_toggles(setting)
-         |> put_flash(:info, flash)}
-
-      {:error, :unauthorized} ->
-        {:noreply,
-         put_flash(socket, :error, gettext("You don't have permission to change this."))}
-    end
-  end
-
-  def handle_event("toggle_magic_link", _params, socket) do
-    enabled = !socket.assigns.magic_link_enabled?
-
-    case SiteSettings.update_magic_link_enabled(socket.assigns.current_scope.user, enabled) do
-      {:ok, setting} ->
-        flash =
-          if setting.magic_link_enabled do
-            gettext("Magic link login is now open.")
-          else
-            gettext("Magic link login is now closed.")
-          end
-
-        {:noreply,
-         socket
-         |> assign_site_toggles(setting)
-         |> put_flash(:info, flash)}
-
-      {:error, :unauthorized} ->
-        {:noreply,
-         put_flash(socket, :error, gettext("You don't have permission to change this."))}
-    end
-  end
-
-  defp assign_site_toggles(socket, setting) do
-    socket
-    |> assign(:registration_enabled?, setting.registration_enabled)
-    |> assign(:magic_link_enabled?, setting.magic_link_enabled)
   end
 
   defp upload_error_to_string(:too_large), do: gettext("File is too large")
@@ -549,86 +464,6 @@ defmodule XamtWeb.SettingsLive do
           </div>
         </section>
         
-    <!-- ==================== Section 4: Change login password ==================== -->
-        <section class="xamt-home-section">
-          <header class="xamt-home-section__header">
-            <div class="flex flex-row items-center gap-2">
-              <.icon name="hero-key" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
-              <h2 class="font-bold text-sm">{gettext("Change Password")}</h2>
-            </div>
-          </header>
-
-          <.form
-            for={@password_form}
-            id="password_form"
-            action={~p"/users/update-password"}
-            method="post"
-            phx-change="validate_password"
-            phx-submit="update_password"
-            phx-trigger-action={@trigger_submit}
-            class="xamt-home-card"
-          >
-            <input
-              name={@password_form[:email].name}
-              type="hidden"
-              id="hidden_user_email"
-              autocomplete="username"
-              value={@current_email}
-            />
-
-            <label class="xamt-bot-field">
-              <span class="xamt-label">{gettext("New Password")}</span>
-              <input
-                type="password"
-                name={@password_form[:password].name}
-                value={@password_form[:password].value}
-                autocomplete="new-password"
-                required
-                placeholder="••••••••••••"
-                class="xamt-bot-input"
-                onfocus="setTimeout(() => this.scrollIntoView({behavior: 'smooth', inline: 'center'}), 150)"
-              />
-            </label>
-
-            <p
-              :for={{msg, opts} <- @password_form[:password].errors}
-              class="text-xs text-red-500 px-1"
-            >
-              {translate_error({msg, opts})}
-            </p>
-
-            <label class="xamt-bot-field">
-              <span class="xamt-label">{gettext("Confirm New Password")}</span>
-              <input
-                type="password"
-                name={@password_form[:password_confirmation].name}
-                value={@password_form[:password_confirmation].value}
-                autocomplete="new-password"
-                required
-                placeholder="••••••••••••"
-                class="xamt-bot-input"
-                onfocus="setTimeout(() => this.scrollIntoView({behavior: 'smooth', inline: 'center'}), 150)"
-              />
-            </label>
-
-            <p
-              :for={{msg, opts} <- @password_form[:password_confirmation].errors}
-              class="text-xs text-red-500 px-1"
-            >
-              {translate_error({msg, opts})}
-            </p>
-
-            <button
-              type="submit"
-              phx-disable-with={gettext("Saving...")}
-              class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold text-xs"
-            >
-              <.icon name="hero-lock-closed" class="w-4 h-4 mb-1.5" />
-              <span>{gettext("Save Password")}</span>
-            </button>
-          </.form>
-        </section>
-        
     <!-- ==================== Section 5: Notifications and secure logout ==================== -->
         <section class="xamt-home-section">
           <header class="xamt-home-section__header">
@@ -703,53 +538,6 @@ defmodule XamtWeb.SettingsLive do
             <h2 class="font-bold text-xs text-[var(--xamt-accent)]">
               {gettext("Site")}
             </h2>
-            <p class="text-xs text-[var(--xamt-muted)]">
-              {gettext("Control how people join and sign in.")}
-            </p>
-
-            <div class="flex flex-row items-center justify-between gap-3">
-              <button
-                type="button"
-                id="registration-toggle"
-                class="xamt-switch"
-                role="switch"
-                aria-checked={to_string(@registration_enabled?)}
-                phx-click="toggle_registration"
-              >
-                <span class="xamt-switch__track" aria-hidden="true">
-                  <span class="xamt-switch__thumb"></span>
-                </span>
-              </button>
-              <div class="flex flex-row items-center gap-1">
-                <span class="text-xs font-bold">{gettext("Allow registration")}</span>
-                <span class="text-xs text-[var(--xamt-muted)]">
-                  {if @registration_enabled?, do: gettext("Open"), else: gettext("Closed")}
-                </span>
-              </div>
-            </div>
-
-            <div class="flex flex-row items-center justify-between gap-3">
-              <button
-                type="button"
-                id="magic-link-toggle"
-                class="xamt-switch"
-                role="switch"
-                aria-checked={to_string(@magic_link_enabled?)}
-                phx-click="toggle_magic_link"
-              >
-                <span class="xamt-switch__track" aria-hidden="true">
-                  <span class="xamt-switch__thumb"></span>
-                </span>
-              </button>
-              <div class="flex flex-row items-center gap-1">
-                <span class="text-xs font-bold">
-                  {gettext("Allow magic link login")}
-                </span>
-                <span class="text-xs text-[var(--xamt-muted)]">
-                  {if @magic_link_enabled?, do: gettext("Open"), else: gettext("Closed")}
-                </span>
-              </div>
-            </div>
 
             <.link
               navigate={~p"/admin/users"}

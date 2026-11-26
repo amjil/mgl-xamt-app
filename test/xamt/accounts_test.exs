@@ -17,24 +17,6 @@ defmodule Xamt.AccountsTest do
     end
   end
 
-  describe "get_user_by_email_and_password/2" do
-    test "does not return the user if the email does not exist" do
-      refute Accounts.get_user_by_email_and_password("unknown@example.com", "hello world!")
-    end
-
-    test "does not return the user if the password is not valid" do
-      user = user_fixture() |> set_password()
-      refute Accounts.get_user_by_email_and_password(user.email, "invalid")
-    end
-
-    test "returns the user if the email and password are valid" do
-      %{id: id} = user = user_fixture() |> set_password()
-
-      assert %User{id: ^id} =
-               Accounts.get_user_by_email_and_password(user.email, valid_user_password())
-    end
-  end
-
   describe "get_user!/1" do
     test "raises if id is invalid" do
       assert_raise Ecto.NoResultsError, fn ->
@@ -45,63 +27,6 @@ defmodule Xamt.AccountsTest do
     test "returns the user with the given id" do
       %{id: id} = user = user_fixture()
       assert %User{id: ^id} = Accounts.get_user!(user.id)
-    end
-  end
-
-  describe "register_user/1" do
-    test "requires email, username, and password to be set" do
-      {:error, changeset} = Accounts.register_user(%{})
-
-      assert %{
-               email: ["can't be blank"],
-               username: ["can't be blank"],
-               password: ["can't be blank"]
-             } =
-               errors_on(changeset)
-    end
-
-    test "validates email when given" do
-      {:error, changeset} = Accounts.register_user(%{email: "not valid"})
-
-      assert %{email: ["must have the @ sign and no spaces"]} = errors_on(changeset)
-    end
-
-    test "validates maximum values for email for security" do
-      too_long = String.duplicate("db", 100)
-      {:error, changeset} = Accounts.register_user(%{email: too_long})
-      assert "should be at most 160 character(s)" in errors_on(changeset).email
-    end
-
-    test "validates email uniqueness" do
-      %{email: email} = user_fixture()
-      {:error, changeset} = Accounts.register_user(%{email: email})
-      assert "has already been taken" in errors_on(changeset).email
-
-      # Now try with the uppercased email too, to check that email case is ignored.
-      {:error, changeset} = Accounts.register_user(%{email: String.upcase(email)})
-      assert "has already been taken" in errors_on(changeset).email
-    end
-
-    test "registers users with password and username" do
-      email = unique_user_email()
-      username = unique_user_username()
-
-      {:ok, user} =
-        Accounts.register_user(valid_user_attributes(email: email, username: username))
-
-      assert user.email == email
-      assert user.username == username
-      assert user.hashed_password
-      refute user.confirmed_at
-      assert user.status == "offline"
-      assert user.global_role == "user"
-    end
-
-    test "ignores global_role from registration params" do
-      {:ok, user} =
-        Accounts.register_user(Map.put(valid_user_attributes(), :global_role, "admin"))
-
-      assert user.global_role == "user"
     end
   end
 
@@ -198,100 +123,6 @@ defmodule Xamt.AccountsTest do
     end
   end
 
-  describe "change_user_password/3" do
-    test "returns a user changeset" do
-      assert %Ecto.Changeset{} = changeset = Accounts.change_user_password(%User{})
-      assert changeset.required == [:password]
-    end
-
-    test "allows fields to be set" do
-      changeset =
-        Accounts.change_user_password(
-          %User{},
-          %{
-            "password" => "new valid pass1!"
-          },
-          hash_password: false
-        )
-
-      assert changeset.valid?
-      assert get_change(changeset, :password) == "new valid pass1!"
-      assert is_nil(get_change(changeset, :hashed_password))
-    end
-  end
-
-  describe "update_user_password/2" do
-    setup do
-      %{user: user_fixture()}
-    end
-
-    test "validates password", %{user: user} do
-      {:error, changeset} =
-        Accounts.update_user_password(user, %{
-          password: "short",
-          password_confirmation: "another"
-        })
-
-      errors = errors_on(changeset)
-      assert "should be at least 8 character(s)" in errors.password
-      assert errors.password_confirmation == ["does not match password"]
-    end
-
-    test "validates password composition", %{user: user} do
-      {:error, letters_only} =
-        Accounts.update_user_password(user, %{password: "abcdefgh"})
-
-      assert "must include a number" in errors_on(letters_only).password
-      assert "must include a symbol" in errors_on(letters_only).password
-
-      {:error, no_letter} =
-        Accounts.update_user_password(user, %{password: "1234567!"})
-
-      assert "must include an English letter" in errors_on(no_letter).password
-
-      {:error, no_symbol} =
-        Accounts.update_user_password(user, %{password: "abcdefg1"})
-
-      assert "must include a symbol" in errors_on(no_symbol).password
-    end
-
-    test "validates maximum values for password for security", %{user: user} do
-      too_long = String.duplicate("db", 100)
-
-      {:error, changeset} =
-        Accounts.update_user_password(user, %{password: too_long})
-
-      assert "should be at most 72 character(s)" in errors_on(changeset).password
-    end
-
-    test "updates the password", %{user: user} do
-      {:ok, {user, expired_tokens}} =
-        Accounts.update_user_password(user, %{
-          password: "new valid pass1!"
-        })
-
-      assert expired_tokens == []
-      assert is_nil(user.password)
-      assert Accounts.get_user_by_email_and_password(user.email, "new valid pass1!")
-    end
-
-    test "accepts an 8-character mixed password", %{user: user} do
-      {:ok, {user, _}} = Accounts.update_user_password(user, %{password: "Abcdef1!"})
-      assert Accounts.get_user_by_email_and_password(user.email, "Abcdef1!")
-    end
-
-    test "deletes all tokens for the given user", %{user: user} do
-      _ = Accounts.generate_user_session_token(user)
-
-      {:ok, {_, _}} =
-        Accounts.update_user_password(user, %{
-          password: "new valid pass1!"
-        })
-
-      refute Repo.get_by(UserToken, user_id: user.id)
-    end
-  end
-
   describe "generate_user_session_token/1" do
     setup do
       %{user: user_fixture()}
@@ -347,153 +178,12 @@ defmodule Xamt.AccountsTest do
     end
   end
 
-  describe "get_user_by_magic_link_token/1" do
-    setup do
-      user = user_fixture()
-      {encoded_token, _hashed_token} = generate_user_magic_link_token(user)
-      %{user: user, token: encoded_token}
-    end
-
-    test "returns user by token", %{user: user, token: token} do
-      assert session_user = Accounts.get_user_by_magic_link_token(token)
-      assert session_user.id == user.id
-    end
-
-    test "does not return user for invalid token" do
-      refute Accounts.get_user_by_magic_link_token("oops")
-    end
-
-    test "does not return user for expired token", %{token: token} do
-      {1, nil} = Repo.update_all(UserToken, set: [inserted_at: ~N[2020-01-01 00:00:00]])
-      refute Accounts.get_user_by_magic_link_token(token)
-    end
-  end
-
-  describe "login_user_by_magic_link/1" do
-    test "confirms user and expires tokens" do
-      user = passwordless_user_fixture()
-      refute user.confirmed_at
-      {encoded_token, hashed_token} = generate_user_magic_link_token(user)
-
-      assert {:ok, {user, [%{token: ^hashed_token}]}} =
-               Accounts.login_user_by_magic_link(encoded_token)
-
-      assert user.confirmed_at
-    end
-
-    test "returns user and (deleted) token for confirmed user" do
-      user = user_fixture()
-      assert user.confirmed_at
-      {encoded_token, _hashed_token} = generate_user_magic_link_token(user)
-      assert {:ok, {^user, []}} = Accounts.login_user_by_magic_link(encoded_token)
-      # one time use only
-      assert {:error, :not_found} = Accounts.login_user_by_magic_link(encoded_token)
-    end
-
-    test "confirms an unconfirmed user who already has a password" do
-      {:ok, user} = Accounts.register_user(valid_user_attributes())
-      refute user.confirmed_at
-      {encoded_token, hashed_token} = generate_user_magic_link_token(user)
-
-      assert {:ok, {confirmed, [%{token: ^hashed_token}]}} =
-               Accounts.login_user_by_magic_link(encoded_token)
-
-      assert confirmed.id == user.id
-      assert confirmed.confirmed_at
-    end
-  end
-
   describe "delete_user_session_token/1" do
     test "deletes the token" do
       user = user_fixture()
       token = Accounts.generate_user_session_token(user)
       assert Accounts.delete_user_session_token(token) == :ok
       refute Accounts.get_user_by_session_token(token)
-    end
-  end
-
-  describe "deliver_login_instructions/2" do
-    setup do
-      %{user: unconfirmed_user_fixture()}
-    end
-
-    test "sends token through notification", %{user: user} do
-      token =
-        extract_user_token(fn url ->
-          Accounts.deliver_login_instructions(user, url)
-        end)
-
-      {:ok, token} = Base.url_decode64(token, padding: false)
-      assert user_token = Repo.get_by(UserToken, token: :crypto.hash(:sha256, token))
-      assert user_token.user_id == user.id
-      assert user_token.sent_to == user.email
-      assert user_token.context == "login"
-    end
-  end
-
-  describe "inspect/2 for the User module" do
-    test "does not include password" do
-      refute inspect(%User{password: "123456"}) =~ "password: \"123456\""
-    end
-  end
-
-  describe "create_user_as_admin/2" do
-    test "admins can create a confirmed user with a role" do
-      admin = admin_fixture()
-      email = unique_user_email()
-      username = unique_user_username()
-
-      attrs =
-        valid_user_attributes(email: email, username: username)
-        |> Map.put(:display_name, "New Neighbor")
-        |> Map.put(:global_role, "creator")
-
-      assert {:ok, user} = Accounts.create_user_as_admin(Scope.for_user(admin), attrs)
-      assert user.email == email
-      assert user.username == username
-      assert user.display_name == "New Neighbor"
-      assert user.global_role == "creator"
-      assert user.confirmed_at
-      assert user.hashed_password
-    end
-
-    test "defaults to the user role" do
-      admin = admin_fixture()
-      {:ok, user} = Accounts.create_user_as_admin(Scope.for_user(admin), valid_user_attributes())
-      assert user.global_role == "user"
-    end
-
-    test "works when public registration is closed" do
-      admin = admin_fixture()
-      Xamt.SiteSettings.put_registration_enabled!(false)
-
-      {:ok, user} = Accounts.create_user_as_admin(Scope.for_user(admin), valid_user_attributes())
-      assert user.id
-    end
-
-    test "rejects non-admins" do
-      user = user_fixture()
-      creator = creator_fixture()
-      attrs = valid_user_attributes()
-
-      assert {:error, :unauthorized} = Accounts.create_user_as_admin(Scope.for_user(user), attrs)
-
-      assert {:error, :unauthorized} =
-               Accounts.create_user_as_admin(Scope.for_user(creator), attrs)
-
-      refute Accounts.get_user_by_email(attrs.email)
-    end
-
-    test "rejects an invalid role" do
-      admin = admin_fixture()
-
-      assert {:error, changeset} =
-               Accounts.create_user_as_admin(
-                 Scope.for_user(admin),
-                 Map.put(valid_user_attributes(), :global_role, "superadmin")
-               )
-
-      assert "is invalid" in errors_on(changeset).global_role
     end
   end
 
@@ -569,42 +259,6 @@ defmodule Xamt.AccountsTest do
       assert updated.bio == "Writes in Mongolian."
       assert updated.global_role == "creator"
       assert User.can_create_server?(updated)
-    end
-
-    test "blank password leaves the current hash" do
-      admin = admin_fixture()
-      user = user_fixture()
-      hash = user.hashed_password
-
-      assert {:ok, updated} =
-               Accounts.update_user_as_admin(Scope.for_user(admin), user, %{
-                 username: user.username,
-                 email: user.email,
-                 global_role: user.global_role,
-                 password: "",
-                 password_confirmation: ""
-               })
-
-      assert updated.hashed_password == hash
-    end
-
-    test "password change updates the hash and expires sessions" do
-      admin = admin_fixture()
-      user = user_fixture()
-      token = Accounts.generate_user_session_token(user)
-      new_password = "a brand new secret1!"
-
-      assert {:ok, updated} =
-               Accounts.update_user_as_admin(Scope.for_user(admin), user, %{
-                 username: user.username,
-                 email: user.email,
-                 global_role: user.global_role,
-                 password: new_password,
-                 password_confirmation: new_password
-               })
-
-      assert User.valid_password?(updated, new_password)
-      refute Accounts.get_user_by_session_token(token)
     end
 
     test "rejects non-admins" do

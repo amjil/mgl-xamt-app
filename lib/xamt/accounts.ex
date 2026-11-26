@@ -35,24 +35,6 @@ defmodule Xamt.Accounts do
   end
 
   @doc """
-  Gets a user by email and password.
-
-  ## Examples
-
-      iex> get_user_by_email_and_password("foo@example.com", "correct_password")
-      %User{}
-
-      iex> get_user_by_email_and_password("foo@example.com", "invalid_password")
-      nil
-
-  """
-  def get_user_by_email_and_password(email, password)
-      when is_binary(email) and is_binary(password) do
-    user = Repo.get_by(User, email: email)
-    if User.valid_password?(user, password), do: user
-  end
-
-  @doc """
   Gets a single user.
 
   Raises `Ecto.NoResultsError` if the User does not exist.
@@ -67,61 +49,6 @@ defmodule Xamt.Accounts do
 
   """
   def get_user!(id), do: Repo.get!(User, id)
-
-  ## User registration
-
-  @doc """
-  Registers a user.
-
-  ## Examples
-
-      iex> register_user(%{field: value})
-      {:ok, %User{}}
-
-      iex> register_user(%{field: bad_value})
-      {:error, %Ecto.Changeset{}}
-
-  """
-  def register_user(attrs) do
-    %User{}
-    |> User.registration_changeset(attrs)
-    |> Repo.insert()
-  end
-
-  @doc """
-  Returns a changeset for tracking registration fields.
-  """
-  def change_user_registration(user, attrs \\ %{}, opts \\ []) do
-    User.registration_changeset(user, attrs, Keyword.put_new(opts, :validate_unique, false))
-  end
-
-  @doc """
-  Creates a confirmed user on behalf of a site admin.
-
-  Independent of the public registration switch. Only an actor with
-  `global_role: "admin"` may call this. `global_role` is accepted here so
-  operators can create creators or other admins in one step.
-  """
-  def create_user_as_admin(%Scope{user: %User{} = actor}, attrs) when is_map(attrs) do
-    if User.admin?(actor) do
-      %User{}
-      |> User.admin_registration_changeset(attrs)
-      |> Repo.insert()
-    else
-      {:error, :unauthorized}
-    end
-  end
-
-  @doc """
-  Returns a changeset for the admin create-user form.
-  """
-  def change_user_admin_registration(user, attrs \\ %{}, opts \\ []) do
-    User.admin_registration_changeset(
-      user,
-      attrs,
-      Keyword.put_new(opts, :validate_unique, false)
-    )
-  end
 
   @doc """
   Users matching `query` for a site admin.
@@ -147,33 +74,22 @@ defmodule Xamt.Accounts do
       attrs,
       opts
       |> Keyword.put_new(:validate_unique, false)
-      |> Keyword.put_new(:hash_password, false)
     )
   end
 
   @doc """
   Updates an account on behalf of a site admin.
 
-  Independent of the public profile and email-confirmation flows. A blank
-  password is left unchanged. Changing the password expires the user's
-  sessions. The last remaining admin cannot be demoted.
+  Independent of the public profile and email-confirmation flows. The last
+  remaining admin cannot be demoted.
   """
   def update_user_as_admin(%Scope{user: %User{} = actor}, %User{} = user, attrs)
       when is_map(attrs) do
     if User.admin?(actor) do
-      changeset =
-        user
-        |> User.admin_update_changeset(attrs)
-        |> maybe_protect_last_admin(user)
-
-      if changeset.valid? and Ecto.Changeset.get_change(changeset, :hashed_password) do
-        case update_user_and_delete_all_tokens(changeset) do
-          {:ok, {updated, _tokens}} -> {:ok, updated}
-          {:error, _} = error -> error
-        end
-      else
-        Repo.update(changeset)
-      end
+      user
+      |> User.admin_update_changeset(attrs)
+      |> maybe_protect_last_admin(user)
+      |> Repo.update()
     else
       {:error, :unauthorized}
     end
@@ -345,41 +261,6 @@ defmodule Xamt.Accounts do
     end)
   end
 
-  @doc """
-  Returns an `%Ecto.Changeset{}` for changing the user password.
-
-  See `Xamt.Accounts.User.password_changeset/3` for a list of supported options.
-
-  ## Examples
-
-      iex> change_user_password(user)
-      %Ecto.Changeset{data: %User{}}
-
-  """
-  def change_user_password(user, attrs \\ %{}, opts \\ []) do
-    User.password_changeset(user, attrs, opts)
-  end
-
-  @doc """
-  Updates the user password.
-
-  Returns a tuple with the updated user, as well as a list of expired tokens.
-
-  ## Examples
-
-      iex> update_user_password(user, %{password: ...})
-      {:ok, {%User{}, [...]}}
-
-      iex> update_user_password(user, %{password: "too short"})
-      {:error, %Ecto.Changeset{}}
-
-  """
-  def update_user_password(user, attrs) do
-    user
-    |> User.password_changeset(attrs)
-    |> update_user_and_delete_all_tokens()
-  end
-
   ## Session
 
   @doc """
@@ -401,51 +282,6 @@ defmodule Xamt.Accounts do
     Repo.one(query)
   end
 
-  @doc """
-  Gets the user with the given magic link token.
-  """
-  def get_user_by_magic_link_token(token) do
-    with {:ok, query} <- UserToken.verify_magic_link_token_query(token),
-         {user, _token} <- Repo.one(query) do
-      user
-    else
-      _ -> nil
-    end
-  end
-
-  @doc """
-  Logs the user in by magic link.
-
-  There are two cases to consider:
-
-  1. The user has already confirmed their email. They are logged in
-     and the magic link is expired.
-
-  2. The user has not confirmed their email (password optional).
-     The inbox holder is confirming the address: `confirmed_at` is set,
-     they are logged in, and existing tokens are expired.
-  """
-  def login_user_by_magic_link(token) do
-    {:ok, query} = UserToken.verify_magic_link_token_query(token)
-
-    case Repo.one(query) do
-      # Public registration leaves `confirmed_at` nil and sets a password.
-      # Only the inbox holder can redeem this token, so confirming here is
-      # the intended claim of the address (not a session-fixation hole).
-      {%User{confirmed_at: nil} = user, _token} ->
-        user
-        |> User.confirm_changeset()
-        |> update_user_and_delete_all_tokens()
-
-      {user, token} ->
-        Repo.delete!(token)
-        {:ok, {user, []}}
-
-      nil ->
-        {:error, :not_found}
-    end
-  end
-
   @doc ~S"""
   Delivers the update email instructions to the given user.
 
@@ -461,16 +297,6 @@ defmodule Xamt.Accounts do
 
     Repo.insert!(user_token)
     UserNotifier.deliver_update_email_instructions(user, update_email_url_fun.(encoded_token))
-  end
-
-  @doc """
-  Delivers the magic link login instructions to the given user.
-  """
-  def deliver_login_instructions(%User{} = user, magic_link_url_fun)
-      when is_function(magic_link_url_fun, 1) do
-    {encoded_token, user_token} = UserToken.build_email_token(user, "login")
-    Repo.insert!(user_token)
-    UserNotifier.deliver_login_instructions(user, magic_link_url_fun.(encoded_token))
   end
 
   @doc """
@@ -522,16 +348,16 @@ defmodule Xamt.Accounts do
   Never matches existing users by username or email.
   """
   def provision_user_from_mgl(claims) when is_map(claims) do
-    email = claims["email"]
     preferred = claims["preferred_username"] || claims["name"]
     display_name = claims["name"]
+    email = mgl_provision_email(claims)
 
     cond do
-      not is_binary(email) or String.trim(email) == "" ->
-        {:error, :missing_email}
-
       not is_binary(claims["sub"]) or claims["sub"] == "" ->
         {:error, :missing_sub}
+
+      not is_binary(email) ->
+        {:error, :missing_email}
 
       true ->
         Repo.transact(fn ->
@@ -552,6 +378,47 @@ defmodule Xamt.Accounts do
         end)
     end
   end
+
+  # Mgl ID users may only have a username; synthesize a stable local email so
+  # Xamt's required email column can be filled without blocking SSO login.
+  defp mgl_provision_email(%{"email" => email} = claims) when is_binary(email) do
+    case String.trim(email) do
+      "" -> mgl_synthetic_email(claims)
+      trimmed -> trimmed
+    end
+  end
+
+  defp mgl_provision_email(claims), do: mgl_synthetic_email(claims)
+
+  defp mgl_synthetic_email(%{"sub" => sub} = claims) when is_binary(sub) and sub != "" do
+    local =
+      case claims["preferred_username"] do
+        name when is_binary(name) ->
+          cleaned =
+            name
+            |> String.trim()
+            |> String.downcase()
+            |> String.replace(~r/[^a-z0-9._+-]+/u, "-")
+            |> String.trim("-")
+
+          if cleaned == "", do: nil, else: cleaned
+
+        _ ->
+          nil
+      end
+
+    local =
+      local ||
+        sub
+        |> String.replace(~r/[^a-zA-Z0-9]+/, "")
+        |> String.downcase()
+        |> String.slice(0, 32)
+
+    local = if local == "", do: "mgl", else: local
+    "#{local}.#{String.slice(sub, 0, 8)}@users.noreply.mgl-id"
+  end
+
+  defp mgl_synthetic_email(_), do: nil
 
   @doc """
   Links a verified Mgl identity to an existing local user.
@@ -652,19 +519,5 @@ defmodule Xamt.Accounts do
 
   defp find_unique_username(_base, _attempt) do
     {:ok, "user" <> Integer.to_string(System.unique_integer([:positive]))}
-  end
-
-  ## Token helper
-
-  defp update_user_and_delete_all_tokens(changeset) do
-    Repo.transact(fn ->
-      with {:ok, user} <- Repo.update(changeset) do
-        tokens_to_expire = Repo.all_by(UserToken, user_id: user.id)
-
-        Repo.delete_all(from(t in UserToken, where: t.id in ^Enum.map(tokens_to_expire, & &1.id)))
-
-        {:ok, {user, tokens_to_expire}}
-      end
-    end)
   end
 end

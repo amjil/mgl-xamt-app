@@ -2,7 +2,6 @@ defmodule XamtWeb.AdminUsersLive do
   use XamtWeb, :live_view
 
   alias Xamt.Accounts
-  alias Xamt.SiteSettings
 
   @impl true
   def mount(_params, _session, socket) do
@@ -10,7 +9,6 @@ defmodule XamtWeb.AdminUsersLive do
      socket
      |> assign(:page_title, gettext("Users"))
      |> assign(:query, "")
-     |> assign(:magic_link_enabled?, SiteSettings.magic_link_enabled?())
      |> assign_users("")}
   end
 
@@ -25,19 +23,6 @@ defmodule XamtWeb.AdminUsersLive do
   end
 
   def handle_event("search", _params, socket), do: {:noreply, socket}
-
-  def handle_event("toggle_magic_link", _params, socket) do
-    enabled = !socket.assigns.magic_link_enabled?
-
-    case SiteSettings.update_magic_link_enabled(socket.assigns.current_scope.user, enabled) do
-      {:ok, setting} ->
-        {:noreply, assign(socket, :magic_link_enabled?, setting.magic_link_enabled)}
-
-      {:error, :unauthorized} ->
-        {:noreply,
-         put_flash(socket, :error, gettext("You don't have permission to change this."))}
-    end
-  end
 
   def handle_event("set_role", %{"user_id" => user_id, "role" => role}, socket) do
     target = Accounts.get_user!(user_id)
@@ -94,35 +79,8 @@ defmodule XamtWeb.AdminUsersLive do
               <span id="admin-users-count" class="mongol-text">
                 {gettext("%{count} accounts", count: @users_count)}
               </span>
-
-              <.link
-                navigate={~p"/admin/users/new"}
-                id="admin-users-create"
-                class="xamt-btn xamt-btn--primary py-2.5 px-2 text-xs font-bold mongol-text"
-              >
-                {gettext("Create user")}
-              </.link>
             </div>
           </header>
-
-          <div class="xamt-user-strip justify-between">
-            <div class="flex flex-row items-center gap-2">
-              <.icon name="hero-envelope-open" class="w-4 h-4 text-[var(--xamt-accent)] shrink-0" />
-              <span class="font-bold text-xs mongol-text">{gettext("Magic link login")}</span>
-            </div>
-
-            <button
-              type="button"
-              id="admin-users-magic-link-toggle"
-              phx-click="toggle_magic_link"
-              class={[
-                "xamt-btn py-3 px-2 text-xs font-bold mongol-text",
-                @magic_link_enabled? && "xamt-btn--primary"
-              ]}
-            >
-              {if @magic_link_enabled?, do: gettext("On"), else: gettext("Off")}
-            </button>
-          </div>
         </aside>
 
         <%!-- Zone 2: search --%>

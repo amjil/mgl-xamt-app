@@ -2,7 +2,7 @@ defmodule XamtWeb.AdminUserLive do
   use XamtWeb, :live_view
 
   alias Xamt.Accounts
-  alias Xamt.Accounts.{Scope, User}
+  alias Xamt.Accounts.Scope
   alias Xamt.Servers
 
   @impl true
@@ -23,10 +23,6 @@ defmodule XamtWeb.AdminUserLive do
       |> Map.put(:action, :validate)
 
     {:noreply, assign(socket, form: to_form(changeset, as: :user))}
-  end
-
-  def handle_event("save", %{"user" => params}, socket) do
-    save_user(socket, socket.assigns.live_action, params)
   end
 
   def handle_event("save_profile", %{"user" => params}, socket) do
@@ -72,16 +68,6 @@ defmodule XamtWeb.AdminUserLive do
     save_user(socket, :edit, params)
   end
 
-  defp apply_action(socket, :new, _params) do
-    socket
-    |> assign(:page_title, gettext("Create user"))
-    |> assign(:user, %User{})
-    |> assign(:target_user, nil)
-    |> assign(:profile_form, nil)
-    |> assign(:servers, [])
-    |> assign(:form, to_form(Accounts.change_user_admin_registration(%User{}), as: :user))
-  end
-
   defp apply_action(socket, :edit, %{"id" => id}) do
     user = Accounts.get_user!(id)
     servers = Servers.list_servers_for_user(Scope.for_user(user))
@@ -95,29 +81,8 @@ defmodule XamtWeb.AdminUserLive do
     |> assign(:form, to_form(Accounts.change_user_admin_update(user), as: :user))
   end
 
-  defp change_user(%{assigns: %{live_action: :new}}, params) do
-    Accounts.change_user_admin_registration(%User{}, params)
-  end
-
   defp change_user(%{assigns: %{live_action: :edit, user: user}}, params) do
     Accounts.change_user_admin_update(user, params)
-  end
-
-  defp save_user(socket, :new, params) do
-    case Accounts.create_user_as_admin(socket.assigns.current_scope, params) do
-      {:ok, user} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, gettext("Created @%{username}", username: user.username))
-         |> assign(:form, to_form(Accounts.change_user_admin_registration(%User{}), as: :user))}
-
-      {:error, :unauthorized} ->
-        {:noreply,
-         put_flash(socket, :error, gettext("You don't have permission to create users."))}
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, assign(socket, form: to_form(changeset, as: :user))}
-    end
   end
 
   defp save_user(socket, :edit, params) do
@@ -148,14 +113,6 @@ defmodule XamtWeb.AdminUserLive do
     end
   end
 
-  defp role_options do
-    [
-      {gettext("User"), "user"},
-      {gettext("Creator"), "creator"},
-      {gettext("Admin"), "admin"}
-    ]
-  end
-
   defp role_label("admin"), do: gettext("Admin")
   defp role_label("creator"), do: gettext("Creator")
   defp role_label(_), do: gettext("Member")
@@ -178,182 +135,14 @@ defmodule XamtWeb.AdminUserLive do
       global_search_query={@global_search_query}
       global_search_results={@global_search_results}
     >
-      <%= if @live_action == :new do %>
-        <.create_user_canvas form={@form} role_options={role_options()} />
-      <% else %>
-        <.edit_user_canvas
-          target_user={@target_user}
-          profile_form={@profile_form}
-          form={@form}
-          servers={@servers}
-          current_scope={@current_scope}
-        />
-      <% end %>
+      <.edit_user_canvas
+        target_user={@target_user}
+        profile_form={@profile_form}
+        form={@form}
+        servers={@servers}
+        current_scope={@current_scope}
+      />
     </Layouts.home>
-    """
-  end
-
-  attr :form, :any, required: true
-  attr :role_options, :list, required: true
-
-  defp create_user_canvas(assigns) do
-    ~H"""
-    <main id="admin-create-user" class="xamt-home-canvas" phx-hook="MongolianScroll">
-      <aside class="xamt-home-section">
-        <div class="flex flex-row items-center justify-between h-full py-1">
-          <div class="flex flex-row items-center gap-3">
-            <.link
-              navigate={~p"/admin/users"}
-              class="xamt-icon-btn"
-              id="admin-user-back"
-              title={gettext("Back")}
-            >
-              <.icon name="hero-arrow-left" class="w-5 h-5" />
-            </.link>
-
-            <h1 class="text-xl font-bold tracking-widest mongol-text">
-              {gettext("Create user")}
-            </h1>
-          </div>
-        </div>
-      </aside>
-
-      <section class="xamt-home-section">
-        <header class="xamt-home-section__header">
-          <div class="flex flex-row items-center gap-2">
-            <.icon name="hero-user-plus" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
-            <h2 class="font-bold text-sm mongol-text">{gettext("Account")}</h2>
-          </div>
-        </header>
-
-        <.form
-          for={@form}
-          id="admin-create-user-form"
-          phx-change="validate"
-          phx-submit="save"
-          class="xamt-home-card"
-        >
-          <label class="xamt-bot-field">
-            <span class="xamt-label">{gettext("Display name")}</span>
-            <input
-              type="text"
-              name={@form[:display_name].name}
-              id={@form[:display_name].id}
-              value={@form[:display_name].value}
-              class="xamt-bot-input mongol-input"
-              phx-hook="MongolianIME"
-              autocomplete="nickname"
-              onfocus="setTimeout(() => this.scrollIntoView({behavior: 'smooth', inline: 'center'}), 150)"
-            />
-          </label>
-
-          <label class="xamt-bot-field">
-            <span class="xamt-label">{gettext("Username")}</span>
-            <input
-              type="text"
-              name={@form[:username].name}
-              id={@form[:username].id}
-              value={@form[:username].value}
-              class="xamt-bot-input"
-              autocomplete="off"
-              spellcheck="false"
-              required
-            />
-            <p
-              :for={msg <- Enum.map(@form[:username].errors, &translate_error(&1))}
-              class="text-xs text-red-500"
-            >
-              {msg}
-            </p>
-          </label>
-
-          <label class="xamt-bot-field">
-            <span class="xamt-label">{gettext("Email")}</span>
-            <input
-              type="email"
-              name={@form[:email].name}
-              id={@form[:email].id}
-              value={@form[:email].value}
-              class="xamt-bot-input"
-              autocomplete="off"
-              spellcheck="false"
-              required
-            />
-            <p
-              :for={msg <- Enum.map(@form[:email].errors, &translate_error(&1))}
-              class="text-xs text-red-500"
-            >
-              {msg}
-            </p>
-          </label>
-
-          <label class="xamt-bot-field">
-            <span class="xamt-label">{gettext("Password")}</span>
-            <input
-              type="password"
-              name={@form[:password].name}
-              id={@form[:password].id}
-              value={@form[:password].value}
-              class="xamt-bot-input"
-              autocomplete="new-password"
-              minlength="8"
-              maxlength="72"
-              required
-            />
-          </label>
-
-          <p class="text-xs text-[var(--xamt-muted)] mongol-text">
-            {gettext("At least 8 characters, with English letters, a number, and a symbol.")}
-          </p>
-
-          <label class="xamt-bot-field">
-            <span class="xamt-label">{gettext("Confirm password")}</span>
-            <input
-              type="password"
-              name={@form[:password_confirmation].name}
-              id={@form[:password_confirmation].id}
-              value={@form[:password_confirmation].value}
-              class="xamt-bot-input"
-              autocomplete="new-password"
-              required
-            />
-          </label>
-
-          <label class="xamt-bot-field">
-            <span class="xamt-label">{gettext("Role")}</span>
-            <div
-              id="admin-create-role-host"
-              class="mn-select-host"
-              phx-hook="MnSelect"
-              phx-update="ignore"
-            >
-              <select
-                id="admin-create-role-select"
-                name={@form[:global_role].name}
-                class="xamt-bot-input"
-              >
-                <option
-                  :for={{label, value} <- @role_options}
-                  value={value}
-                  selected={to_string(@form[:global_role].value) == value}
-                >
-                  {label}
-                </option>
-              </select>
-            </div>
-          </label>
-
-          <button
-            type="submit"
-            id="create-user-submit"
-            class="xamt-btn xamt-btn--primary h-full px-3 font-bold text-xs mongol-text"
-          >
-            <.icon name="hero-check" class="w-4 h-4 mb-1.5" />
-            <span>{gettext("Create user")}</span>
-          </button>
-        </.form>
-      </section>
-    </main>
     """
   end
 
@@ -568,36 +357,6 @@ defmodule XamtWeb.AdminUserLive do
               >
                 {msg}
               </p>
-            </label>
-
-            <label class="xamt-bot-field">
-              <span class="xamt-label">{gettext("New password")}</span>
-              <input
-                type="password"
-                name={@form[:password].name}
-                id={@form[:password].id}
-                value={@form[:password].value}
-                class="xamt-bot-input"
-                autocomplete="new-password"
-                minlength="8"
-                maxlength="72"
-              />
-            </label>
-
-            <p class="text-xs text-[var(--xamt-muted)] mongol-text">
-              {gettext("Leave blank to keep the current password.")}
-            </p>
-
-            <label class="xamt-bot-field">
-              <span class="xamt-label">{gettext("Confirm password")}</span>
-              <input
-                type="password"
-                name={@form[:password_confirmation].name}
-                id={@form[:password_confirmation].id}
-                value={@form[:password_confirmation].value}
-                class="xamt-bot-input"
-                autocomplete="new-password"
-              />
             </label>
 
             <input type="hidden" name={@form[:global_role].name} value={@target_user.global_role} />

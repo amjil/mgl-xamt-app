@@ -8,10 +8,12 @@ defmodule Xamt.MglId.Auth do
   alias Xamt.Accounts
   alias Xamt.MglId
   alias Xamt.MglId.{Client, IdToken}
-  alias Xamt.SiteSettings
 
   @doc """
   Exchanges `code`, verifies the ID token, and resolves or provisions a user.
+
+  First-time Mgl ID login provisions a local account. Mgl ID is the only
+  sign-in path, so there is no separate public registration step.
 
   Returns `{:ok, user}` or `{:error, reason}`.
   """
@@ -132,17 +134,13 @@ defmodule Xamt.MglId.Auth do
         {:ok, user}
 
       nil ->
-        if SiteSettings.registration_enabled?() do
-          case Accounts.provision_user_from_mgl(claims) do
-            {:ok, user} ->
-              emit("auth.mgl.identity.created", user, claims)
-              {:ok, user}
+        case Accounts.provision_user_from_mgl(claims) do
+          {:ok, user} ->
+            emit("auth.mgl.identity.created", user, claims)
+            {:ok, user}
 
-            {:error, reason} ->
-              {:error, reason}
-          end
-        else
-          {:error, :registration_disabled}
+          {:error, reason} ->
+            {:error, reason}
         end
     end
   end

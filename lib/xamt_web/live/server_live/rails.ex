@@ -457,15 +457,19 @@ defmodule XamtWeb.ServerLive.Rails do
           <span>{gettext("Settings")}</span>
         </.link>
 
-        <.link
-          href={~p"/users/log-out"}
-          method="delete"
-          class="xamt-user-menu__item xamt-user-menu__item--danger mongol-text"
-          role="menuitem"
-        >
-          <.icon name="hero-arrow-right-start-on-rectangle" class="w-4 h-4 shrink-0" />
-          <span>{gettext("Log out")}</span>
-        </.link>
+        <form action={~p"/users/log-out"} method="post" role="none" class="contents">
+          <input type="hidden" name="_method" value="delete" />
+          <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+          <button
+            type="submit"
+            class="xamt-user-menu__item xamt-user-menu__item--danger mongol-text"
+            role="menuitem"
+            id={"#{@id}-log-out"}
+          >
+            <.icon name="hero-arrow-right-start-on-rectangle" class="w-4 h-4 shrink-0" />
+            <span>{gettext("Log out")}</span>
+          </button>
+        </form>
 
         <span class="xamt-user-menu__divider" aria-hidden="true"></span>
 

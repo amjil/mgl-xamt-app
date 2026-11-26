@@ -1,18 +1,15 @@
 defmodule Xamt.AuthRateLimit do
   @moduledoc """
-  Sliding-window limits for login, magic-link, register, and invite redeem.
+  Sliding-window limits for invite redeem.
 
   Reuses `Xamt.Messages.RateLimiter` ETS buckets. Keys are
-  `{action, client}` so a busy chat user is not locked out of auth, and
-  auth bursts do not eat the message quota.
+  `{action, client}` so a busy chat user is not locked out of invites, and
+  invite bursts do not eat the message quota.
   """
 
   alias Xamt.Messages.RateLimiter
 
   @defaults [
-    login: [limit: 10, window_seconds: 60],
-    magic_link: [limit: 5, window_seconds: 60],
-    register: [limit: 5, window_seconds: 60],
     invite: [limit: 10, window_seconds: 60]
   ]
 

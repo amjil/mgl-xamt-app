@@ -34,12 +34,8 @@ config :xamt, :ime_base_url, nil
 # Message send rate limit (ETS sliding window). Tests override limit.
 config :xamt, Xamt.Messages.RateLimiter, limit: 5, window_seconds: 3
 
-# Auth endpoints share the same ETS limiter with separate keys.
-config :xamt, Xamt.AuthRateLimit,
-  login: [limit: 10, window_seconds: 60],
-  magic_link: [limit: 5, window_seconds: 60],
-  register: [limit: 5, window_seconds: 60],
-  invite: [limit: 10, window_seconds: 60]
+# Rate-limited actions share the same ETS limiter with separate keys.
+config :xamt, Xamt.AuthRateLimit, invite: [limit: 10, window_seconds: 60]
 
 # Audiobook shares on these hosts unfurl as a player card. Replace the
 # placeholder host when the audiobook app domain is real.
@@ -56,14 +52,14 @@ config :xamt,
   bot_webhook_delivery_enabled: true
 
 # Mgl ID OIDC (disabled until env secrets are provided).
-# Local default issuer matches mgl-id dev (`mix phx.server` on :4004).
+# Dev host is the LAN/Tailscale address browsers actually use (not localhost).
 config :xamt, Xamt.MglId,
   enabled: false,
-  issuer: "http://localhost:4004",
+  issuer: "http://100.64.0.8:4004",
   client_id: nil,
   client_secret: nil,
-  redirect_uri: "http://localhost:4002/auth/mgl/callback",
-  link_redirect_uri: "http://localhost:4002/settings/account/identities/mgl/callback",
+  redirect_uri: "http://100.64.0.8:4002/auth/mgl/callback",
+  link_redirect_uri: "http://100.64.0.8:4002/settings/account/identities/mgl/callback",
   scopes: "openid profile email",
   transaction_ttl_seconds: 600
 
