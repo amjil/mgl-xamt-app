@@ -25,17 +25,19 @@ still succeed and thumb URLs fall back to the original.
 
 ```bash
 mix setup
-mix phx.server
+./start.sh   # preferred: loads MGL_ID_* so OIDC login works
+# or: mix phx.server  # login stays disabled unless MGL_ID_ENABLED=true is set
 ```
 
-Open [http://localhost:4002](http://localhost:4002). Dev binds all interfaces
-(`0.0.0.0:4002`) so other machines on the LAN can reach the server.
+Open [http://localhost:4002](http://localhost:4002) (or the LAN/Tailscale host in
+`start.sh`). Dev binds all interfaces (`0.0.0.0:4002`) so other machines on the
+LAN can reach the server. Sign-in is **Mgl ID only** — plain `mix phx.server`
+without `MGL_ID_*` leaves the login button disabled.
 
 Demo account (from seeds):
 
-- email: `demo@xamt.local`
 - username: `demo`
-- password: `hello world1!`
+- sign-in: Mgl ID only. The seeded row has no Mgl identity, so it cannot sign in as-is; it is only useful as local fixture data.
 - role: `creator` (can create servers)
 - server: `/servers/mongol-bichig/general`
 
@@ -65,10 +67,8 @@ to call another host, or `local` to stay on the bundled dictionary.
 | Path | Page |
 |------|------|
 | `/` | Home / discover |
-| `/login` `/register` | Auth (aliases of `/users/log-in` `/users/register`) |
-| `/users/settings` | Email & password |
+| `/login` | Sign in with Mgl ID (alias of `/users/log-in`) |
 | `/admin/users` | Admin: search and edit users (site admin only) |
-| `/admin/users/new` | Admin: create a user (site admin only) |
 | `/invite/:code` | Redeem invite |
 | `/servers/:server_slug` | Server (redirects to first channel) |
 | `/servers/:server_slug/:channel_slug` | Channel chat |

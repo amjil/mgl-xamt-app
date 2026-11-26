@@ -13,7 +13,9 @@ defmodule XamtWeb.UserSessionControllerTest do
       response = html_response(conn, 200)
 
       assert response =~ "Log in"
-      assert response =~ "Sign in with your Mgl ID account."
+      assert response =~ ~s(id="mgl-id-login")
+      assert response =~ "Continue with Mgl ID"
+      refute response =~ ~s(id="mgl-id-disabled")
       refute response =~ ~s(id="login_form_password")
       refute response =~ ~s(id="login_form_magic")
       refute response =~ ~s(type="password")

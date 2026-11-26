@@ -30,7 +30,7 @@
     </aside>
 
     <%!-- Mgl ID OIDC (the only sign-in method) --%>
-    <section :if={@mgl_id_enabled?} class="xamt-home-section">
+    <section class="xamt-home-section">
       <header class="xamt-home-section__header">
         <div class="flex flex-row items-center gap-2">
           <.icon name="hero-identification" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
@@ -39,17 +39,28 @@
       </header>
 
       <div class="xamt-home-card">
-        <p class="text-sm text-[var(--xamt-muted)] mongol-text leading-relaxed">
-          {gettext("Sign in with your Mgl ID account.")}
-        </p>
-        <.link
-          href={~p"/auth/mgl"}
-          id="mgl-id-login"
-          class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold text-xs mongol-text"
-        >
-          <.icon name="hero-arrow-right-end-on-rectangle" class="w-4 h-4 mb-1.5" />
-          <span>{gettext("Continue with Mgl ID")}</span>
-        </.link>
+        <%= if @mgl_id_enabled? do %>
+          <p class="text-sm text-[var(--xamt-muted)] mongol-text leading-relaxed">
+            {gettext("Sign in with your Mgl ID account.")}
+          </p>
+          <.link
+            href={~p"/auth/mgl"}
+            id="mgl-id-login"
+            class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold text-xs mongol-text"
+          >
+            <.icon name="hero-arrow-right-end-on-rectangle" class="w-4 h-4 mb-1.5" />
+            <span>{gettext("Continue with Mgl ID")}</span>
+          </.link>
+        <% else %>
+          <p
+            id="mgl-id-disabled"
+            class="text-sm text-[var(--xamt-muted)] mongol-text leading-relaxed"
+          >
+            {gettext(
+              "Mgl ID login is disabled. Start the app with start.sh (or set MGL_ID_ENABLED=true)."
+            )}
+          </p>
+        <% end %>
       </div>
     </section>
   </main>
