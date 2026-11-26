@@ -10,7 +10,7 @@ defmodule Xamt.Accounts.MglIdentityTest do
     claims = MglIdHelpers.default_claims()
 
     assert {:ok, user} = Accounts.provision_user_from_mgl(claims)
-    assert user.email == claims["email"]
+    assert user.display_name == claims["name"]
     assert user.confirmed_at
 
     identity = Accounts.get_mgl_identity(user)
@@ -32,16 +32,17 @@ defmodule Xamt.Accounts.MglIdentityTest do
     assert found.user.id == user.id
   end
 
-  test "does not merge by email when provisioning" do
-    existing = user_fixture(%{email: "taken@example.com"})
+  test "does not merge by username when provisioning" do
+    existing = user_fixture(%{username: "taken_name"})
 
     claims =
       MglIdHelpers.default_claims(%{
-        "email" => existing.email,
-        "preferred_username" => "othername"
+        "preferred_username" => "taken_name"
       })
 
-    assert {:error, %Ecto.Changeset{}} = Accounts.provision_user_from_mgl(claims)
+    assert {:ok, user} = Accounts.provision_user_from_mgl(claims)
+    assert user.id != existing.id
+    assert user.username != existing.username
     assert is_nil(Accounts.get_mgl_identity(existing))
   end
 
@@ -77,7 +78,7 @@ defmodule Xamt.Accounts.MglIdentityTest do
     assert {:error, :user_already_linked} = Accounts.link_mgl_identity(user, claims_b)
   end
 
-  test "synthesizes email when claim is missing" do
+  test "provisions without an email claim" do
     claims =
       MglIdHelpers.default_claims(%{
         "sub" => "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
@@ -86,7 +87,7 @@ defmodule Xamt.Accounts.MglIdentityTest do
       |> Map.delete("email")
 
     assert {:ok, user} = Accounts.provision_user_from_mgl(claims)
-    assert user.email == "nomailuser.aaaaaaaa@users.noreply.mgl-id"
+    assert user.username == "NoMailUser"
     assert Accounts.get_mgl_identity(user)
   end
 end

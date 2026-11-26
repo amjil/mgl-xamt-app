@@ -28,7 +28,6 @@ defmodule XamtWeb.AdminUserLiveTest do
   test "admins can update a user's profile and role", %{conn: conn} do
     admin = admin_fixture()
     user = user_fixture(%{display_name: "Old Name"})
-    email = unique_user_email()
     username = unique_user_username()
 
     conn = log_in_user(conn, admin)
@@ -57,8 +56,7 @@ defmodule XamtWeb.AdminUserLiveTest do
       view
       |> form("#admin-edit-user-form",
         user: %{
-          username: username,
-          email: email
+          username: username
         }
       )
       |> render_submit()
@@ -69,7 +67,6 @@ defmodule XamtWeb.AdminUserLiveTest do
     updated = Accounts.get_user!(user.id)
     assert updated.display_name == "Updated Neighbor"
     assert updated.username == username
-    assert updated.email == email
     assert updated.bio == "Lives nearby."
     assert updated.global_role == "creator"
   end
@@ -82,10 +79,9 @@ defmodule XamtWeb.AdminUserLiveTest do
 
     html =
       view
-      |> form("#admin-edit-user-form", user: %{email: "not valid", username: "ab"})
+      |> form("#admin-edit-user-form", user: %{username: "ab"})
       |> render_submit()
 
-    assert html =~ "must have the @ sign and no spaces"
     assert html =~ "should be at least 3 character"
   end
 end

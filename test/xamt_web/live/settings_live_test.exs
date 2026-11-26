@@ -18,7 +18,7 @@ defmodule XamtWeb.SettingsLiveTest do
     assert has_element?(view, "#settings-canvas")
     assert has_element?(view, "#avatar-form")
     assert has_element?(view, "#profile-form")
-    assert has_element?(view, "#email_form")
+    refute has_element?(view, "#email_form")
     refute has_element?(view, "#password_form")
     assert has_element?(view, "#web-push-settings")
     assert has_element?(view, "#settings-status-emoji[phx-hook='StatusEmoji']")

@@ -189,14 +189,6 @@ defmodule XamtWeb.MglAuthController do
             |> put_flash(:info, gettext("Welcome back!"))
             |> UserAuth.log_in_user(user)
 
-          {:error, :missing_email} ->
-            conn
-            |> put_flash(
-              :error,
-              gettext("Mgl ID account needs an email before signing in to Xamt.")
-            )
-            |> redirect(to: ~p"/login")
-
           {:error, _reason} ->
             conn
             |> put_flash(:error, gettext("Could not complete Mgl ID login."))

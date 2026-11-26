@@ -42,7 +42,7 @@ defmodule XamtWeb.UserSessionControllerTest do
     end
 
     test "password and magic link POSTs are no longer served", %{conn: conn, user: user} do
-      params = %{"user" => %{"email" => user.email, "password" => "x"}}
+      params = %{"user" => %{"username" => user.username, "password" => "x"}}
 
       assert post(conn, "/users/log-in", params).status == 404
       assert post(recycle(conn), "/login", params).status == 404

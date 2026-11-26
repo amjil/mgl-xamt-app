@@ -84,7 +84,6 @@ defmodule XamtWeb.Router do
       live "/servers/:server_slug/:channel_slug/edit/:edit_slug", ServerLive, :edit_channel
       live "/servers/:server_slug/:channel_slug", ServerLive, :show
       live "/settings", SettingsLive, :edit
-      live "/settings/confirm-email/:token", SettingsLive, :confirm_email
       live "/saved", SavedLive, :index
     end
   end
@@ -110,14 +109,6 @@ defmodule XamtWeb.Router do
     pipe_through [:browser, :redirect_if_user_is_authenticated]
 
     get "/login", UserSessionController, :new
-  end
-
-  scope "/", XamtWeb do
-    pipe_through [:browser, :require_authenticated_user]
-
-    get "/users/settings", UserSettingsController, :edit
-    put "/users/settings", UserSettingsController, :update
-    get "/users/settings/confirm-email/:token", UserSettingsController, :confirm_email
   end
 
   scope "/", XamtWeb do

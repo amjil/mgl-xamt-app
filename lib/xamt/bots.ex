@@ -32,7 +32,6 @@ defmodule Xamt.Bots do
       avatar_url = Map.get(attrs, "avatar_url") || Map.get(attrs, :avatar_url)
 
       %User{
-        email: "bot_#{bot_uid}@bots.xamt.local",
         username: "bot_#{bot_uid}",
         display_name: "#{name} [BOT]",
         avatar: avatar_url,

@@ -10,25 +10,12 @@ defmodule Xamt.AccountsFixtures do
   alias Xamt.Accounts.{Scope, User}
   alias Xamt.Repo
 
-  def unique_user_email, do: "user#{System.unique_integer()}@example.com"
   def unique_user_username, do: "user#{System.unique_integer() |> abs()}"
 
   def valid_user_attributes(attrs \\ %{}) do
     Enum.into(attrs, %{
-      email: unique_user_email(),
       username: unique_user_username()
     })
-  end
-
-  def unconfirmed_user_fixture(attrs \\ %{}) do
-    attrs = valid_user_attributes(attrs)
-
-    {:ok, user} =
-      %User{}
-      |> User.invite_changeset(%{email: attrs.email, username: attrs.username})
-      |> Repo.insert()
-
-    user
   end
 
   def user_fixture(attrs \\ %{}) do
@@ -81,12 +68,6 @@ defmodule Xamt.AccountsFixtures do
 
   def user_scope_fixture(user) do
     Scope.for_user(user)
-  end
-
-  def extract_user_token(fun) do
-    {:ok, captured_email} = fun.(&"[TOKEN]#{&1}[TOKEN]")
-    [_, token | _] = String.split(captured_email.text_body, "[TOKEN]")
-    token
   end
 
   def override_token_authenticated_at(token, authenticated_at) when is_binary(token) do

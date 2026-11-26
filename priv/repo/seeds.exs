@@ -4,11 +4,11 @@ alias Xamt.Repo
 alias Xamt.Servers
 alias Xamt.Servers.Server
 
-demo_email = "demo@xamt.local"
+demo_username = "demo"
 server_slug = "mongol-bichig"
 
 user =
-  case Accounts.get_user_by_email(demo_email) do
+  case Accounts.get_user_by_username(demo_username) do
     %User{} = existing ->
       existing
 
@@ -17,8 +17,7 @@ user =
       # confirmed account directly. Sign-in for the demo user is via Mgl ID.
       %User{}
       |> User.admin_registration_changeset(%{
-        "email" => demo_email,
-        "username" => "demo",
+        "username" => demo_username,
         "display_name" => "Demo",
         "global_role" => "creator"
       })
@@ -47,6 +46,4 @@ case Repo.get_by(Server, slug: server_slug) do
       })
 end
 
-IO.puts(
-  "Seeded demo user #{demo_email} (username: demo, role: creator) and server #{server_slug}"
-)
+IO.puts("Seeded demo user #{demo_username} (role: creator) and server #{server_slug}")

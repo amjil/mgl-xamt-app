@@ -6,26 +6,10 @@ defmodule Xamt.Accounts do
   import Ecto.Query, warn: false
   alias Xamt.Repo
 
-  alias Xamt.Accounts.{Scope, User, UserIdentity, UserToken, UserNotifier}
+  alias Xamt.Accounts.{Scope, User, UserIdentity, UserToken}
   alias Xamt.MglId
 
   ## Database getters
-
-  @doc """
-  Gets a user by email.
-
-  ## Examples
-
-      iex> get_user_by_email("foo@example.com")
-      %User{}
-
-      iex> get_user_by_email("unknown@example.com")
-      nil
-
-  """
-  def get_user_by_email(email) when is_binary(email) do
-    Repo.get_by(User, email: email)
-  end
 
   @doc """
   Gets a user by username.
@@ -55,7 +39,7 @@ defmodule Xamt.Accounts do
 
   A blank query returns accounts ordered by username. A non-blank query
   treats each whitespace-separated token as a case-insensitive substring
-  that must appear in the username, email, or display name.
+  that must appear in the username or display name.
   """
   def search_users_as_admin(%Scope{user: %User{} = actor}, query \\ "", opts \\ []) do
     if User.admin?(actor) do
@@ -80,7 +64,7 @@ defmodule Xamt.Accounts do
   @doc """
   Updates an account on behalf of a site admin.
 
-  Independent of the public profile and email-confirmation flows. The last
+  Independent of the public profile flow. The last
   remaining admin cannot be demoted.
   """
   def update_user_as_admin(%Scope{user: %User{} = actor}, %User{} = user, attrs)
@@ -137,7 +121,6 @@ defmodule Xamt.Accounts do
       from(u in acc,
         where:
           ilike(u.username, ^pattern) or
-            ilike(u.email, ^pattern) or
             ilike(fragment("coalesce(?, '')", u.display_name), ^pattern)
       )
     end)
@@ -225,42 +208,6 @@ defmodule Xamt.Accounts do
 
   def sudo_mode?(_user, _minutes), do: false
 
-  @doc """
-  Returns an `%Ecto.Changeset{}` for changing the user email.
-
-  See `Xamt.Accounts.User.email_changeset/3` for a list of supported options.
-
-  ## Examples
-
-      iex> change_user_email(user)
-      %Ecto.Changeset{data: %User{}}
-
-  """
-  def change_user_email(user, attrs \\ %{}, opts \\ []) do
-    User.email_changeset(user, attrs, opts)
-  end
-
-  @doc """
-  Updates the user email using the given token.
-
-  If the token matches, the user email is updated and the token is deleted.
-  """
-  def update_user_email(user, token) do
-    context = "change:#{user.email}"
-
-    Repo.transact(fn ->
-      with {:ok, query} <- UserToken.verify_change_email_token_query(token, context),
-           %UserToken{sent_to: email} <- Repo.one(query),
-           {:ok, user} <- Repo.update(User.email_changeset(user, %{email: email})),
-           {_count, _result} <-
-             Repo.delete_all(from(UserToken, where: [user_id: ^user.id, context: ^context])) do
-        {:ok, user}
-      else
-        _ -> {:error, :transaction_aborted}
-      end
-    end)
-  end
-
   ## Session
 
   @doc """
@@ -280,23 +227,6 @@ defmodule Xamt.Accounts do
   def get_user_by_session_token(token) do
     {:ok, query} = UserToken.verify_session_token_query(token)
     Repo.one(query)
-  end
-
-  @doc ~S"""
-  Delivers the update email instructions to the given user.
-
-  ## Examples
-
-      iex> deliver_user_update_email_instructions(user, current_email, &url(~p"/users/settings/confirm-email/#{&1}"))
-      {:ok, %{to: ..., body: ...}}
-
-  """
-  def deliver_user_update_email_instructions(%User{} = user, current_email, update_email_url_fun)
-      when is_function(update_email_url_fun, 1) do
-    {encoded_token, user_token} = UserToken.build_email_token(user, "change:#{current_email}")
-
-    Repo.insert!(user_token)
-    UserNotifier.deliver_update_email_instructions(user, update_email_url_fun.(encoded_token))
   end
 
   @doc """
@@ -345,80 +275,32 @@ defmodule Xamt.Accounts do
   @doc """
   Creates a local user and Mgl identity in one transaction from verified claims.
 
-  Never matches existing users by username or email.
+  Never matches existing users by username.
   """
   def provision_user_from_mgl(claims) when is_map(claims) do
     preferred = claims["preferred_username"] || claims["name"]
     display_name = claims["name"]
-    email = mgl_provision_email(claims)
 
-    cond do
-      not is_binary(claims["sub"]) or claims["sub"] == "" ->
-        {:error, :missing_sub}
-
-      not is_binary(email) ->
-        {:error, :missing_email}
-
-      true ->
-        Repo.transact(fn ->
-          with {:ok, username} <- unique_username(preferred),
-               {:ok, user} <-
-                 %User{}
-                 |> User.oidc_registration_changeset(%{
-                   email: email,
-                   username: username,
-                   display_name: display_name
-                 })
-                 |> Repo.insert(),
-               {:ok, _identity} <- insert_mgl_identity(user, claims) do
-            {:ok, user}
-          else
-            {:error, reason} -> {:error, reason}
-          end
-        end)
+    if is_binary(claims["sub"]) and claims["sub"] != "" do
+      Repo.transact(fn ->
+        with {:ok, username} <- unique_username(preferred),
+             {:ok, user} <-
+               %User{}
+               |> User.oidc_registration_changeset(%{
+                 username: username,
+                 display_name: display_name
+               })
+               |> Repo.insert(),
+             {:ok, _identity} <- insert_mgl_identity(user, claims) do
+          {:ok, user}
+        else
+          {:error, reason} -> {:error, reason}
+        end
+      end)
+    else
+      {:error, :missing_sub}
     end
   end
-
-  # Mgl ID users may only have a username; synthesize a stable local email so
-  # Xamt's required email column can be filled without blocking SSO login.
-  defp mgl_provision_email(%{"email" => email} = claims) when is_binary(email) do
-    case String.trim(email) do
-      "" -> mgl_synthetic_email(claims)
-      trimmed -> trimmed
-    end
-  end
-
-  defp mgl_provision_email(claims), do: mgl_synthetic_email(claims)
-
-  defp mgl_synthetic_email(%{"sub" => sub} = claims) when is_binary(sub) and sub != "" do
-    local =
-      case claims["preferred_username"] do
-        name when is_binary(name) ->
-          cleaned =
-            name
-            |> String.trim()
-            |> String.downcase()
-            |> String.replace(~r/[^a-z0-9._+-]+/u, "-")
-            |> String.trim("-")
-
-          if cleaned == "", do: nil, else: cleaned
-
-        _ ->
-          nil
-      end
-
-    local =
-      local ||
-        sub
-        |> String.replace(~r/[^a-zA-Z0-9]+/, "")
-        |> String.downcase()
-        |> String.slice(0, 32)
-
-    local = if local == "", do: "mgl", else: local
-    "#{local}.#{String.slice(sub, 0, 8)}@users.noreply.mgl-id"
-  end
-
-  defp mgl_synthetic_email(_), do: nil
 
   @doc """
   Links a verified Mgl identity to an existing local user.

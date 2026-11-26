@@ -204,10 +204,6 @@ defmodule XamtWeb.AdminUserLive do
           ]}>
             {role_label(@target_user.global_role)}
           </span>
-
-          <div class="text-xs text-[var(--xamt-muted)] font-mono mt-auto">
-            {@target_user.email}
-          </div>
         </div>
       </aside>
 
@@ -333,26 +329,6 @@ defmodule XamtWeb.AdminUserLive do
               />
               <p
                 :for={msg <- Enum.map(@form[:username].errors, &translate_error(&1))}
-                class="text-xs text-red-500"
-              >
-                {msg}
-              </p>
-            </label>
-
-            <label class="xamt-bot-field">
-              <span class="xamt-label">{gettext("Email")}</span>
-              <input
-                type="email"
-                name={@form[:email].name}
-                id={@form[:email].id}
-                value={@form[:email].value}
-                class="xamt-bot-input"
-                autocomplete="off"
-                spellcheck="false"
-                required
-              />
-              <p
-                :for={msg <- Enum.map(@form[:email].errors, &translate_error(&1))}
                 class="text-xs text-red-500"
               >
                 {msg}

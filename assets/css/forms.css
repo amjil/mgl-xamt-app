@@ -1030,8 +1030,7 @@ label:has(> input, > textarea, > select) > * {
   letter-spacing: 0.04em;
 }
 
-.xamt-admin-user__username,
-.xamt-admin-user__email {
+.xamt-admin-user__username {
   margin: 0;
   color: var(--xamt-muted);
   font-size: 0.86rem;

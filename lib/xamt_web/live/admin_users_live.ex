@@ -105,7 +105,7 @@ defmodule XamtWeb.AdminUsersLive do
                 type="text"
                 name="q"
                 value={@query}
-                placeholder={gettext("Username, nickname, or email...")}
+                placeholder={gettext("Username or nickname...")}
                 phx-debounce="300"
                 class="xamt-bot-input mongol-input"
                 phx-hook="MongolianIME"
@@ -242,10 +242,6 @@ defmodule XamtWeb.AdminUsersLive do
                       <.icon name="hero-chevron-right" class="w-4 h-4" />
                     </.link>
                   </div>
-                </div>
-
-                <div class="xamt-user-strip__email">
-                  <span class="xamt-admin-user__email">{u.email}</span>
                 </div>
               </div>
             </div>

@@ -668,7 +668,6 @@ defmodule XamtWeb.CoreComponents do
       case user do
         %{display_name: name} when is_binary(name) and name != "" -> name
         %{username: name} when is_binary(name) and name != "" -> name
-        %{email: email} when is_binary(email) -> email
         _ -> "?"
       end
 

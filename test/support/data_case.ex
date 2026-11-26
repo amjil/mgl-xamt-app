@@ -50,9 +50,9 @@ defmodule Xamt.DataCase do
   @doc """
   A helper that transforms changeset errors into a map of messages.
 
-      assert {:error, changeset} = Accounts.create_user(%{email: "not valid"})
-      assert "must have the @ sign and no spaces" in errors_on(changeset).email
-      assert %{email: ["must have the @ sign and no spaces"]} = errors_on(changeset)
+      assert {:error, changeset} = Accounts.create_user(%{username: "ab"})
+      assert "should be at least 3 character(s)" in errors_on(changeset).username
+      assert %{username: ["should be at least 3 character(s)"]} = errors_on(changeset)
 
   """
   def errors_on(changeset) do

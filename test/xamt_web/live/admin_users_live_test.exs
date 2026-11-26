@@ -28,15 +28,13 @@ defmodule XamtWeb.AdminUsersLiveTest do
     alice =
       user_fixture(%{
         username: "alice#{suffix}",
-        display_name: "Alice Neighbor",
-        email: "alice#{suffix}@example.com"
+        display_name: "Alice Neighbor"
       })
 
     bob =
       user_fixture(%{
         username: "bob#{suffix}",
-        display_name: "Bob Guest",
-        email: "bob#{suffix}@example.com"
+        display_name: "Bob Guest"
       })
 
     {:ok, view, html} = live(log_in_user(conn, admin), ~p"/admin/users")
@@ -49,7 +47,6 @@ defmodule XamtWeb.AdminUsersLiveTest do
     assert has_element?(view, "#users-#{bob.id}")
     assert has_element?(view, "#admin-user-edit-#{alice.id}")
     assert has_element?(view, "#users-#{alice.id} .xamt-admin-user__username")
-    assert has_element?(view, "#users-#{alice.id} .xamt-admin-user__email")
     refute has_element?(view, "#users-#{alice.id} .xamt-upright")
     refute has_element?(view, "#users-#{alice.id} .xamt-latin")
 

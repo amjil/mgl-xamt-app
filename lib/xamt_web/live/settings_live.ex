@@ -6,19 +6,6 @@ defmodule XamtWeb.SettingsLive do
   alias XamtWeb.Uploads
 
   @impl true
-  def mount(%{"token" => token}, _session, socket) do
-    socket =
-      case Accounts.update_user_email(socket.assigns.current_scope.user, token) do
-        {:ok, _user} ->
-          put_flash(socket, :info, gettext("Email changed successfully."))
-
-        {:error, _} ->
-          put_flash(socket, :error, gettext("Email change link is invalid or it has expired."))
-      end
-
-    {:ok, push_navigate(socket, to: ~p"/settings")}
-  end
-
   def mount(_params, _session, socket) do
     user = socket.assigns.current_scope.user
     mgl_identity = Accounts.get_mgl_identity(user)
@@ -26,12 +13,7 @@ defmodule XamtWeb.SettingsLive do
     {:ok,
      socket
      |> assign(:page_title, gettext("Settings"))
-     |> assign(:current_email, user.email)
      |> assign(:profile_form, to_form(Accounts.change_user_profile(user)))
-     |> assign(
-       :email_form,
-       to_form(Accounts.change_user_email(user, %{}, validate_unique: false), as: "email")
-     )
      |> assign(:site_admin?, User.admin?(user))
      |> assign(:mgl_id_enabled?, Xamt.MglId.enabled?())
      |> assign(:mgl_identity, mgl_identity)
@@ -130,39 +112,6 @@ defmodule XamtWeb.SettingsLive do
     end
   end
 
-  def handle_event("validate_email", %{"email" => email_params}, socket) do
-    email_form =
-      socket.assigns.current_scope.user
-      |> Accounts.change_user_email(email_params, validate_unique: false)
-      |> Map.put(:action, :validate)
-      |> to_form(as: "email")
-
-    {:noreply, assign(socket, email_form: email_form)}
-  end
-
-  def handle_event("update_email", %{"email" => email_params}, socket) do
-    user = socket.assigns.current_scope.user
-
-    case Accounts.change_user_email(user, email_params) do
-      %{valid?: true} = changeset ->
-        Accounts.deliver_user_update_email_instructions(
-          Ecto.Changeset.apply_action!(changeset, :insert),
-          user.email,
-          &url(~p"/settings/confirm-email/#{&1}")
-        )
-
-        {:noreply,
-         put_flash(
-           socket,
-           :info,
-           gettext("A link to confirm your email change has been sent to the new address.")
-         )}
-
-      changeset ->
-        {:noreply, assign(socket, :email_form, to_form(changeset, action: :insert, as: "email"))}
-    end
-  end
-
   def handle_event("revoke_all_sessions", _params, socket) do
     user = socket.assigns.current_scope.user
     Accounts.revoke_all_user_sessions(user)
@@ -226,10 +175,6 @@ defmodule XamtWeb.SettingsLive do
 
               <span class="font-bold text-base">
                 {User.display_name(@current_scope.user)}
-              </span>
-
-              <span class="text-xs text-[var(--xamt-muted)] font-mono">
-                {@current_email}
               </span>
             </div>
             
@@ -378,53 +323,6 @@ defmodule XamtWeb.SettingsLive do
             >
               <.icon name="hero-check" class="w-4 h-4 mb-1.5" />
               <span>{gettext("Save Profile")}</span>
-            </button>
-          </.form>
-        </section>
-        
-    <!-- ==================== Section 3: Change account email ==================== -->
-        <section class="xamt-home-section">
-          <header class="xamt-home-section__header">
-            <div class="flex flex-row items-center gap-2">
-              <.icon name="hero-envelope" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
-              <h2 class="font-bold text-sm">{gettext("Account Email")}</h2>
-            </div>
-          </header>
-
-          <.form
-            for={@email_form}
-            id="email_form"
-            phx-submit="update_email"
-            phx-change="validate_email"
-            class="xamt-home-card"
-          >
-            <label class="xamt-bot-field">
-              <span class="xamt-label">{gettext("New Email")}</span>
-              <input
-                type="email"
-                name={@email_form[:email].name}
-                value={@email_form[:email].value}
-                autocomplete="username"
-                required
-                class="xamt-bot-input font-mono text-xs"
-                onfocus="setTimeout(() => this.scrollIntoView({behavior: 'smooth', inline: 'center'}), 150)"
-              />
-            </label>
-
-            <p
-              :for={{msg, opts} <- @email_form[:email].errors}
-              class="text-xs text-red-500 px-1"
-            >
-              {translate_error({msg, opts})}
-            </p>
-
-            <button
-              type="submit"
-              phx-disable-with={gettext("Changing...")}
-              class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold text-xs"
-            >
-              <.icon name="hero-paper-airplane" class="w-4 h-4 mb-1.5" />
-              <span>{gettext("Change Email")}</span>
             </button>
           </.form>
         </section>

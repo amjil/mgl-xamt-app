@@ -71,7 +71,7 @@ defmodule XamtWeb.MglAuthControllerTest do
 
     identity = Accounts.get_user_by_mgl_identity(MglId.issuer(), claims["sub"])
     assert identity
-    assert identity.user.email == claims["email"]
+    assert identity.user.display_name == claims["name"]
   end
 
   test "login page shows Mgl ID button when enabled", %{conn: conn} do

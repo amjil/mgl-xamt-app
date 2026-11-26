@@ -1217,10 +1217,8 @@ body.mgl-ime-mobile-open .xamt-home-canvas {
   z-index: 0;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: auto auto;
-  grid-template-areas:
-    "avatar main"
-    "avatar email";
+  grid-template-rows: auto;
+  grid-template-areas: "avatar main";
   align-items: stretch;
   justify-items: stretch;
   height: 100%;
@@ -1253,7 +1251,7 @@ body.mgl-ime-mobile-open .xamt-home-canvas {
   justify-self: center;
 }
 
-/* Unwrap so main/email become direct grid items */
+/* Unwrap so main becomes a direct grid item */
 .xamt-user-strip__cols {
   display: contents;
 }
@@ -1267,26 +1265,6 @@ body.mgl-ime-mobile-open .xamt-home-canvas {
   justify-content: space-between;
   gap: 0.75rem;
   min-width: 0;
-}
-
-/* Right pillar under avatar: email */
-.xamt-user-strip__email {
-  grid-area: email;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  min-width: 2.4rem;
-  padding: 0.35rem 0.15rem;
-  border-left: 1px solid var(--xamt-line);
-}
-
-.xamt-user-strip__email .xamt-admin-user__email {
-  font-size: 0.75rem;
-  font-family: var(--xamt-font-ui, ui-monospace, monospace);
-  color: var(--xamt-muted);
-  letter-spacing: 0.02em;
-  word-break: break-all;
 }
 
 /*
@@ -1444,11 +1422,6 @@ body.mgl-ime-mobile-open .xamt-home-canvas {
 
   .xamt-user-strip__cols {
     gap: 0.4rem;
-  }
-
-  .xamt-user-strip__email {
-    min-width: 2rem;
-    padding: 0.25rem 0.1rem;
   }
 }
 

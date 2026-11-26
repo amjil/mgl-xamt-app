@@ -114,7 +114,6 @@ defmodule XamtWeb.ServerLive.Helpers do
 
   def display_name(%{display_name: name}) when is_binary(name) and name != "", do: name
   def display_name(%{username: name}) when is_binary(name), do: name
-  def display_name(%{email: email}), do: email
   def display_name(_), do: "?"
 
   def own_presence_user?(%{id: id}, %{id: current_id})

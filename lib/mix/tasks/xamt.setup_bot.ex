@@ -12,7 +12,7 @@ defmodule Mix.Tasks.Xamt.SetupBot do
   Options:
 
     --server-id / --server-slug / --server-name   (one required)
-    --admin-email         actor for create/install (default: server owner)
+    --admin-username      actor for create/install (default: server owner)
     --channel-name        find-or-create channel (default: bot-channel)
     --channel-id          use an existing channel instead of name lookup
     --bot-name            find-or-create bot on this server (default: Xamt Bot)
@@ -54,7 +54,7 @@ defmodule Mix.Tasks.Xamt.SetupBot do
           server_id: :string,
           server_slug: :string,
           server_name: :string,
-          admin_email: :string,
+          admin_username: :string,
           channel_name: :string,
           channel_id: :string,
           bot_name: :string,
@@ -153,16 +153,16 @@ defmodule Mix.Tasks.Xamt.SetupBot do
   end
 
   defp resolve_admin(server, opts) do
-    case present(opts[:admin_email]) do
+    case present(opts[:admin_username]) do
       nil ->
         case Accounts.get_user!(server.owner_id) do
           %User{} = user -> {:ok, user}
         end
 
-      email ->
-        case Accounts.get_user_by_email(email) do
+      username ->
+        case Accounts.get_user_by_username(username) do
           %User{} = user -> {:ok, user}
-          nil -> {:error, {:admin_not_found, email}}
+          nil -> {:error, {:admin_not_found, username}}
         end
     end
   end
@@ -392,7 +392,7 @@ defmodule Mix.Tasks.Xamt.SetupBot do
   defp format_error({:server_not_found, id}), do: "Server not found: #{id}"
   defp format_error({:server_not_found_slug, slug}), do: "Server slug not found: #{slug}"
   defp format_error({:server_not_found_name, name}), do: "Server name not found: #{name}"
-  defp format_error({:admin_not_found, email}), do: "Admin user not found: #{email}"
+  defp format_error({:admin_not_found, username}), do: "Admin user not found: #{username}"
   defp format_error({:channel_not_found, id}), do: "Channel not found: #{id}"
   defp format_error({:channel_wrong_server, id}), do: "Channel #{id} is not on that server"
 

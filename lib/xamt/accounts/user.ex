@@ -5,7 +5,6 @@ defmodule Xamt.Accounts.User do
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
   schema "users" do
-    field :email, :string
     field :username, :string
     field :display_name, :string
     field :avatar, :string
@@ -41,21 +40,11 @@ defmodule Xamt.Accounts.User do
   def admin?(_), do: false
 
   @doc """
-  Prefer display name; fall back to username (then email) for UI labels.
+  Prefer display name; fall back to username for UI labels.
   """
   def display_name(%__MODULE__{display_name: name}) when is_binary(name) and name != "", do: name
   def display_name(%__MODULE__{username: name}) when is_binary(name) and name != "", do: name
-  def display_name(%__MODULE__{email: email}) when is_binary(email), do: email
   def display_name(_), do: "?"
-
-  @doc false
-  def invite_changeset(user, attrs, opts \\ []) do
-    user
-    |> cast(attrs, [:email, :username])
-    |> validate_required([:email, :username])
-    |> validate_registration_email(opts)
-    |> validate_username(opts)
-  end
 
   @doc """
   Registration via verified Mgl ID claims.
@@ -64,9 +53,8 @@ defmodule Xamt.Accounts.User do
   """
   def oidc_registration_changeset(user, attrs, opts \\ []) do
     user
-    |> cast(attrs, [:email, :username, :display_name])
-    |> validate_required([:email, :username])
-    |> validate_registration_email(opts)
+    |> cast(attrs, [:username, :display_name])
+    |> validate_required([:username])
     |> validate_username(opts)
     |> put_change(:confirmed_at, DateTime.utc_now(:second))
   end
@@ -80,9 +68,8 @@ defmodule Xamt.Accounts.User do
   """
   def admin_registration_changeset(user, attrs, opts \\ []) do
     user
-    |> cast(attrs, [:email, :username, :display_name, :global_role])
-    |> validate_required([:email, :username, :global_role])
-    |> validate_registration_email(opts)
+    |> cast(attrs, [:username, :display_name, :global_role])
+    |> validate_required([:username, :global_role])
     |> validate_username(opts)
     |> validate_inclusion(:global_role, @global_roles)
     |> maybe_confirm_on_register()
@@ -168,67 +155,6 @@ defmodule Xamt.Accounts.User do
     end
   end
 
-  defp validate_registration_email(changeset, opts) do
-    changeset
-    |> validate_format(:email, ~r/^[^@,;\s]+@[^@,;\s]+$/,
-      message: "must have the @ sign and no spaces"
-    )
-    |> validate_length(:email, max: 160)
-    |> then(fn cs ->
-      if Keyword.get(opts, :validate_unique, true) do
-        cs
-        |> unsafe_validate_unique(:email, Xamt.Repo)
-        |> unique_constraint(:email)
-      else
-        cs
-      end
-    end)
-  end
-
-  @doc """
-  A user changeset for registering or changing the email.
-
-  It requires the email to change otherwise an error is added.
-
-  ## Options
-
-    * `:validate_unique` - Set to false if you don't want to validate the
-      uniqueness of the email, useful when displaying live validations.
-      Defaults to `true`.
-  """
-  def email_changeset(user, attrs, opts \\ []) do
-    user
-    |> cast(attrs, [:email])
-    |> validate_email(opts)
-  end
-
-  defp validate_email(changeset, opts) do
-    changeset =
-      changeset
-      |> validate_required([:email])
-      |> validate_format(:email, ~r/^[^@,;\s]+@[^@,;\s]+$/,
-        message: "must have the @ sign and no spaces"
-      )
-      |> validate_length(:email, max: 160)
-
-    if Keyword.get(opts, :validate_unique, true) do
-      changeset
-      |> unsafe_validate_unique(:email, Xamt.Repo)
-      |> unique_constraint(:email)
-      |> validate_email_changed()
-    else
-      changeset
-    end
-  end
-
-  defp validate_email_changed(changeset) do
-    if get_field(changeset, :email) && get_change(changeset, :email) == nil do
-      add_error(changeset, :email, "did not change")
-    else
-      changeset
-    end
-  end
-
   @doc """
   Changeset for operators to assign a global role.
 
@@ -245,17 +171,16 @@ defmodule Xamt.Accounts.User do
   @doc """
   Changeset for site admins to update another account.
 
-  Accepts profile fields, email, username, and role. Keep this out of public
+  Accepts profile fields, username, and role. Keep this out of public
   forms so users cannot escalate themselves.
   """
   def admin_update_changeset(user, attrs, opts \\ []) do
     user
-    |> cast(attrs, [:email, :username, :display_name, :bio, :global_role])
-    |> validate_required([:email, :username, :global_role])
+    |> cast(attrs, [:username, :display_name, :bio, :global_role])
+    |> validate_required([:username, :global_role])
     |> validate_inclusion(:global_role, @global_roles)
     |> validate_length(:display_name, max: 100)
     |> validate_length(:bio, max: 500)
     |> validate_username(opts)
-    |> validate_registration_email(opts)
   end
 end

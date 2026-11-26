@@ -6,14 +6,14 @@ defmodule Xamt.AccountsTest do
   import Xamt.AccountsFixtures
   alias Xamt.Accounts.{Scope, User, UserToken}
 
-  describe "get_user_by_email/1" do
-    test "does not return the user if the email does not exist" do
-      refute Accounts.get_user_by_email("unknown@example.com")
+  describe "get_user_by_username/1" do
+    test "does not return the user if the username does not exist" do
+      refute Accounts.get_user_by_username("nobody_here")
     end
 
-    test "returns the user if the email exists" do
+    test "returns the user if the username exists" do
       %{id: id} = user = user_fixture()
-      assert %User{id: ^id} = Accounts.get_user_by_email(user.email)
+      assert %User{id: ^id} = Accounts.get_user_by_username(user.username)
     end
   end
 
@@ -46,80 +46,6 @@ defmodule Xamt.AccountsTest do
 
       # not authenticated
       refute Accounts.sudo_mode?(%User{})
-    end
-  end
-
-  describe "change_user_email/3" do
-    test "returns a user changeset" do
-      assert %Ecto.Changeset{} = changeset = Accounts.change_user_email(%User{})
-      assert changeset.required == [:email]
-    end
-  end
-
-  describe "deliver_user_update_email_instructions/3" do
-    setup do
-      %{user: user_fixture()}
-    end
-
-    test "sends token through notification", %{user: user} do
-      token =
-        extract_user_token(fn url ->
-          Accounts.deliver_user_update_email_instructions(user, "current@example.com", url)
-        end)
-
-      {:ok, token} = Base.url_decode64(token, padding: false)
-      assert user_token = Repo.get_by(UserToken, token: :crypto.hash(:sha256, token))
-      assert user_token.user_id == user.id
-      assert user_token.sent_to == user.email
-      assert user_token.context == "change:current@example.com"
-    end
-  end
-
-  describe "update_user_email/2" do
-    setup do
-      user = unconfirmed_user_fixture()
-      email = unique_user_email()
-
-      token =
-        extract_user_token(fn url ->
-          Accounts.deliver_user_update_email_instructions(%{user | email: email}, user.email, url)
-        end)
-
-      %{user: user, token: token, email: email}
-    end
-
-    test "updates the email with a valid token", %{user: user, token: token, email: email} do
-      assert {:ok, %{email: ^email}} = Accounts.update_user_email(user, token)
-      changed_user = Repo.get!(User, user.id)
-      assert changed_user.email != user.email
-      assert changed_user.email == email
-      refute Repo.get_by(UserToken, user_id: user.id)
-    end
-
-    test "does not update email with invalid token", %{user: user} do
-      assert Accounts.update_user_email(user, "oops") ==
-               {:error, :transaction_aborted}
-
-      assert Repo.get!(User, user.id).email == user.email
-      assert Repo.get_by(UserToken, user_id: user.id)
-    end
-
-    test "does not update email if user email changed", %{user: user, token: token} do
-      assert Accounts.update_user_email(%{user | email: "current@example.com"}, token) ==
-               {:error, :transaction_aborted}
-
-      assert Repo.get!(User, user.id).email == user.email
-      assert Repo.get_by(UserToken, user_id: user.id)
-    end
-
-    test "does not update email if token expired", %{user: user, token: token} do
-      {1, nil} = Repo.update_all(UserToken, set: [inserted_at: ~N[2020-01-01 00:00:00]])
-
-      assert Accounts.update_user_email(user, token) ==
-               {:error, :transaction_aborted}
-
-      assert Repo.get!(User, user.id).email == user.email
-      assert Repo.get_by(UserToken, user_id: user.id)
     end
   end
 
@@ -188,7 +114,7 @@ defmodule Xamt.AccountsTest do
   end
 
   describe "search_users_as_admin/2" do
-    test "admins can list and filter users by username, email, or display name" do
+    test "admins can list and filter users by username or display name" do
       admin = admin_fixture()
       scope = Scope.for_user(admin)
       suffix = System.unique_integer([:positive])
@@ -196,15 +122,13 @@ defmodule Xamt.AccountsTest do
       alice =
         user_fixture(%{
           username: "alice#{suffix}",
-          display_name: "Alice Neighbor",
-          email: "alice#{suffix}@example.com"
+          display_name: "Alice Neighbor"
         })
 
       bob =
         user_fixture(%{
           username: "bob#{suffix}",
-          display_name: "Bob Guest",
-          email: "findme#{suffix}@example.com"
+          display_name: "Bob Guest"
         })
 
       assert {:ok, listed} = Accounts.search_users_as_admin(scope, "")
@@ -213,9 +137,6 @@ defmodule Xamt.AccountsTest do
 
       assert {:ok, [found]} = Accounts.search_users_as_admin(scope, "alice#{suffix}")
       assert found.id == alice.id
-
-      assert {:ok, [found_email]} = Accounts.search_users_as_admin(scope, "findme#{suffix}")
-      assert found_email.id == bob.id
 
       assert {:ok, [found_name]} = Accounts.search_users_as_admin(scope, "Alice Neighbor")
       assert found_name.id == alice.id
@@ -241,21 +162,18 @@ defmodule Xamt.AccountsTest do
     test "admins can update profile fields and role" do
       admin = admin_fixture()
       user = user_fixture(%{display_name: "Old Name"})
-      email = unique_user_email()
       username = unique_user_username()
 
       assert {:ok, updated} =
                Accounts.update_user_as_admin(Scope.for_user(admin), user, %{
                  display_name: "New Neighbor",
                  username: username,
-                 email: email,
                  bio: "Writes in Mongolian.",
                  global_role: "creator"
                })
 
       assert updated.display_name == "New Neighbor"
       assert updated.username == username
-      assert updated.email == email
       assert updated.bio == "Writes in Mongolian."
       assert updated.global_role == "creator"
       assert User.can_create_server?(updated)
@@ -269,7 +187,6 @@ defmodule Xamt.AccountsTest do
                Accounts.update_user_as_admin(Scope.for_user(actor), target, %{
                  display_name: "Nope",
                  username: target.username,
-                 email: target.email,
                  global_role: "admin"
                })
 
@@ -282,7 +199,6 @@ defmodule Xamt.AccountsTest do
       assert {:error, changeset} =
                Accounts.update_user_as_admin(Scope.for_user(admin), admin, %{
                  username: admin.username,
-                 email: admin.email,
                  global_role: "user"
                })
 
