@@ -1,13 +1,13 @@
 defmodule Xamt.MglId.Transactions do
   @moduledoc """
-  Server-side OIDC login/link transaction helpers stored in the Plug session.
+  Server-side OIDC login/link transaction helpers stored in the encrypted Plug session.
 
   Multiple concurrent transactions are kept so multi-tab login does not
-  overwrite an earlier `state` / PKCE verifier.
+  overwrite an earlier `state` / PKCE verifier, while capping count to stay
+  well within the 4KB browser cookie limit.
   """
 
   @session_key :mgl_oidc_txns
-  # Keep this small: each txn holds a PKCE verifier + nonce in the cookie session.
   @max_txns 4
 
   def session_key, do: @session_key
@@ -25,22 +25,25 @@ defmodule Xamt.MglId.Transactions do
 
   @doc """
   Pops a matching unused transaction by `state`. Marks it consumed by removal.
+  Checks expiration after matching `state` so expired flows report `:expired`
+  rather than `:not_found`.
   """
   def take(conn, state) when is_binary(state) do
     now = DateTime.utc_now()
-    txns = Plug.Conn.get_session(conn, @session_key, []) |> prune_expired(now)
+    txns = Plug.Conn.get_session(conn, @session_key, [])
 
     case Enum.split_with(txns, fn txn -> txn["state"] == state end) do
       {[txn | _], rest} ->
+        conn = Plug.Conn.put_session(conn, @session_key, prune_expired(rest, now))
+
         if expired?(txn, now) do
-          conn = Plug.Conn.put_session(conn, @session_key, rest)
           {conn, {:error, :expired}}
         else
-          conn = Plug.Conn.put_session(conn, @session_key, rest)
           {conn, {:ok, txn}}
         end
 
       {[], _} ->
+        conn = Plug.Conn.put_session(conn, @session_key, prune_expired(txns, now))
         {conn, {:error, :not_found}}
     end
   end

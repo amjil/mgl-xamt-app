@@ -8,7 +8,7 @@ defmodule XamtWeb.Endpoint do
     store: :cookie,
     key: "_xamt_key",
     signing_salt: "SshzUNs1",
-    encryption_salt: "xamt sess enc",
+    encryption_salt: "XamtSessEnc9kQ2m",
     same_site: "Lax",
     secure: Application.compile_env(:xamt, :secure_cookies, false)
   ]

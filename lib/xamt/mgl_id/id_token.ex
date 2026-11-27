@@ -15,33 +15,41 @@ defmodule Xamt.MglId.IdToken do
   Verifies the JWT signature and required claims.
 
   Options:
-    * `:nonce` - required expected nonce (non-empty binary)
+    * `:nonce` - required non-empty expected nonce
     * `:force_jwks` - bypass JWKS cache
   """
   def verify(id_token, opts \\ []) when is_binary(id_token) do
     expected_nonce = Keyword.fetch!(opts, :nonce)
     force_jwks? = Keyword.get(opts, :force_jwks, false)
 
-    with :ok <- require_expected_nonce(expected_nonce),
+    with :ok <- validate_expected_nonce(expected_nonce),
          {:ok, header} <- peek_header(id_token),
          :ok <- validate_alg(header),
-         {:ok, jwk} <- resolve_jwk(header, force_jwks?),
+         {:ok, jwk, _source} <- resolve_jwk(header, force_jwks?),
          {:ok, claims} <- verify_signature(id_token, jwk),
          :ok <- validate_claims(claims, expected_nonce) do
       {:ok, claims}
     else
-      # Only refresh JWKS when we have not already forced a fetch.
-      {:error, :unknown_kid} when not force_jwks? ->
+      {:error, :unknown_kid, :cached} ->
+        # One refresh retry for key rotation when the miss came from cached JWKS.
         with {:ok, header} <- peek_header(id_token),
-             {:ok, jwk} <- resolve_jwk(header, true),
+             {:ok, jwk, _source} <- resolve_jwk(header, true),
              {:ok, claims} <- verify_signature(id_token, jwk),
              :ok <- validate_claims(claims, expected_nonce) do
           {:ok, claims}
         else
+          {:error, :unknown_kid, _} ->
+            emit_validation_failed(:unknown_kid)
+            {:error, :unknown_kid}
+
           {:error, reason} = error ->
             emit_validation_failed(reason)
             error
         end
+
+      {:error, :unknown_kid, _source} ->
+        emit_validation_failed(:unknown_kid)
+        {:error, :unknown_kid}
 
       {:error, reason} = error ->
         emit_validation_failed(reason)
@@ -49,19 +57,17 @@ defmodule Xamt.MglId.IdToken do
     end
   end
 
-  defp require_expected_nonce(nonce) when is_binary(nonce) and nonce != "", do: :ok
-  defp require_expected_nonce(_), do: {:error, :missing_expected_nonce}
+  defp validate_expected_nonce(nonce) when is_binary(nonce) and nonce != "", do: :ok
+  defp validate_expected_nonce(_), do: {:error, :missing_expected_nonce}
 
   defp peek_header(id_token) do
     try do
       case String.split(id_token, ".") do
         [header_b64, _payload, _sig] ->
-          header =
-            header_b64
-            |> Base.url_decode64!(padding: false)
-            |> Jason.decode!()
-
-          {:ok, header}
+          case header_b64 |> Base.url_decode64!(padding: false) |> Jason.decode!() do
+            header when is_map(header) -> {:ok, header}
+            _ -> {:error, :invalid_jwt}
+          end
 
         _ ->
           {:error, :invalid_jwt}
@@ -81,15 +87,18 @@ defmodule Xamt.MglId.IdToken do
   defp resolve_jwk(header, force?) do
     kid = Map.get(header, "kid")
 
-    with {:ok, jwks} <- fetch_jwks(force?),
-         {:ok, jwk_map} <- find_key(jwks, kid) do
-      {:ok, JOSE.JWK.from_map(jwk_map)}
+    with {:ok, jwks, source} <- fetch_jwks(force?) do
+      case find_key(jwks, kid) do
+        {:ok, jwk_map} -> {:ok, JOSE.JWK.from_map(jwk_map), source}
+        {:error, :unknown_kid} -> {:error, :unknown_kid, source}
+        {:error, reason} -> {:error, reason}
+      end
     end
   end
 
   defp fetch_jwks(false) do
     case Cache.get(@jwks_cache_key) do
-      {:ok, jwks} -> {:ok, jwks}
+      {:ok, jwks} -> {:ok, jwks, :cached}
       :miss -> fetch_jwks(true)
     end
   end
@@ -100,8 +109,11 @@ defmodule Xamt.MglId.IdToken do
            Req.get(uri, Keyword.merge([decode_body: true], MglId.req_options())),
          keys when is_list(keys) <- Map.get(body, "keys") do
       :ok = Cache.put(@jwks_cache_key, body, @jwks_ttl_ms)
-      {:ok, body}
+      {:ok, body, :fresh}
     else
+      {:ok, %{status: 200}} ->
+        {:error, :jwks_invalid_body}
+
       {:ok, %{status: status}} ->
         {:error, {:jwks_http_status, status}}
 
