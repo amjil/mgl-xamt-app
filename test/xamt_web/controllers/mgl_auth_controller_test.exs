@@ -131,15 +131,17 @@ defmodule XamtWeb.MglAuthControllerTest do
 
   test "GET account_link renders confirmation without binding", %{conn: conn} do
     user = user_fixture()
-    token = Accounts.generate_user_session_token(user)
 
     conn =
       conn
-      |> init_test_session(%{:user_token => token})
+      |> log_in_user(user)
       |> get(~p"/account/link", %{"token" => "init-token", "provider" => "xamt"})
 
-    assert html_response(conn, 200) =~ ~s(id="account-link-form")
-    assert html_response(conn, 200) =~ user.username
+    html = html_response(conn, 200)
+    assert html =~ ~s(id="account-link-confirm-form")
+    assert html =~ user.username
+    refute html =~ "init-token"
+    assert get_session(conn, :mgl_pending_account_link)["token"] == "init-token"
     assert is_nil(Accounts.get_mgl_identity(user))
   end
 
@@ -148,15 +150,20 @@ defmodule XamtWeb.MglAuthControllerTest do
     amjil_user_id = Ecto.UUID.generate()
     stub_account_link_confirm(amjil_user_id, "mgl_user")
 
-    token = Accounts.generate_user_session_token(user)
-
     conn =
       conn
-      |> init_test_session(%{:user_token => token})
-      |> post(~p"/account/link", %{"token" => "init-token", "provider" => "xamt"})
+      |> log_in_user(user)
+      |> get(~p"/account/link", %{"token" => "init-token", "provider" => "xamt"})
+
+    html = html_response(conn, 200)
+    assert html =~ ~s(id="account-link-confirm-form")
+    [_, link_nonce] = Regex.run(~r/name="link_nonce" value="([^"]+)"/, html)
+
+    conn = post(conn, ~p"/account/link", %{"link_nonce" => link_nonce})
 
     assert redirected_to(conn) == ~p"/settings"
-    assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "connected"
+    assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "connected successfully"
+    assert is_nil(get_session(conn, :mgl_pending_account_link))
 
     identity = Accounts.get_mgl_identity(user)
     assert identity
@@ -165,16 +172,52 @@ defmodule XamtWeb.MglAuthControllerTest do
     assert identity.issuer == String.trim_trailing(MglId.issuer(), "/")
   end
 
+  test "POST account_link rejects replay after session is consumed", %{conn: conn} do
+    user = user_fixture()
+    amjil_user_id = Ecto.UUID.generate()
+    stub_account_link_confirm(amjil_user_id, "mgl_user")
+
+    conn =
+      conn
+      |> log_in_user(user)
+      |> get(~p"/account/link", %{"token" => "init-token", "provider" => "xamt"})
+
+    html = html_response(conn, 200)
+    [_, link_nonce] = Regex.run(~r/name="link_nonce" value="([^"]+)"/, html)
+
+    conn = post(conn, ~p"/account/link", %{"link_nonce" => link_nonce})
+    assert redirected_to(conn) == ~p"/settings"
+    assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "connected successfully"
+
+    conn = post(conn, ~p"/account/link", %{"link_nonce" => link_nonce})
+    assert redirected_to(conn) == ~p"/settings"
+    assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "expired"
+  end
+
+  test "POST account_link rejects mismatched nonce", %{conn: conn} do
+    user = user_fixture()
+
+    conn =
+      conn
+      |> log_in_user(user)
+      |> get(~p"/account/link", %{"token" => "init-token", "provider" => "xamt"})
+
+    assert html_response(conn, 200)
+
+    conn = post(conn, ~p"/account/link", %{"link_nonce" => "wrong-nonce-value!!!!"})
+    assert redirected_to(conn) == ~p"/settings"
+    assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "expired"
+    assert is_nil(Accounts.get_mgl_identity(user))
+  end
+
   test "GET account_link soft-succeeds when user already linked", %{conn: conn} do
     user = user_fixture()
     claims = MglIdHelpers.default_claims()
     assert {:ok, _} = Accounts.link_mgl_identity(user, claims)
 
-    token = Accounts.generate_user_session_token(user)
-
     conn =
       conn
-      |> init_test_session(%{:user_token => token})
+      |> log_in_user(user)
       |> get(~p"/account/link", %{"token" => "init-token", "provider" => "xamt"})
 
     assert redirected_to(conn) == ~p"/settings"
@@ -183,27 +226,29 @@ defmodule XamtWeb.MglAuthControllerTest do
 
   test "POST account_link rejects when user already linked", %{conn: conn} do
     user = user_fixture()
-    claims = MglIdHelpers.default_claims()
-    assert {:ok, _} = Accounts.link_mgl_identity(user, claims)
-
-    token = Accounts.generate_user_session_token(user)
 
     conn =
       conn
-      |> init_test_session(%{:user_token => token})
-      |> post(~p"/account/link", %{"token" => "init-token", "provider" => "xamt"})
+      |> log_in_user(user)
+      |> get(~p"/account/link", %{"token" => "init-token", "provider" => "xamt"})
 
+    html = html_response(conn, 200)
+    [_, link_nonce] = Regex.run(~r/name="link_nonce" value="([^"]+)"/, html)
+
+    claims = MglIdHelpers.default_claims()
+    assert {:ok, _} = Accounts.link_mgl_identity(user, claims)
+
+    conn = post(conn, ~p"/account/link", %{"link_nonce" => link_nonce})
     assert redirected_to(conn) == ~p"/settings"
     assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "already connected"
   end
 
   test "GET account_link rejects missing token", %{conn: conn} do
     user = user_fixture()
-    token = Accounts.generate_user_session_token(user)
 
     conn =
       conn
-      |> init_test_session(%{:user_token => token})
+      |> log_in_user(user)
       |> get(~p"/account/link", %{"provider" => "xamt"})
 
     assert redirected_to(conn) == ~p"/settings"

@@ -114,10 +114,15 @@ defmodule XamtWeb.MglAuthController do
     end
   end
 
+  @pending_link_session_key :mgl_pending_account_link
+  @pending_link_ttl_seconds 300
+
   @doc """
-  Renders a confirmation page for Mgl ID → Xamt account-link redirects
-  (`?token=&provider=xamt`). Binding only happens on POST `/account/link`
-  so a forged top-level GET cannot hijack the signed-in session.
+  GET `/account/link?token=...&provider=xamt`
+
+  Validates preconditions, stores the initiation token in the session bound to
+  the signed-in user, and renders a confirmation scroll so a cross-site GET
+  cannot silently link an attacker's Mgl ID.
   """
   def account_link_confirm(conn, params) do
     user = current_user(conn)
@@ -135,12 +140,7 @@ defmodule XamtWeb.MglAuthController do
         |> put_flash(:error, gettext("You must log in before connecting Mgl ID."))
         |> redirect(to: ~p"/login")
 
-      not is_binary(token) or token == "" ->
-        conn
-        |> put_flash(:error, gettext("Invalid Mgl ID link request."))
-        |> redirect(to: ~p"/settings")
-
-      provider != "xamt" ->
+      provider != "xamt" or not is_binary(token) or token == "" ->
         conn
         |> put_flash(:error, gettext("Invalid Mgl ID link request."))
         |> redirect(to: ~p"/settings")
@@ -153,23 +153,41 @@ defmodule XamtWeb.MglAuthController do
         |> redirect(to: ~p"/settings")
 
       true ->
-        render(conn, :account_link_confirm,
-          token: token,
-          provider: provider,
-          user: user,
-          page_title: gettext("Connect Mgl ID")
+        link_nonce = :crypto.strong_rand_bytes(16) |> Base.url_encode64(padding: false)
+
+        pending = %{
+          "nonce" => link_nonce,
+          "token" => token,
+          "provider" => provider,
+          "user_id" => to_string(user.id),
+          "expires_at" =>
+            DateTime.utc_now()
+            |> DateTime.add(@pending_link_ttl_seconds, :second)
+            |> DateTime.to_iso8601()
+        }
+
+        conn
+        |> put_session(@pending_link_session_key, pending)
+        |> put_resp_header("cache-control", "no-store")
+        |> put_resp_header("referrer-policy", "no-referrer")
+        |> render(:account_link_confirm,
+          page_title: gettext("Connect Mgl ID"),
+          current_user: user,
+          link_nonce: link_nonce
         )
     end
   end
 
   @doc """
-  Completes the account link after the user confirms on the GET page.
-  Requires CSRF (via `protect_from_forgery`) so cross-site GET CSRF cannot bind.
+  POST `/account/link`
+
+  Consumes the session-bound initiation token after CSRF verification and
+  completes the Mgl ID → Xamt account link.
   """
   def account_link(conn, params) do
     user = current_user(conn)
-    token = params["token"]
-    provider = params["provider"] || "xamt"
+    pending = get_session(conn, @pending_link_session_key)
+    conn = delete_session(conn, @pending_link_session_key)
 
     cond do
       not MglId.enabled?() ->
@@ -182,13 +200,13 @@ defmodule XamtWeb.MglAuthController do
         |> put_flash(:error, gettext("You must log in before connecting Mgl ID."))
         |> redirect(to: ~p"/login")
 
-      not is_binary(token) or token == "" ->
+      not valid_pending_link?(pending, user, params["link_nonce"]) ->
         conn
-        |> put_flash(:error, gettext("Invalid Mgl ID link request."))
+        |> put_flash(:error, gettext("Mgl ID link expired. Please try again."))
         |> redirect(to: ~p"/settings")
 
       true ->
-        case Auth.complete_account_link(user, token, provider) do
+        case Auth.complete_account_link(user, pending["token"], pending["provider"]) do
           {:ok, _user} ->
             conn
             |> put_flash(:info, gettext("Mgl ID connected successfully."))
@@ -312,6 +330,36 @@ defmodule XamtWeb.MglAuthController do
       _ -> nil
     end
   end
+
+  defp valid_pending_link?(
+         %{
+           "nonce" => expected_nonce,
+           "token" => token,
+           "provider" => provider,
+           "user_id" => expected_user_id,
+           "expires_at" => iso
+         },
+         user,
+         submitted_nonce
+       )
+       when is_binary(token) and token != "" and is_binary(provider) and
+              is_binary(submitted_nonce) do
+    nonce_ok? =
+      byte_size(expected_nonce) == byte_size(submitted_nonce) and
+        Plug.Crypto.secure_compare(expected_nonce, submitted_nonce)
+
+    user_ok? = expected_user_id == to_string(user.id)
+
+    not_expired? =
+      case DateTime.from_iso8601(iso) do
+        {:ok, expires_at, _} -> DateTime.compare(DateTime.utc_now(), expires_at) != :gt
+        _ -> false
+      end
+
+    nonce_ok? and user_ok? and not_expired?
+  end
+
+  defp valid_pending_link?(_, _, _), do: false
 
   defp oauth_error_message("access_denied", _),
     do: gettext("Mgl ID login was cancelled.")

@@ -1,5 +1,6 @@
 <Layouts.home flash={@flash} current_scope={@current_scope}>
   <main id="account-link-panel" class="xamt-home-canvas" phx-hook="MongolianScroll">
+    <%!-- Section 1: Current Xamt account identity and security notice --%>
     <aside class="xamt-home-section">
       <header class="xamt-home-section__header">
         <div class="flex flex-row items-center gap-2">
@@ -11,56 +12,77 @@
       </header>
 
       <div class="xamt-home-card justify-between">
+        <%!-- Column 1: Ornament and identity pill --%>
         <div class="flex flex-row items-center gap-3 h-full">
           <span class="xamt-ornament !h-12" aria-hidden="true"></span>
-          <p class="xamt-kicker mongol-text">{gettext("Confirm account link")}</p>
-          <p class="text-sm text-[var(--xamt-muted)] mongol-text leading-relaxed">
-            {gettext(
-              "Connect your Mgl ID to the signed-in Xamt account @%{username}. Only continue if you started this link yourself.",
-              username: @user.username
-            )}
-          </p>
+          <p class="xamt-kicker mongol-text">{gettext("Account Link")}</p>
+
+          <div class="flex flex-row items-center gap-2.5">
+            <.avatar
+              user={@current_user}
+              id="account-link-avatar"
+              class="xamt-avatar !w-10 !h-10 shrink-0"
+            />
+            <span class="font-bold text-base text-[var(--xamt-text)] mongol-text">
+              {User.display_name(@current_user)}
+            </span>
+            <span class="text-xs text-[var(--xamt-muted)] xamt-profile__username">
+              @{@current_user.username}
+            </span>
+          </div>
         </div>
+
+        <%!-- Column 2: Ownership warning --%>
+        <p class="text-sm text-[var(--xamt-muted)] mongol-text leading-relaxed h-full px-1">
+          {gettext(
+            "Only confirm if you initiated this link from Mgl ID. Once connected, that Mgl ID will sign in to this Xamt account."
+          )}
+        </p>
       </div>
     </aside>
 
+    <%!-- Section 2: Explicit POST confirmation form --%>
     <section class="xamt-home-section">
       <header class="xamt-home-section__header">
         <div class="flex flex-row items-center gap-2">
-          <.icon name="hero-identification" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
+          <.icon name="hero-shield-check" class="w-5 h-5 text-[var(--xamt-accent)] shrink-0" />
           <h2 class="font-bold text-sm mongol-text">{gettext("Confirm")}</h2>
         </div>
       </header>
 
-      <div class="xamt-home-card gap-3">
-        <.form
-          for={%{}}
-          action={~p"/account/link"}
-          method="post"
-          id="account-link-form"
-          class="flex flex-col gap-3 h-full"
-        >
-          <input type="hidden" name="token" value={@token} />
-          <input type="hidden" name="provider" value={@provider} />
+      <.form
+        for={%{}}
+        action={~p"/account/link"}
+        method="post"
+        id="account-link-confirm-form"
+        class="xamt-home-card"
+      >
+        <input type="hidden" name="link_nonce" value={@link_nonce} />
 
+        <p class="text-sm text-[var(--xamt-muted)] mongol-text leading-relaxed h-full">
+          {gettext("Connect your Mgl ID to use unified sign-in across Mgl products.")}
+        </p>
+
+        <div class="flex flex-row items-center gap-3 h-full">
           <button
             type="submit"
-            id="account-link-confirm"
+            id="confirm-account-link"
             class="xamt-btn xamt-btn--primary h-full px-3.5 font-bold text-xs mongol-text"
           >
-            <.icon name="hero-check" class="w-4 h-4 mb-1.5" />
-            <span>{gettext("Connect to @%{username}", username: @user.username)}</span>
+            <.icon name="hero-check-badge" class="w-4 h-4 mb-1.5" />
+            <span>{gettext("Confirm and connect")}</span>
           </button>
-        </.form>
 
-        <.link
-          href={~p"/settings"}
-          id="account-link-cancel"
-          class="xamt-btn h-full px-3.5 font-bold text-xs mongol-text"
-        >
-          <span>{gettext("Cancel")}</span>
-        </.link>
-      </div>
+          <.link
+            href={~p"/settings"}
+            id="cancel-account-link"
+            class="xamt-btn xamt-btn--soft h-full px-3 text-xs font-bold mongol-text"
+          >
+            <.icon name="hero-x-mark" class="w-4 h-4 mb-1.5" />
+            <span>{gettext("Cancel")}</span>
+          </.link>
+        </div>
+      </.form>
     </section>
   </main>
 </Layouts.home>
