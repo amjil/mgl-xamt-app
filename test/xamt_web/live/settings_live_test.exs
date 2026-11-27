@@ -66,7 +66,7 @@ defmodule XamtWeb.SettingsLiveTest do
       view
       |> element("button[phx-click='revoke_all_sessions']")
       |> render_click()
-      |> follow_redirect(conn, ~p"/users/log-in")
+      |> follow_redirect(conn, ~p"/login")
 
     assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "logged out"
     assert Accounts.get_user_by_session_token(get_session(conn, :user_token)) == nil

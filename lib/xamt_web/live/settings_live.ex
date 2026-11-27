@@ -119,7 +119,7 @@ defmodule XamtWeb.SettingsLive do
     {:noreply,
      socket
      |> put_flash(:info, gettext("All sessions have been logged out. Please log in again."))
-     |> redirect(to: ~p"/users/log-in")}
+     |> redirect(to: ~p"/login")}
   end
 
   defp upload_error_to_string(:too_large), do: gettext("File is too large")

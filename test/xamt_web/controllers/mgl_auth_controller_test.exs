@@ -129,11 +129,8 @@ defmodule XamtWeb.MglAuthControllerTest do
     assert redirected_to(conn) in [~p"/users/log-in", ~p"/login"]
   end
 
-  test "account_link confirms with mgl-id and stores local identity", %{conn: conn} do
+  test "GET account_link renders confirmation without binding", %{conn: conn} do
     user = user_fixture()
-    amjil_user_id = Ecto.UUID.generate()
-    stub_account_link_confirm(amjil_user_id)
-
     token = Accounts.generate_user_session_token(user)
 
     conn =
@@ -141,16 +138,34 @@ defmodule XamtWeb.MglAuthControllerTest do
       |> init_test_session(%{:user_token => token})
       |> get(~p"/account/link", %{"token" => "init-token", "provider" => "xamt"})
 
+    assert html_response(conn, 200) =~ ~s(id="account-link-form")
+    assert html_response(conn, 200) =~ user.username
+    assert is_nil(Accounts.get_mgl_identity(user))
+  end
+
+  test "POST account_link confirms with mgl-id and stores local identity", %{conn: conn} do
+    user = user_fixture()
+    amjil_user_id = Ecto.UUID.generate()
+    stub_account_link_confirm(amjil_user_id, "mgl_user")
+
+    token = Accounts.generate_user_session_token(user)
+
+    conn =
+      conn
+      |> init_test_session(%{:user_token => token})
+      |> post(~p"/account/link", %{"token" => "init-token", "provider" => "xamt"})
+
     assert redirected_to(conn) == ~p"/settings"
     assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "connected"
 
     identity = Accounts.get_mgl_identity(user)
     assert identity
     assert identity.subject == amjil_user_id
+    assert identity.provider_username == "mgl_user"
     assert identity.issuer == String.trim_trailing(MglId.issuer(), "/")
   end
 
-  test "account_link rejects when user already linked", %{conn: conn} do
+  test "GET account_link soft-succeeds when user already linked", %{conn: conn} do
     user = user_fixture()
     claims = MglIdHelpers.default_claims()
     assert {:ok, _} = Accounts.link_mgl_identity(user, claims)
@@ -163,10 +178,26 @@ defmodule XamtWeb.MglAuthControllerTest do
       |> get(~p"/account/link", %{"token" => "init-token", "provider" => "xamt"})
 
     assert redirected_to(conn) == ~p"/settings"
+    assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "already connected"
+  end
+
+  test "POST account_link rejects when user already linked", %{conn: conn} do
+    user = user_fixture()
+    claims = MglIdHelpers.default_claims()
+    assert {:ok, _} = Accounts.link_mgl_identity(user, claims)
+
+    token = Accounts.generate_user_session_token(user)
+
+    conn =
+      conn
+      |> init_test_session(%{:user_token => token})
+      |> post(~p"/account/link", %{"token" => "init-token", "provider" => "xamt"})
+
+    assert redirected_to(conn) == ~p"/settings"
     assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "already connected"
   end
 
-  test "account_link rejects missing token", %{conn: conn} do
+  test "GET account_link rejects missing token", %{conn: conn} do
     user = user_fixture()
     token = Accounts.generate_user_session_token(user)
 
@@ -209,7 +240,7 @@ defmodule XamtWeb.MglAuthControllerTest do
     end)
   end
 
-  defp stub_account_link_confirm(amjil_user_id) do
+  defp stub_account_link_confirm(amjil_user_id, preferred_username) do
     Req.Test.stub(Xamt.MglId, fn conn ->
       case {conn.method, conn.request_path} do
         {"POST", "/api/v1/account-links/confirm"} ->
@@ -217,6 +248,7 @@ defmodule XamtWeb.MglAuthControllerTest do
             "data" => %{
               "user_id" => amjil_user_id,
               "amjil_user_id" => amjil_user_id,
+              "preferred_username" => preferred_username,
               "link" => %{
                 "id" => Ecto.UUID.generate(),
                 "provider" => "xamt",

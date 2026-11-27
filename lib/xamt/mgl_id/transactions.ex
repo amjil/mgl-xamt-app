@@ -7,7 +7,8 @@ defmodule Xamt.MglId.Transactions do
   """
 
   @session_key :mgl_oidc_txns
-  @max_txns 8
+  # Keep this small: each txn holds a PKCE verifier + nonce in the cookie session.
+  @max_txns 4
 
   def session_key, do: @session_key
 

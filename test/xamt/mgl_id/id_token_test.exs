@@ -29,6 +29,14 @@ defmodule Xamt.MglId.IdTokenTest do
              IdToken.verify(token, nonce: "other")
   end
 
+  test "rejects missing expected nonce", %{jwk: jwk} do
+    claims = MglIdHelpers.default_claims() |> Map.delete("nonce")
+    token = MglIdHelpers.sign_id_token(jwk, claims)
+
+    assert {:error, :missing_expected_nonce} = IdToken.verify(token, nonce: nil)
+    assert {:error, :missing_expected_nonce} = IdToken.verify(token, nonce: "")
+  end
+
   test "rejects expired token", %{jwk: jwk} do
     now = System.system_time(:second)
 

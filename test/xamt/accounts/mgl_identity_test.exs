@@ -90,4 +90,32 @@ defmodule Xamt.Accounts.MglIdentityTest do
     assert user.username == "NoMailUser"
     assert Accounts.get_mgl_identity(user)
   end
+
+  test "provisions a readable username for traditional Mongolian names" do
+    claims =
+      MglIdHelpers.default_claims(%{
+        "sub" => Ecto.UUID.generate(),
+        "name" => "ᠮᠣᠩᠭᠣᠯ",
+        "preferred_username" => "ᠮᠣᠩᠭᠣᠯ"
+      })
+
+    assert {:ok, user} = Accounts.provision_user_from_mgl(claims)
+    assert String.starts_with?(user.username, "mgl_")
+    refute String.match?(user.username, ~r/^_+$/)
+    assert String.length(user.username) >= 3
+  end
+
+  test "truncates long display names on provision" do
+    long_name = String.duplicate("あ", 150)
+
+    claims =
+      MglIdHelpers.default_claims(%{
+        "sub" => Ecto.UUID.generate(),
+        "name" => long_name,
+        "preferred_username" => "longnameuser"
+      })
+
+    assert {:ok, user} = Accounts.provision_user_from_mgl(claims)
+    assert String.length(user.display_name) == 100
+  end
 end

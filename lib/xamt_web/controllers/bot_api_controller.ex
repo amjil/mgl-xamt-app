@@ -479,7 +479,7 @@ defmodule XamtWeb.BotApiController do
       author_type: if(match?(%{user: %{is_bot: true}}, message), do: "bot", else: "user"),
       deleted_at: message.deleted_at,
       inserted_at: message.inserted_at,
-      updated_at: message.inserted_at && message.updated_at
+      updated_at: message.updated_at
     }
   end
 

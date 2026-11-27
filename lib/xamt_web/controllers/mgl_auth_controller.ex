@@ -1,6 +1,7 @@
 defmodule XamtWeb.MglAuthController do
   use XamtWeb, :controller
 
+  alias Xamt.Accounts
   alias Xamt.MglId
   alias Xamt.MglId.{Auth, Client, Transactions}
   alias XamtWeb.UserAuth
@@ -114,10 +115,56 @@ defmodule XamtWeb.MglAuthController do
   end
 
   @doc """
-  Receives Mgl ID → Xamt account-link redirects (`?token=&provider=xamt`).
+  Renders a confirmation page for Mgl ID → Xamt account-link redirects
+  (`?token=&provider=xamt`). Binding only happens on POST `/account/link`
+  so a forged top-level GET cannot hijack the signed-in session.
+  """
+  def account_link_confirm(conn, params) do
+    user = current_user(conn)
+    token = params["token"]
+    provider = params["provider"] || "xamt"
 
-  Placed behind `require_authenticated_user` so ownership is proven by the
-  existing Xamt session; unauthenticated users are sent to login with return_to.
+    cond do
+      not MglId.enabled?() ->
+        conn
+        |> put_flash(:error, gettext("Mgl ID login is disabled."))
+        |> redirect(to: ~p"/settings")
+
+      is_nil(user) ->
+        conn
+        |> put_flash(:error, gettext("You must log in before connecting Mgl ID."))
+        |> redirect(to: ~p"/login")
+
+      not is_binary(token) or token == "" ->
+        conn
+        |> put_flash(:error, gettext("Invalid Mgl ID link request."))
+        |> redirect(to: ~p"/settings")
+
+      provider != "xamt" ->
+        conn
+        |> put_flash(:error, gettext("Invalid Mgl ID link request."))
+        |> redirect(to: ~p"/settings")
+
+      Accounts.get_mgl_identity(user) ->
+        # Common after first-time Mgl ID login with return_to=/account/link:
+        # provisioning already linked this account. Treat as done.
+        conn
+        |> put_flash(:info, gettext("This Xamt account is already connected to Mgl ID."))
+        |> redirect(to: ~p"/settings")
+
+      true ->
+        render(conn, :account_link_confirm,
+          token: token,
+          provider: provider,
+          user: user,
+          page_title: gettext("Connect Mgl ID")
+        )
+    end
+  end
+
+  @doc """
+  Completes the account link after the user confirms on the GET page.
+  Requires CSRF (via `protect_from_forgery`) so cross-site GET CSRF cannot bind.
   """
   def account_link(conn, params) do
     user = current_user(conn)

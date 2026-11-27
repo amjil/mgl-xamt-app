@@ -98,12 +98,25 @@ defmodule Xamt.MglId.Auth do
   defp claims_from_confirm(%{"data" => data}) when is_map(data) do
     subject = data["amjil_user_id"] || data["user_id"]
 
+    preferred =
+      data["preferred_username"] ||
+        get_in(data, ["user", "preferred_username"]) ||
+        get_in(data, ["link", "preferred_username"])
+
     if is_binary(subject) and subject != "" do
-      {:ok,
-       %{
-         "sub" => subject,
-         "iss" => MglId.issuer() |> String.trim_trailing("/")
-       }}
+      claims = %{
+        "sub" => subject,
+        "iss" => MglId.issuer() |> String.trim_trailing("/")
+      }
+
+      claims =
+        if is_binary(preferred) and preferred != "" do
+          Map.put(claims, "preferred_username", preferred)
+        else
+          claims
+        end
+
+      {:ok, claims}
     else
       {:error, :missing_amjil_user_id}
     end
@@ -138,6 +151,14 @@ defmodule Xamt.MglId.Auth do
           {:ok, user} ->
             emit("auth.mgl.identity.created", user, claims)
             {:ok, user}
+
+          # Concurrent first-login / double-submit: identity was inserted by a
+          # racing request — re-query so login stays idempotent.
+          {:error, :identity_conflict} ->
+            case Accounts.get_user_by_mgl_identity(issuer, subject) do
+              %{user: user} -> {:ok, user}
+              nil -> {:error, :identity_conflict}
+            end
 
           {:error, reason} ->
             {:error, reason}

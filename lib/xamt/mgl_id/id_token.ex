@@ -15,22 +15,23 @@ defmodule Xamt.MglId.IdToken do
   Verifies the JWT signature and required claims.
 
   Options:
-    * `:nonce` - required expected nonce
+    * `:nonce` - required expected nonce (non-empty binary)
     * `:force_jwks` - bypass JWKS cache
   """
   def verify(id_token, opts \\ []) when is_binary(id_token) do
     expected_nonce = Keyword.fetch!(opts, :nonce)
     force_jwks? = Keyword.get(opts, :force_jwks, false)
 
-    with {:ok, header} <- peek_header(id_token),
+    with :ok <- require_expected_nonce(expected_nonce),
+         {:ok, header} <- peek_header(id_token),
          :ok <- validate_alg(header),
          {:ok, jwk} <- resolve_jwk(header, force_jwks?),
          {:ok, claims} <- verify_signature(id_token, jwk),
          :ok <- validate_claims(claims, expected_nonce) do
       {:ok, claims}
     else
-      {:error, :unknown_kid} ->
-        # One refresh retry for key rotation.
+      # Only refresh JWKS when we have not already forced a fetch.
+      {:error, :unknown_kid} when not force_jwks? ->
         with {:ok, header} <- peek_header(id_token),
              {:ok, jwk} <- resolve_jwk(header, true),
              {:ok, claims} <- verify_signature(id_token, jwk),
@@ -47,6 +48,9 @@ defmodule Xamt.MglId.IdToken do
         error
     end
   end
+
+  defp require_expected_nonce(nonce) when is_binary(nonce) and nonce != "", do: :ok
+  defp require_expected_nonce(_), do: {:error, :missing_expected_nonce}
 
   defp peek_header(id_token) do
     try do
@@ -92,7 +96,7 @@ defmodule Xamt.MglId.IdToken do
 
   defp fetch_jwks(true) do
     with {:ok, uri} <- Discovery.jwks_uri(),
-         {:ok, %{status: 200, body: body}} <-
+         {:ok, %{status: 200, body: body}} when is_map(body) <-
            Req.get(uri, Keyword.merge([decode_body: true], MglId.req_options())),
          keys when is_list(keys) <- Map.get(body, "keys") do
       :ok = Cache.put(@jwks_cache_key, body, @jwks_ttl_ms)

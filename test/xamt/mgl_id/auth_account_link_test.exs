@@ -12,12 +12,13 @@ defmodule Xamt.MglId.AuthAccountLinkTest do
 
   test "complete_account_link confirms and stores identity", %{user: user} do
     amjil_user_id = Ecto.UUID.generate()
-    stub_confirm(amjil_user_id)
+    stub_confirm(amjil_user_id, "readable_name")
 
     assert {:ok, ^user} = Auth.complete_account_link(user, "init-token", "xamt")
 
     identity = Accounts.get_mgl_identity(user)
     assert identity.subject == amjil_user_id
+    assert identity.provider_username == "readable_name"
     assert identity.issuer == String.trim_trailing(MglId.issuer(), "/")
   end
 
@@ -48,12 +49,13 @@ defmodule Xamt.MglId.AuthAccountLinkTest do
              Auth.complete_account_link(user, "expired", "xamt")
   end
 
-  defp stub_confirm(amjil_user_id) do
+  defp stub_confirm(amjil_user_id, preferred_username) do
     Req.Test.stub(Xamt.MglId, fn conn ->
       Req.Test.json(conn, %{
         "data" => %{
           "user_id" => amjil_user_id,
           "amjil_user_id" => amjil_user_id,
+          "preferred_username" => preferred_username,
           "link" => %{"provider" => "xamt"}
         },
         "meta" => %{}

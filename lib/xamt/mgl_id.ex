@@ -63,10 +63,21 @@ defmodule Xamt.MglId do
   end
 
   @doc """
-  Extra Req options (e.g. `plug: {Req.Test, ...}` in tests).
+  Default Req options merged with config overrides
+  (e.g. `plug: {Req.Test, ...}` in tests).
+
+  Timeouts and `retry: false` prevent a flaky IdP from blocking a login
+  callback for the Req default of ~45s (3 retries × 15s).
   """
   def req_options do
-    Keyword.get(config(), :req_options, [])
+    defaults = [
+      receive_timeout: 5_000,
+      connect_options: [timeout: 3_000],
+      retry: false,
+      redirect: false
+    ]
+
+    Keyword.merge(defaults, Keyword.get(config(), :req_options, []))
   end
 
   defp normalize_scopes(scopes) when is_binary(scopes) do

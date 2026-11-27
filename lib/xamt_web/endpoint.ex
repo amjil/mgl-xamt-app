@@ -1,13 +1,14 @@
 defmodule XamtWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :xamt
 
-  # The session will be stored in the cookie and signed,
-  # this means its contents can be read but not tampered with.
-  # Set :encryption_salt if you would also like to encrypt it.
+  # Cookie session is signed and encrypted so OIDC PKCE verifiers / nonces
+  # stored in the session cannot be read from the client-side cookie.
+  # Adding encryption_salt invalidates existing signed-only sessions.
   @session_options [
     store: :cookie,
     key: "_xamt_key",
     signing_salt: "SshzUNs1",
+    encryption_salt: "xamt sess enc",
     same_site: "Lax",
     secure: Application.compile_env(:xamt, :secure_cookies, false)
   ]

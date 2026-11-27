@@ -279,7 +279,7 @@ defmodule Xamt.Accounts do
   """
   def provision_user_from_mgl(claims) when is_map(claims) do
     preferred = claims["preferred_username"] || claims["name"]
-    display_name = claims["name"]
+    display_name = truncate_display_name(claims["name"])
 
     if is_binary(claims["sub"]) and claims["sub"] != "" do
       Repo.transact(fn ->
@@ -301,6 +301,9 @@ defmodule Xamt.Accounts do
       {:error, :missing_sub}
     end
   end
+
+  defp truncate_display_name(name) when is_binary(name), do: String.slice(name, 0, 100)
+  defp truncate_display_name(_), do: nil
 
   @doc """
   Links a verified Mgl identity to an existing local user.
@@ -368,17 +371,24 @@ defmodule Xamt.Accounts do
       preferred
       |> to_string()
       |> String.trim()
-      |> case do
-        "" -> "user"
-        value -> value
-      end
-      |> String.replace(~r/[^a-zA-Z0-9_]/, "_")
+      |> String.replace(~r/[^a-zA-Z0-9_]+/, "_")
+      |> String.trim("_")
       |> String.slice(0, 24)
 
     base =
       cond do
-        String.length(base) < 3 -> base <> String.duplicate("0", 3 - String.length(base))
-        true -> base
+        # Traditional Mongolian / non-Latin names become empty or all underscores.
+        not Regex.match?(~r/[a-zA-Z0-9]/, base) ->
+          "mgl_" <>
+            (:crypto.strong_rand_bytes(4)
+             |> Base.url_encode64(padding: false)
+             |> String.replace("-", "_"))
+
+        String.length(base) < 3 ->
+          base <> String.duplicate("0", 3 - String.length(base))
+
+        true ->
+          base
       end
 
     find_unique_username(base, 0)

@@ -55,6 +55,7 @@ defmodule Xamt.Accounts.User do
     user
     |> cast(attrs, [:username, :display_name])
     |> validate_required([:username])
+    |> validate_length(:display_name, max: 100)
     |> validate_username(opts)
     |> put_change(:confirmed_at, DateTime.utc_now(:second))
   end
